@@ -11,8 +11,9 @@
 #include "DEV_Config.h"
 #include "EPD.h"
 #include "GUI_Paint.h"
-#include "imagedata.h"
+// #include "imagedata.h"
 #include <stdlib.h>
+#include <SPIFFS.h>
 
 static const char *TAG = "bl.cpp";
 
@@ -20,6 +21,7 @@ bool pref_clear = false;
 WiFiManager wifi_manager;
 bool wm_nonblocking = false; // change to true to use non blocking
 char filename[100];
+uint8_t buffer[48130];
 static void downloadAndSaveToFile(const char *url);
 bool status = false;
 
@@ -113,21 +115,92 @@ void downloadAndSaveToFile(const char *url)
               Serial.print("Content-Size: ");
               Serial.println(https.getSize());
 
-              WiFiClient* stream = https.getStreamPtr();
+              WiFiClient *stream = https.getStreamPtr();
 
               uint32_t counter = 0;
-              while (stream->available())
+              // Read and save BMP data to SPIFFS
+
+              // Find the last occurrence of '/'
+              const char *lastSlash = strrchr(filename, '/');
+              String bmp_name;
+              if (lastSlash != nullptr)
               {
-                Serial.print("0x");
-                Serial.print(stream->read(), HEX);
-                Serial.print(",");
-                counter++;
-                if(counter % 30 == 0)
-                  Serial.println();
-                //delay(1);
+                // Extract the filename (substring after the last '/')
+                bmp_name = lastSlash;
+
+                Serial.print("Filename: ");
+                Serial.println(bmp_name);
               }
-              Serial.println();
-              Serial.println(counter);
+              else
+              {
+                Serial.println("Invalid file path");
+              }
+              if (!SPIFFS.exists(bmp_name))
+              {
+                File file = SPIFFS.open(bmp_name, "w");
+                if (stream->available() && https.getSize() == sizeof(buffer))
+                {
+                  /*Serial.print("0x");
+                  Serial.print(stream->read(), HEX);
+                  Serial.print(",");
+                  */
+                  counter = stream->readBytes(buffer, sizeof(buffer));
+                  file.write(buffer, sizeof(buffer));
+                }
+                file.close();
+                if (counter == sizeof(buffer))
+                {
+                  Serial.print("Written succes: ");
+                  Serial.println(counter);
+                  Serial.println("Time to draw");
+                  //EPD_7IN5_V2_Clear();
+                  //DEV_Delay_ms(500);
+                  // Create a new image cache
+                  UBYTE *BlackImage;
+                  /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
+                  UWORD Imagesize = ((EPD_7IN5_V2_WIDTH % 8 == 0) ? (EPD_7IN5_V2_WIDTH / 8) : (EPD_7IN5_V2_WIDTH / 8 + 1)) * EPD_7IN5_V2_HEIGHT;
+                  if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
+                  {
+                    printf("Failed to apply for black memory...\r\n");
+                    while (1)
+                      ;
+                  }
+                  printf("Paint_NewImage\r\n");
+                  Paint_NewImage(BlackImage, EPD_7IN5_V2_WIDTH, EPD_7IN5_V2_HEIGHT, 0, WHITE);
+
+                  printf("show image for array\r\n");
+                  Paint_SelectImage(BlackImage);
+                  Serial.println("Select image");
+                  Paint_Clear(WHITE);
+                  Serial.println("clear");
+                  Paint_DrawBitMap(buffer + 130);
+                  Serial.println("Draw bitmap");
+                  EPD_7IN5_V2_Display(BlackImage);
+                  Serial.println("Display");
+                  printf("Goto Sleep...\r\n");
+                  DEV_Delay_ms(2000);
+                  //EPD_7IN5_V2_Sleep();
+                  free(BlackImage);
+                  BlackImage = NULL;
+                }
+                else
+                {
+                  Serial.print("File writing failed. Written: ");
+                  Serial.println(counter);
+                  if (SPIFFS.remove(bmp_name))
+                    Serial.println("File deleted");
+                  else
+                    Serial.println("File deleting error");
+                }
+              }
+              else
+              {
+                Serial.println("File exists");
+                if (SPIFFS.remove(bmp_name))
+                  Serial.println("File deleted");
+                else
+                  Serial.println("File deleting error");
+              }
             }
           }
           else
@@ -182,8 +255,14 @@ void bl_init(void)
     Log.error("%s [%d]: connected...\r\n)", TAG, __LINE__);
   }
 
-  // Download file and save to SPIFFS
-  downloadAndSaveToFile("https://usetrmnl.com");
+  // Mount SPIFFS
+  if (!SPIFFS.begin(true))
+  {
+    Serial.println("Failed to mount SPIFFS");
+    return;
+  }
+
+  Serial.println("SPIFFS mounted");
 
   printf("EPD_7IN5_V2_test Demo\r\n");
   DEV_Module_Init();
@@ -192,35 +271,9 @@ void bl_init(void)
   EPD_7IN5_V2_Init();
   EPD_7IN5_V2_Clear();
   DEV_Delay_ms(500);
+  // Download file and save to SPIFFS
+  downloadAndSaveToFile("https://usetrmnl.com");
 
-  // Create a new image cache
-  UBYTE *BlackImage;
-  /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
-  UWORD Imagesize = ((EPD_7IN5_V2_WIDTH % 8 == 0) ? (EPD_7IN5_V2_WIDTH / 8) : (EPD_7IN5_V2_WIDTH / 8 + 1)) * EPD_7IN5_V2_HEIGHT;
-  if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
-  {
-    printf("Failed to apply for black memory...\r\n");
-    while (1)
-      ;
-  }
-  printf("Paint_NewImage\r\n");
-  Paint_NewImage(BlackImage, EPD_7IN5_V2_WIDTH, EPD_7IN5_V2_HEIGHT, 0, WHITE);
-
-#if 1 // show image for array
-  printf("show image for array\r\n");
-  Paint_SelectImage(BlackImage);
-  Paint_Clear(WHITE);
-  Paint_DrawBitMap(gImage_7in5_V2);
-  EPD_7IN5_V2_Display(BlackImage);
-  DEV_Delay_ms(2000);
-#endif
-  printf("Clear...\r\n");
-  //EPD_7IN5_V2_Clear();
-
-  printf("Goto Sleep...\r\n");
-  EPD_7IN5_V2_Sleep();
-  free(BlackImage);
-  BlackImage = NULL;
 }
 
 /**
