@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "debug.h": "c",
+        "epd_3in52.h": "c"
+    }
+}

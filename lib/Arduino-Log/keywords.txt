@@ -1,0 +1,58 @@
+#######################################
+# Syntax Coloring Map ArduinoLog library
+#######################################
+
+#######################################
+#	Instances	(KEYWORD1)
+#######################################
+Logging	KEYWORD1
+Log	    KEYWORD1
+#######################################
+#	Datatypes	(KEYWORD1)
+#######################################
+
+#######################################
+#	Methods	and	Functions	(KEYWORD2)
+####################################### 
+fatal	KEYWORD2
+fatalln	KEYWORD2
+error	KEYWORD2
+errorln	KEYWORD2
+warning	KEYWORD2
+warningln	KEYWORD2
+info	KEYWORD2
+infoln	KEYWORD2
+notice	KEYWORD2
+noticeln	KEYWORD2
+trace 	KEYWORD2
+traceln 	KEYWORD2
+verbose	KEYWORD2
+verboseln	KEYWORD2
+begin	KEYWORD2
+setLevel	KEYWORD2
+getLevel	KEYWORD2
+setShowLevel	KEYWORD2
+getShowLevel	KEYWORD2
+setPrefix	KEYWORD2
+setSuffix	KEYWORD2
+clearPrefix	KEYWORD2
+clearSuffix	KEYWORD2
+
+#######################################
+#	Instances	(KEYWORD2)
+#######################################
+Logging	KEYWORD2
+Log	KEYWORD2
+
+#######################################
+#	Constants	(LITERAL1)
+#######################################
+LOG_LEVEL_SILENT	LITERAL1	Constants
+LOG_LEVEL_FATAL	LITERAL1	Constants
+LOG_LEVEL_ERROR	LITERAL1	Constants
+LOG_LEVEL_WARNING	LITERAL1	Constants
+LOG_LEVEL_NOTICE	LITERAL1	Constants
+LOG_LEVEL_INFO	LITERAL1	Constants
+LOG_LEVEL_TRACE	LITERAL1	Constants
+LOG_LEVEL_VERBOSE	LITERAL1	Constants
+

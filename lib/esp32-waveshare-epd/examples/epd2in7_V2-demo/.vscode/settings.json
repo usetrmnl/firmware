@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "epd_2in7_v2.h": "c",
+        "dev_config.h": "c"
+    }
+}

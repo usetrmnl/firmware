@@ -1,0 +1,32 @@
+{
+  "language": "c",
+  "before_install": [
+    "/sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_1.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :1 -ac -screen 0 1280x1024x16",
+    "sleep 3",
+    "export DISPLAY=:1.0",
+    "wget http://downloads.arduino.cc/arduino-1.8.1-linux64.tar.xz",
+    "wget http://downloads.arduino.cc/arduino-1.6.13-linux64.tar.xz", 
+    "tar xf arduino-1.6.13-linux64.tar.xz",
+    "tar xf arduino-1.8.1-linux64.tar.xz"
+  ],
+  "install": [    
+  ],
+  "script": [
+    "sudo cp -r arduino-1.6.13 /usr/local/share/arduino",
+    "sudo ln -s /usr/local/share/arduino/arduino /usr/local/bin/arduino",
+    "sudo ln -s $PWD /usr/local/share/arduino/libraries/ArduinoLog",    
+    "arduino --verify --board arduino:avr:uno $PWD/examples/Log-basic/Log-basic.ino"
+    "arduino --verify --board arduino:avr:uno $PWD/examples/Log-advanced/Log-advanced.ino"
+    
+    "sudo rm -rf /usr/local/share/arduino",
+    "sudo cp -r arduino-1.8.1 /usr/local/share/arduino",
+    "sudo rm /usr/local/bin/arduino",
+    "sudo ln -s /usr/local/share/arduino/arduino /usr/local/bin/arduino",
+    "sudo ln -s $PWD /usr/local/share/arduino/libraries/ArduinoLog",    
+    "arduino --verify --board arduino:avr:uno $PWD/examples/Log-basic/Log-basic.ino"
+    "arduino --verify --board arduino:avr:uno $PWD/examples/Log-advanced/Log-advanced.ino"
+  ],
+  "group": "stable",
+  "dist": "precise",
+  "os": "linux"
+}
