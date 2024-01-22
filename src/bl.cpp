@@ -15,16 +15,18 @@
 #include <stdlib.h>
 #include <SPIFFS.h>
 
+#include <ESPAsyncWebServer.h>
+#include <AsyncTCP.h>
+
 static const char *TAG = "bl.cpp";
 
 bool pref_clear = false;
-WiFiManager wifi_manager;
-bool wm_nonblocking = false; // change to true to use non blocking
+WiFiManager wm;
 char filename[100];
 uint8_t buffer[48130];
 static void downloadAndSaveToFile(const char *url);
 bool status = false;
-
+uint32_t timer = 0;
 static void configModeCallback(WiFiManager *myWiFiManager);
 
 void IRAM_ATTR button_reset_handler()
@@ -228,41 +230,6 @@ void downloadAndSaveToFile(const char *url)
   }
 }
 
-void test_init(void)
-{
-  // put your setup code here, to run once:
-  Serial.begin(115200);
-
-  // WiFiManager, Local intialization. Once its business is done, there is no need to keep it around
-  WiFiManager wm;
-
-  // reset settings - wipe stored credentials for testing
-  // these are stored by the esp library
-  wm.resetSettings();
-
-  // Automatically connect using saved credentials,
-  // if connection fails, it starts an access point with the specified name ( "AutoConnectAP"),
-  // if empty will auto generate SSID, if password is blank it will be anonymous AP (wm.autoConnect())
-  // then goes into a blocking loop awaiting configuration and will return success result
-  delay(4000);
-  Serial.println("Start AP");
-  wm.setConnectTimeout(15);
-  bool res;
-  // res = wm.autoConnect(); // auto generated AP name from chipid
-  // res = wm.autoConnect("AutoConnectAP"); // anonymous ap
-  res = wm.autoConnect("AutoConnectAP", "password"); // password protected ap
-
-  if (!res)
-  {
-    Serial.println("Failed to connect");
-    // ESP.restart();
-  }
-  else
-  {
-    // if you get here you have connected to the WiFi
-    Serial.println("connected...yeey :)");
-  }
-}
 
 /**
  * @brief Function to init business logic module
@@ -296,7 +263,7 @@ void bl_init(void)
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
 
   // DEV_Delay_ms(500);
-  if (wifi_manager.getWiFiIsSaved())
+  if (wm.getWiFiIsSaved())
   {
     Serial.println("WiFi saved");
   }
@@ -353,20 +320,35 @@ void bl_init(void)
     BlackImage = NULL;
   }
 
-  // wifi_manager.setConnectRetries(1);
-  wifi_manager.setConnectTimeout(10);
-  // wifi_manager.setBreakAfterConfig(true);
-  // wifi_manager.setAPCallback(configModeCallback);
-  // wifi_manager.setBreakAfterConfig(true);
-  // wifi_manager.setConfigPortalTimeout(10);
-  delay(3000);
-  Serial.println("Start AP");
-  bool res = wifi_manager.autoConnect("trmnl"); // password protected ap
-  Serial.print("SSID: ");
-  Serial.println(WiFi.SSID());
+  //wm.resetSettings();
+  // set dark theme
+  wm.setClass("invert");
+
+  wm.setConnectRetries(1);
+  // set static ip
+  //  wm.setSTAStaticIPConfig(IPAddress(10,0,1,99), IPAddress(10,0,1,1), IPAddress(255,255,255,0)); // set static ip,gw,sn
+  //  wm.setShowStaticFields(true); // force show static ip fields
+  //  wm.setShowDnsFields(true);    // force show dns field always
+
+  wm.setConnectTimeout(10); // how long to try to connect for before continuing
+  // wm.setConfigPortalTimeout(30); // auto close configportal after n seconds
+  // wm.setCaptivePortalEnable(false); // disable captive portal redirection
+  // wm.setAPClientCheck(true); // avoid timeout if client connected to softap
+
+  // wifi scan settings
+  // wm.setRemoveDuplicateAPs(false); // do not remove duplicate ap names (true)
+  // wm.setMinimumSignalQuality(20);  // set min RSSI (percentage) to show in scans, null = 8%
+  // wm.setShowInfoErase(false);      // do not show erase button on info page
+  // wm.setScanDispPerc(true);       // show RSSI as percentage not graph icons
+
+  wm.setBreakAfterConfig(true);       // always exit configportal even if wifi save fails
+  bool res = wm.autoConnect("trmnl"); // password protected ap
   if (!res)
   {
     Log.error("%s [%d]: Failed to connect or hit timeout\r\n", TAG, __LINE__);
+    wm.disconnect();
+    wm.stopWebPortal();
+
     // show logo with string
     if (!SPIFFS.exists("logo_white.bmp"))
     {
@@ -411,8 +393,9 @@ void bl_init(void)
     Paint_SelectImage(BlackImage);
     Paint_Clear(WHITE);
     Paint_DrawBitMap(buffer + 130);
-    Paint_DrawString_EN(150, 400, "Can't establsih WiFi connection with saved WiFi", &Font24, WHITE, BLACK);
-    Paint_DrawString_EN(175, 430, "Hold button on the back to reset WiFi", &Font24, WHITE, BLACK);
+    
+    Paint_DrawString_EN(0, 400, "Can't establsih WiFi connection with saved WiFi", &Font24, WHITE, BLACK);
+    Paint_DrawString_EN(75, 430, "Hold button on the back to reset WiFi", &Font24, WHITE, BLACK);
     EPD_7IN5_V2_Display(BlackImage);
     // DEV_Delay_ms(500);
     free(BlackImage);
@@ -423,8 +406,9 @@ void bl_init(void)
   else
   {
     // if you get here you have connected to the WiFi
-    Log.error("%s [%d]: connected...\r\n)", TAG, __LINE__);
+    Log.info("%s [%d]: connected...\r\n)", TAG, __LINE__);
   }
+  timer = millis();
 }
 
 /**
@@ -441,17 +425,19 @@ void bl_process(void)
   if (pref_clear)
   {
     pref_clear = false;
-    wifi_manager.resetSettings();
-    if (wifi_manager.getWiFiIsSaved())
+    wm.resetSettings();
+    if (wm.getWiFiIsSaved())
       Serial.println("WiFi saved");
     else
       Serial.println("WiFi NOT saved");
     ESP.restart();
   }
-
-  downloadAndSaveToFile("https://usetrmnl.com");
-
-  delay(10000);
+  if (WiFi.status() == WL_CONNECTED && (millis() - timer) > 10000)
+  {
+    Log.info("%s [%d]: WiFi connected\r\n", TAG, __LINE__);
+    downloadAndSaveToFile("https://usetrmnl.com");
+    timer = millis();
+  }
 }
 
 static void configModeCallback(WiFiManager *myWiFiManager)

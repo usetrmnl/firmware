@@ -1,6 +1,5 @@
 #include <Arduino.h>
 
-/* Includes ------------------------------------------------------------------*/
 #include "bl.h"
 #include "DEV_Config.h"
 #include "EPD.h"
@@ -17,14 +16,12 @@
 
 static const char *TAG = "main.cpp";
 
-/* Entry point ----------------------------------------------------------------*/
 void setup()
 {
-  //bl_init();
-  test_init();
+  bl_init();
+  //test_init();
 }
 
-/* The main loop -------------------------------------------------------------*/
 void loop()
 {
   bl_process();
