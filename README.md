@@ -4,7 +4,7 @@
 
 **Web Server Endpoints**
 
-following Wifi connection, swap Mac Address for API Key and Friendly ID.
+following Wifi connection, swap Mac Address for API Key and Friendly ID (which get saved on device).
 
 ```curl
 GET `/api/setup`
