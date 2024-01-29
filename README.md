@@ -28,7 +28,7 @@ headers = {
   'ID' => 'XX:XX:XX:XX',
   'Access-Token' => '2r--SahjsAKCFksVcped2Q',
   'Refresh-Rate' => '1800' 
-  'Battery-Voltage' => '' # not currently in use by web server
+  'Battery-Voltage' => '4100' # not currently in use by web server
   'FW-Version' => '0.1.3' 
 }
 
