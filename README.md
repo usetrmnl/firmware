@@ -14,7 +14,7 @@ headers = {
 }
 
 response example (success):
-{ "status" => 200, "api_key" => "2r--SahjsAKCFksVcped2Q", friendly_id: "917F0B" }
+{ "status" => 200, "api_key" => "2r--SahjsAKCFksVcped2Q", friendly_id: "917F0B", image_url: '/images/setup/setup-logo.png' }
 
 response example (fail, device with this Mac Address not found)
 { "status" => 404, "api_key" => nil, friendly_id: nil }
