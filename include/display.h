@@ -39,6 +39,13 @@ void display_show_image(uint8_t * image_buffer);
 void display_show_msg(uint8_t * image_buffer, MSG message_type);
 
 /**
+ * @brief Function to show the image with message on the display
+ * @param image_buffer - pointer to the uint8_t image buffer
+ * @return none
+ */
+void display_show_msg(uint8_t * image_buffer, MSG message_type, String friendly_id);
+
+/**
  * @brief Function to got the display to the sleep
  * @param none
  * @return none

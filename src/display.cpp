@@ -49,6 +49,7 @@ void display_show_image(uint8_t *image_buffer)
     UWORD Imagesize = ((EPD_7IN5_V2_WIDTH % 8 == 0) ? (EPD_7IN5_V2_WIDTH / 8) : (EPD_7IN5_V2_WIDTH / 8 + 1)) * EPD_7IN5_V2_HEIGHT;
     if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
     {
+        Log.error("%s [%d]: free heap - %d\r\n", TAG, __LINE__, ESP.getFreeHeap());
         Log.fatal("%s [%d]: Failed to apply for black memory...\r\n", TAG, __LINE__);
         while (1)
             ;
@@ -81,6 +82,7 @@ void display_show_msg(uint8_t * image_buffer, MSG message_type)
     UWORD Imagesize = ((EPD_7IN5_V2_WIDTH % 8 == 0) ? (EPD_7IN5_V2_WIDTH / 8) : (EPD_7IN5_V2_WIDTH / 8 + 1)) * EPD_7IN5_V2_HEIGHT;
     if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
     {
+        Log.error("%s [%d]: free heap - %d\r\n", TAG, __LINE__, ESP.getFreeHeap());
         Log.fatal("%s [%d]: Failed to apply for black memory...\r\n", TAG, __LINE__);
         while (1)
             ;
@@ -97,6 +99,69 @@ void display_show_msg(uint8_t * image_buffer, MSG message_type)
     {
     case WIFI_CONNECT:
     {
+        Paint_DrawString_EN(225, 400, "Connect to trmnl WiFi", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(250, 430, "And plug USB in", &Font24, WHITE, BLACK);
+    }
+    break;
+    case WIFI_FAILED:
+    {
+        Paint_DrawString_EN(0, 400, "Can't establsih WiFi connection with saved WiFi", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(75, 430, "Hold button on the back to reset WiFi", &Font24, WHITE, BLACK);
+    }
+    break;
+    case API_ERROR:
+    {
+        Paint_DrawString_EN(50, 400, "WiFI connected, TRMNL API not responding.", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(25, 430, "Wait or reset WiFi holding button on the back", &Font24, WHITE, BLACK);
+    }
+    break;
+    case API_SIZE_ERROR:
+    {
+        Paint_DrawString_EN(15, 400, "WiFI connected, TRMNL API responded bad value.", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(15, 430, "Wait or reset WiFi holding button on the back.", &Font24, WHITE, BLACK);
+    }
+    break;
+    default:
+        break;
+    }
+
+    EPD_7IN5_V2_Display(BlackImage);
+    // DEV_Delay_ms(500);
+    free(BlackImage);
+    BlackImage = NULL;
+}
+
+/**
+ * @brief Function to show the image with message on the display
+ * @param image_buffer - pointer to the uint8_t image buffer
+ * @return bool true - if success; false - if failed
+ */
+void display_show_msg(uint8_t * image_buffer, MSG message_type, String friendly_id)
+{
+    UBYTE *BlackImage;
+    /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
+    UWORD Imagesize = ((EPD_7IN5_V2_WIDTH % 8 == 0) ? (EPD_7IN5_V2_WIDTH / 8) : (EPD_7IN5_V2_WIDTH / 8 + 1)) * EPD_7IN5_V2_HEIGHT;
+    if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
+    {
+        Log.error("%s [%d]: free heap - %d\r\n", TAG, __LINE__, ESP.getFreeHeap());
+        Log.fatal("%s [%d]: Failed to apply for black memory...\r\n", TAG, __LINE__);
+        while (1)
+            ;
+    }
+
+    Log.info("%s [%d]: Paint_NewImage\r\n", TAG, __LINE__);
+    Paint_NewImage(BlackImage, EPD_7IN5_V2_WIDTH, EPD_7IN5_V2_HEIGHT, 0, WHITE);
+
+    Log.info("%s [%d]: show image for array\r\n", TAG, __LINE__);
+    Paint_SelectImage(BlackImage);
+    Paint_Clear(WHITE);
+    Paint_DrawBitMap(image_buffer + 130);
+    switch (message_type)
+    {
+    case WIFI_CONNECT:
+    {
+        Paint_DrawString_EN(250, 370, "Friendly ID: ", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(300, 370, friendly_id.c_str(), &Font24, WHITE, BLACK);
         Paint_DrawString_EN(225, 400, "Connect to trmnl WiFi", &Font24, WHITE, BLACK);
         Paint_DrawString_EN(250, 430, "And plug USB in", &Font24, WHITE, BLACK);
     }

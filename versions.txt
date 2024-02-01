@@ -1,0 +1,7 @@
+[v.1.0.0]
+    - initial work version;
+[v.1.0.1]
+    - added version control;
+    - added reading the default logo from flash, not from SPIFFS; 
+[v.1.0.1]
+    
