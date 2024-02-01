@@ -1,6 +1,10 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#define FW_MAJOR_VERSION 1
+#define FW_MINOR_VERSION 0
+#define FW_PATCH_VERSION 1
+
 #define WIFI_DEFAULT_SSID "none"
 #define WIFI_DEFAULT_PASSWORD "none"
 #define WIFI_CONNECTION_ATTEMPTS 5

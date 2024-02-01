@@ -32,7 +32,9 @@
 #ifndef _IMAGEDATA_H_
 #define _IMAGEDATA_H_
 
-extern const unsigned char gImage_7in5_V2[];
+#include <Arduino.h>
+
+extern uint8_t default_icon[];
 
 #endif
 /* FILE END */

@@ -13,6 +13,7 @@
 #include <ESPAsyncWebServer.h>
 #include <AsyncTCP.h>
 #include <SPIFFS.h>
+#include <ImageData.h>
 
 static const char *TAG = "bl.cpp";
 
@@ -43,6 +44,7 @@ void bl_init(void)
   Serial.begin(115200);
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
   Log.info("%s [%d]: BL inited success\r\n", TAG, __LINE__);
+  Log.info("%s [%d]: Firware version %d.%d.%d", TAG, __LINE__, FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
   pins_init();
   button_timer = millis();
 
@@ -93,8 +95,11 @@ void bl_init(void)
   else
   {
     Log.info("%s [%d]: WiFi NOT saved\r\n", TAG, __LINE__);
-    readBufferFromFile(buffer);
-    display_show_msg(buffer, WIFI_CONNECT);
+    bool res = readBufferFromFile(buffer);
+    if (res)
+      display_show_msg(buffer, WIFI_CONNECT);
+    else
+      display_show_msg(default_icon, WIFI_CONNECT);
   }
 
   wm.setClass("invert");
@@ -109,8 +114,11 @@ void bl_init(void)
     wm.stopWebPortal();
     wm.resetSettings();
     // show logo with string
-    readBufferFromFile(buffer);
-    display_show_msg(buffer, WIFI_FAILED);
+    bool res = readBufferFromFile(buffer);
+    if (res)
+      display_show_msg(buffer, WIFI_FAILED);
+    else
+      display_show_msg(default_icon, WIFI_FAILED);
     // Go to deep sleep
     display_sleep();
     goToSleep();
@@ -218,16 +226,22 @@ static void downloadAndSaveToFile(const char *url)
           else
           {
             Log.info("%s [%d]: [HTTPS] Unable to connect\r\n", TAG, __LINE__);
-            readBufferFromFile(buffer);
-            display_show_msg(buffer, API_ERROR);
+            bool res = readBufferFromFile(buffer);
+            if (res)
+              display_show_msg(buffer, API_ERROR);
+            else
+              display_show_msg(default_icon, API_ERROR);
             // display_sleep();
           }
         }
         else
         {
           Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", TAG, __LINE__, https.errorToString(httpCode).c_str());
-          readBufferFromFile(buffer);
-          display_show_msg(buffer, API_ERROR);
+          bool res = readBufferFromFile(buffer);
+          if (res)
+            display_show_msg(buffer, API_ERROR);
+          else
+            display_show_msg(default_icon, API_ERROR);
           // display_sleep();
         }
 
@@ -236,8 +250,11 @@ static void downloadAndSaveToFile(const char *url)
       else
       {
         Log.error("%s [%d]: [HTTPS] Unable to connect\r\n", TAG, __LINE__);
-        readBufferFromFile(buffer);
-        display_show_msg(buffer, API_ERROR);
+        bool res = readBufferFromFile(buffer);
+        if (res)
+          display_show_msg(buffer, API_ERROR);
+        else
+          display_show_msg(default_icon, API_ERROR);
         // display_sleep();
       }
 
@@ -247,7 +264,7 @@ static void downloadAndSaveToFile(const char *url)
         memset(new_url, 0, sizeof(new_url));
         strcpy(new_url, url);
         strcat(new_url, filename);
-        
+
         Log.info("%s [%d]: [HTTPS] Request to %s\r\n", TAG, __LINE__, new_url);
         if (https.begin(*client, new_url))
         { // HTTPS
@@ -286,22 +303,31 @@ static void downloadAndSaveToFile(const char *url)
               else
               {
                 Log.error("%s [%d]: Receiving failed. Readed: %d\r\n", TAG, __LINE__, counter);
-                readBufferFromFile(buffer);
-                display_show_msg(buffer, API_SIZE_ERROR);
+                bool res = readBufferFromFile(buffer);
+                if (res)
+                  display_show_msg(buffer, API_SIZE_ERROR);
+                else
+                  display_show_msg(default_icon, API_SIZE_ERROR);
               }
             }
             else
             {
               Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", TAG, __LINE__, https.errorToString(httpCode).c_str());
-              readBufferFromFile(buffer);
-              display_show_msg(buffer, API_ERROR);
+              bool res = readBufferFromFile(buffer);
+              if (res)
+                display_show_msg(buffer, API_ERROR);
+              else
+                display_show_msg(default_icon, API_ERROR);
             }
           }
           else
           {
             Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", TAG, __LINE__, https.errorToString(httpCode).c_str());
-            readBufferFromFile(buffer);
-            display_show_msg(buffer, API_ERROR);
+            bool res = readBufferFromFile(buffer);
+            if (res)
+              display_show_msg(buffer, API_ERROR);
+            else
+              display_show_msg(default_icon, API_ERROR);
           }
 
           https.end();
@@ -309,8 +335,11 @@ static void downloadAndSaveToFile(const char *url)
         else
         {
           Log.error("%s [%d]: unable to connect\r\n", TAG, __LINE__);
-          readBufferFromFile(buffer);
-          display_show_msg(buffer, API_ERROR);
+          bool res = readBufferFromFile(buffer);
+          if (res)
+            display_show_msg(buffer, API_ERROR);
+          else
+            display_show_msg(default_icon, API_ERROR);
         }
       }
       // End extra scoping block

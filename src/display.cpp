@@ -98,6 +98,7 @@ void display_show_msg(uint8_t * image_buffer, MSG message_type)
     case WIFI_CONNECT:
     {
         Paint_DrawString_EN(225, 400, "Connect to trmnl WiFi", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(250, 430, "And plug USB in", &Font24, WHITE, BLACK);
     }
     break;
     case WIFI_FAILED:
