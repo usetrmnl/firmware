@@ -3,5 +3,9 @@
 [v.1.0.1]
     - added version control;
     - added reading the default logo from flash, not from SPIFFS; 
-[v.1.0.1]
-    
+[v.1.0.2]
+    - added setup request and response handling;
+    - added battery reading;
+    - added new errors messages;
+    - added key to requests;
+    - add dynamic refresh rate;
