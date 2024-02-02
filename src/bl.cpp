@@ -179,7 +179,8 @@ void bl_init(void)
       }
       else
       {
-        display_show_msg(buffer, WIFI_CONNECT, "NOT SAVED");
+        Log.error("%s [%d]: friendly ID exists\r\n", TAG, __LINE__);
+        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_CONNECT, "NOT SAVED");
       }
     }
   }
