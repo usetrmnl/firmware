@@ -100,13 +100,19 @@ void display_show_msg(uint8_t * image_buffer, MSG message_type)
     case WIFI_CONNECT:
     {
         Paint_DrawString_EN(225, 400, "Connect to trmnl WiFi", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(250, 430, "And plug USB in", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(260, 430, "And plug USB in", &Font24, WHITE, BLACK);
     }
     break;
     case WIFI_FAILED:
     {
         Paint_DrawString_EN(0, 400, "Can't establsih WiFi connection with saved WiFi", &Font24, WHITE, BLACK);
         Paint_DrawString_EN(75, 430, "Hold button on the back to reset WiFi", &Font24, WHITE, BLACK);
+    }
+    break;
+    case WIFI_INTERNAL_ERROR:
+    {
+        Paint_DrawString_EN(300, 400, "WiFi connected", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(150, 430, "But connection cannot be stablished", &Font24, WHITE, BLACK);
     }
     break;
     case API_ERROR:
@@ -161,9 +167,9 @@ void display_show_msg(uint8_t * image_buffer, MSG message_type, String friendly_
     case WIFI_CONNECT:
     {
         Paint_DrawString_EN(250, 370, "Friendly ID: ", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(300, 370, friendly_id.c_str(), &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(460, 370, friendly_id.c_str(), &Font24, WHITE, BLACK);
         Paint_DrawString_EN(225, 400, "Connect to trmnl WiFi", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(250, 430, "And plug USB in", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(270, 430, "And plug USB in", &Font24, WHITE, BLACK);
     }
     break;
     case WIFI_FAILED:

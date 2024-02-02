@@ -34,7 +34,7 @@
 
 #include <Arduino.h>
 
-extern uint8_t default_icon[];
+extern const uint8_t default_icon[];
 
 #endif
 /* FILE END */
