@@ -25,9 +25,11 @@ WiFiManager wm;
 // timers
 uint8_t buffer[48130];
 char filename[100];
+char binUrl[200];
 
 bool status = false;
 bool keys_stored = false;
+bool update_firmware = false;
 
 // timers
 uint32_t timer = 0;
@@ -39,6 +41,7 @@ static void downloadAndSaveToFile(const char *url);
 static void getDeviceCredentials(const char *url);
 static bool readBufferFromFile(uint8_t *out_buffer);
 static bool writeBufferToFile(const char *name, uint8_t *in_buffer, uint16_t size);
+static void checkAndPerformFirmwareUpdate(void);
 static void goToSleep(void);
 static void setClock(void);
 static float readBatteryVoltage(void);
@@ -77,6 +80,43 @@ static void setClock()
   gmtime_r(&nowSecs, &timeinfo);
   Serial.print(F("Current time: "));
   Serial.print(asctime(&timeinfo));
+}
+
+void listDir(fs::FS &fs, const char *dirname, uint8_t levels)
+{
+  Serial.printf("Listing directory: %s\r\n", dirname);
+  File root = fs.open(dirname);
+  if (!root)
+  {
+    Serial.println("- failed to open directory");
+    return;
+  }
+  if (!root.isDirectory())
+  {
+    Serial.println(" - not a directory");
+    return;
+  }
+  File file = root.openNextFile();
+  while (file)
+  {
+    if (file.isDirectory())
+    {
+      Serial.print("  DIR : ");
+      Serial.println(file.name());
+      if (levels)
+      {
+        listDir(fs, file.name(), levels - 1);
+      }
+    }
+    else
+    {
+      Serial.print("  FILE: ");
+      Serial.print(file.name());
+      Serial.print("\tSIZE: ");
+      Serial.println(file.size());
+    }
+    file = root.openNextFile();
+  }
 }
 
 /**
@@ -132,6 +172,7 @@ void bl_init(void)
   else
   {
     Log.info("%s [%d]: SPIFFS mounted\r\n", TAG, __LINE__);
+    listDir(SPIFFS, "/", 0);
   }
 
   // EPD init
@@ -228,8 +269,17 @@ void bl_init(void)
   }
 
   downloadAndSaveToFile("https://usetrmnl.com");
+
+  if (update_firmware)
+  {
+    checkAndPerformFirmwareUpdate();
+  }
+
   display_sleep();
-  goToSleep();
+  if (!update_firmware)
+    goToSleep();
+  else
+    ESP.restart();
 }
 
 /**
@@ -239,10 +289,6 @@ void bl_init(void)
  */
 void bl_process(void)
 {
-  /*
-  if (wm_nonblocking)
-    wifi_manager.process();
-*/
 }
 
 static bool writeBufferToFile(const char *name, uint8_t *in_buffer, uint16_t size)
@@ -255,7 +301,12 @@ static bool writeBufferToFile(const char *name, uint8_t *in_buffer, uint16_t siz
     else
       Log.info("%s [%d]: file %s deleting failed\r\n", TAG, __LINE__, name);
   }
-  File file = SPIFFS.open(name, FILE_WRITE);
+  else
+  {
+    Log.info("%s [%d]: file %s not exists.\r\n", TAG, __LINE__, name);
+  }
+  File file = SPIFFS.open(name, FILE_APPEND);
+  Serial.println(file);
   if (file)
   {
     size_t res = file.write(in_buffer, size);
@@ -280,10 +331,10 @@ static bool writeBufferToFile(const char *name, uint8_t *in_buffer, uint16_t siz
 
 static bool readBufferFromFile(uint8_t *out_buffer)
 {
-  if (SPIFFS.exists("logo_white.bmp"))
+  if (SPIFFS.exists("/logo.bmp"))
   {
     Log.info("%s [%d]: icon exists\r\n", TAG, __LINE__);
-    File file = SPIFFS.open("/logo_white.bmp", FILE_READ);
+    File file = SPIFFS.open("/logo.bmp", FILE_READ);
     if (file)
     {
       if (file.size() == DISPLAY_BMP_IMAGE_SIZE)
@@ -314,6 +365,7 @@ static bool readBufferFromFile(uint8_t *out_buffer)
 
 static void downloadAndSaveToFile(const char *url)
 {
+
   WiFiClientSecure *client = new WiFiClientSecure;
   if (client)
   {
@@ -401,6 +453,7 @@ static void downloadAndSaveToFile(const char *url)
             if (error)
               return;
             String image_url = doc["image_url"];
+            update_firmware = doc["update_firmware"];
             String firmware_url = doc["firmware_url"];
             uint64_t rate = doc["refresh_rate"];
 
@@ -409,9 +462,11 @@ static void downloadAndSaveToFile(const char *url)
               Log.info("%s [%d]: image_url: %s\r\n", TAG, __LINE__, image_url.c_str());
               image_url.toCharArray(filename, image_url.length() + 1);
             }
+            Log.info("%s [%d]: update_firmware: %d\r\n", TAG, __LINE__, update_firmware);
             if (firmware_url.length() > 0)
             {
               Log.info("%s [%d]: firmware_url: %s\r\n", TAG, __LINE__, firmware_url.c_str());
+              firmware_url.toCharArray(binUrl, firmware_url.length() + 1);
             }
             Log.info("%s [%d]: refresh_rate: %d\r\n", TAG, __LINE__, rate);
             if (rate != preferences.getLong64(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP))
@@ -455,7 +510,7 @@ static void downloadAndSaveToFile(const char *url)
         // display_sleep();
       }
 
-      if (status)
+      if (status && !update_firmware)
       {
         status = false;
         memset(new_url, 0, sizeof(new_url));
@@ -554,6 +609,86 @@ static void downloadAndSaveToFile(const char *url)
       display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_INTERNAL_ERROR);
   }
   // display_sleep();
+}
+
+static void checkAndPerformFirmwareUpdate(void)
+{
+  WiFiClientSecure *client = new WiFiClientSecure;
+  if (client)
+  {
+    client->setInsecure();
+    HTTPClient https;
+    if (https.begin(*client, binUrl))
+    {
+      int httpCode = https.GET();
+      if (httpCode == HTTP_CODE_OK)
+      {
+        Log.info("%s [%d]: Downloading .bin file...\r\n", TAG, __LINE__);
+
+        size_t contentLength = https.getSize();
+        // Perform firmware update
+        if (Update.begin(contentLength))
+        {
+          Log.info("%s [%d]: Firmware update start\r\n", TAG, __LINE__);
+          bool res = readBufferFromFile(buffer);
+              if (res)
+                display_show_msg(buffer, FW_UPDATE);
+              else
+                display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE);
+          if (Update.writeStream(https.getStream()))
+          {
+            if (Update.end(true))
+            {
+              Log.info("%s [%d]: Firmware update successful. Rebooting...\r\n", TAG, __LINE__);
+              bool res = readBufferFromFile(buffer);
+              if (res)
+                display_show_msg(buffer, FW_UPDATE_SUCCESS);
+              else
+                display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE_SUCCESS);
+            }
+            else
+            {
+              Log.fatal("%s [%d]: Firmware update failed!\r\n", TAG, __LINE__);
+              bool res = readBufferFromFile(buffer);
+              if (res)
+                display_show_msg(buffer, FW_UPDATE_FAILED);
+              else
+                display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE_FAILED);
+            }
+          }
+          else
+          {
+            Log.fatal("%s [%d]: Write to firmware update stream failed!\r\n", TAG, __LINE__);
+            bool res = readBufferFromFile(buffer);
+            if (res)
+              display_show_msg(buffer, FW_UPDATE_FAILED);
+            else
+              display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE_FAILED);
+          }
+        }
+        else
+        {
+          Log.fatal("%s [%d]: Begin firmware update failed!\r\n", TAG, __LINE__);
+          bool res = readBufferFromFile(buffer);
+          if (res)
+            display_show_msg(buffer, FW_UPDATE_FAILED);
+          else
+            display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE_FAILED);
+        }
+      }
+      else
+      {
+        Log.fatal("%s [%d]: HTTP GET failed!\r\n", TAG, __LINE__);
+        bool res = readBufferFromFile(buffer);
+        if (res)
+          display_show_msg(buffer, API_ERROR);
+        else
+          display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+      }
+      https.end();
+    }
+  }
+  delete client;
 }
 
 static void getDeviceCredentials(const char *url)
@@ -702,7 +837,11 @@ static void getDeviceCredentials(const char *url)
                 // EPD_7IN5_V2_Clear();
                 // DEV_Delay_ms(500);
 
-                writeBufferToFile("logo_white.bmp", buffer, sizeof(buffer));
+                bool res = writeBufferToFile("/logo.bmp", buffer, sizeof(buffer));
+                if (res)
+                  Log.info("%s [%d]: File written!\r\n", TAG, __LINE__);
+                else
+                  Log.error("%s [%d]: File not written!\r\n", TAG, __LINE__);
 
                 // show the image
                 display_show_image(buffer);

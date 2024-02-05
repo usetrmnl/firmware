@@ -9,3 +9,6 @@
     - added new errors messages;
     - added key to requests;
     - add dynamic refresh rate;
+[v.1.0.3]
+    - added default logo storing and showing;
+    - added OTA;
