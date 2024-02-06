@@ -51,4 +51,15 @@ response example (fail, device not found for this access token):
 
 if 'FW-Version' header and web server `Device::FIRMWARE_VERSION` do not match, server will respond with endpoint from which to download new Firmware.
 ```
+
+**Power consumption**
+
+The image displays the amount of power consumed during a work cycle that involves downloading and displaying images.
+
 ![Image Alt text](/pics/Simple_cycle.jpg "Optional title"))
+
+The image displays the amount of power consumed while in sleep mode
+
+![Image Alt text](/pics/Sleep_cycle.jpg "Optional title"))
+
+The image displays the amount of power consumed during a work cycle that involves link pinging, new firmware downloading and OTA.
