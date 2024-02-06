@@ -132,7 +132,7 @@ void bl_init(void)
   Log.info("%s [%d]: Firware version %d.%d.%d\r\n", TAG, __LINE__, FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
   pins_init();
   button_timer = millis();
-
+  
   bool res = preferences.begin("data", false);
   if (res)
   {
@@ -631,10 +631,10 @@ static void checkAndPerformFirmwareUpdate(void)
         {
           Log.info("%s [%d]: Firmware update start\r\n", TAG, __LINE__);
           bool res = readBufferFromFile(buffer);
-              if (res)
-                display_show_msg(buffer, FW_UPDATE);
-              else
-                display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE);
+          if (res)
+            display_show_msg(buffer, FW_UPDATE);
+          else
+            display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE);
           if (Update.writeStream(https.getStream()))
           {
             if (Update.end(true))
