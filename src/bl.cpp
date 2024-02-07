@@ -413,12 +413,12 @@ static void downloadAndSaveToFile(const char *url)
         Log.error("%s [%d]: %s key not exists.\r\n", TAG, __LINE__, PREFERENCES_SLEEP_TIME_KEY);
       }
 
-      String fw_version = String(FW_MAJOR_VERSION) + "." + String(FW_MINOR_VERSION) + "." + String(FW_PATCH_VERSION) + ".";
+      String fw_version = String(FW_MAJOR_VERSION) + "." + String(FW_MINOR_VERSION) + "." + String(FW_PATCH_VERSION);
 
       float battery_voltage = readBatteryVoltage();
       Log.info("%s [%d]: %s battery voltage - %f\r\n", TAG, __LINE__, PREFERENCES_SLEEP_TIME_KEY, battery_voltage);
 
-      Log.info("%s [%d]: Added headers:\n\rID: %s\n\rAccess-Token: %s\n\rRefresh_Rate: %s\n\rBattery-Voltage: %s\n\rFW-Version: %s", TAG, __LINE__, WiFi.macAddress().c_str(), api_key.c_str(), String(refresh_rate).c_str(), String(battery_voltage).c_str(), fw_version.c_str());
+      Log.info("%s [%d]: Added headers:\n\rID: %s\n\rAccess-Token: %s\n\rRefresh_Rate: %s\n\rBattery-Voltage: %s\n\rFW-Version: %s\r\n", TAG, __LINE__, WiFi.macAddress().c_str(), api_key.c_str(), String(refresh_rate).c_str(), String(battery_voltage).c_str(), fw_version.c_str());
 
       // if (https.begin(*client, new_url))
       if (https.begin(*client, "https://usetrmnl.com/api/display"))
