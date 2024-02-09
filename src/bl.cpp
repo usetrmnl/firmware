@@ -132,7 +132,7 @@ void bl_init(void)
   Log.info("%s [%d]: Firware version %d.%d.%d\r\n", TAG, __LINE__, FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
   pins_init();
   button_timer = millis();
-  
+
   bool res = preferences.begin("data", false);
   if (res)
   {
@@ -190,11 +190,40 @@ void bl_init(void)
   if (wm.getWiFiIsSaved())
   {
     Log.info("%s [%d]: WiFi saved\r\n", TAG, __LINE__);
+    WiFi.begin(wm.getWiFiSSID(), wm.getWiFiPass());
+
+    uint8_t attepmts = 0;
+    Log.info("%s [%d]: wifi connection...\r\n", TAG, __LINE__);
+    while (WiFi.status() != WL_CONNECTED && attepmts < WIFI_CONNECTION_ATTEMPTS)
+    {
+      delay(1000);
+      attepmts++;
+    }
+    Serial.println();
+    // Check if connected
+    if (WiFi.status() == WL_CONNECTED)
+    {
+      String ip = String(WiFi.localIP());
+      Log.info("%s [%d]:wifi_connection [DEBUG]: Connected: %s\r\n", TAG, __LINE__, ip.c_str());
+    }
+    else
+    {
+      Log.fatal("%s [%d]: Connection failed!\r\n", TAG, __LINE__);
+      WiFi.disconnect();
+      res = readBufferFromFile(buffer);
+      if (res)
+        display_show_msg(buffer, WIFI_FAILED);
+      else
+        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_FAILED);
+      // Go to deep sleep
+      display_sleep();
+      goToSleep();
+    }
   }
   else
   {
     Log.info("%s [%d]: WiFi NOT saved\r\n", TAG, __LINE__);
-    bool res = readBufferFromFile(buffer);
+    res = readBufferFromFile(buffer);
     if (res)
     {
       Log.info("%s [%d]: logo not exists. Use default\r\n", TAG, __LINE__);
@@ -224,37 +253,31 @@ void bl_init(void)
         display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_CONNECT, "NOT SAVED");
       }
     }
+    wm.setClass("invert");
+    // wm.setConnectRetries(1);
+    wm.setConnectTimeout(10);
+    // wm.setBreakAfterConfig(true);  // always exit configportal even if wifi save fails
+    res = wm.startConfigPortal("TRMNL"); // password protected ap
+    if (!res)
+    {
+      Log.error("%s [%d]: Failed to connect or hit timeout\r\n", TAG, __LINE__);
+      wm.disconnect();
+      wm.stopWebPortal();
+      WiFi.disconnect();
+      // wm.resetSettings();
+      //  show logo with string
+      res = readBufferFromFile(buffer);
+      if (res)
+        display_show_msg(buffer, WIFI_FAILED);
+      else
+        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_FAILED);
+      // Go to deep sleep
+      display_sleep();
+      goToSleep();
+    }
+    Log.info("%s [%d]: WiFi connected\r\n", TAG, __LINE__);
   }
 
-  wm.setClass("invert");
-  wm.setConnectRetries(1);
-  wm.setConnectTimeout(10);
-  wm.setBreakAfterConfig(true);  // always exit configportal even if wifi save fails
-  res = wm.autoConnect("trmnl"); // password protected ap
-  if (!res)
-  {
-    Log.error("%s [%d]: Failed to connect or hit timeout\r\n", TAG, __LINE__);
-    wm.disconnect();
-    wm.stopWebPortal();
-    // wm.resetSettings();
-    //  show logo with string
-    res = readBufferFromFile(buffer);
-    if (res && keys_stored)
-      display_show_msg(buffer, WIFI_FAILED);
-    else
-      display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_FAILED);
-    // Go to deep sleep
-    display_sleep();
-    goToSleep();
-  }
-  else
-  {
-    // if you get here you have connected to the WiFi
-    Log.info("%s [%d]: connected...\r\n)", TAG, __LINE__);
-  }
-
-  // timer = millis();
-  Log.info("%s [%d]: WiFi connected\r\n", TAG, __LINE__);
   setClock();
 
   if (!preferences.isKey(PREFERENCES_API_KEY) || !preferences.isKey(PREFERENCES_FRIENDLY_ID))

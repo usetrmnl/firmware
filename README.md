@@ -65,3 +65,27 @@ The image displays the amount of power consumed while in sleep mode
 The image displays the amount of power consumed during a work cycle that involves link pinging, new firmware downloading and OTA.
 
 ![Image Alt text](/pics/OTA.jpg "OTA")
+
+**Version Log**
+
+[v.1.0.0]
+    - initial work version;
+[v.1.0.1]
+    - added version control;
+    - added reading the default logo from flash, not from SPIFFS; 
+[v.1.0.2]
+    - added setup request and response handling;
+    - added battery reading;
+    - added new errors messages;
+    - added key to requests;
+    - add dynamic refresh rate;
+[v.1.0.3]
+    - added default logo storing and showing;
+    - added OTA
+[v.1.0.4]
+    - fix version that sending to the server;
+    - change default refresh rate to 15 minutes;
+[v.1.0.5]
+    - fix WiFi connection with wrong credentials;
+    - change default AP name;
+    - fix starting config portal in backend if connection is wrong;
