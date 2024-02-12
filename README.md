@@ -66,6 +66,20 @@ The image displays the amount of power consumed during a work cycle that involve
 
 ![Image Alt text](/pics/OTA.jpg "OTA")
 
+In this repo readme you can see actual power consumption test results
+https://github.com/usetrmnl/firmware/tree/main
+
+Full Power Cycle
+
+- Sleep 0.1mA
+- Image refresh cycle 32.8mA during 24s
+
+In case it will do a continuous refresh it will refresh 8231 times on full charge or 54 hours of continuous refreshing
+In case it will sleep all the time it can sleep 18000 hours which is 750 days
+
+15 min refresh = 78 days
+5 min refresh = 29 days
+
 **Version Log**
 
 [v.1.0.0]
