@@ -118,15 +118,15 @@ In case it will sleep all the time it can sleep 18000 hours which is 750 days
 5. After cloning “Open” project in workspace
 6. After configuring the project, click on the PlatformIO -> Build button located at the bottom of the screen
 
-![Image Alt text](/pics/build_icon.jpg "Build")
+![Image Alt text](/pics/build_icon.JPG "Build")
 
 8. After the compilation process is complete, you should expect to see a message in the console.
 
-![Image Alt text](/pics/console.jpg "Console")
+![Image Alt text](/pics/console.JPG "Console")
 
 9. You can find the compiled file in the folder shown in the picture
 
-![Image Alt text](/pics/bin_folder.jpg "Bin")
+![Image Alt text](/pics/bin_folder.JPG "Bin")
 
 **Uploading guide**
 
