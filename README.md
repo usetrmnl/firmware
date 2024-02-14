@@ -84,21 +84,26 @@ In case it will sleep all the time it can sleep 18000 hours which is 750 days
 
 [v.1.0.0]
     - initial work version;
+
 [v.1.0.1]
     - added version control;
     - added reading the default logo from flash, not from SPIFFS; 
+
 [v.1.0.2]
     - added setup request and response handling;
     - added battery reading;
     - added new errors messages;
     - added key to requests;
     - add dynamic refresh rate;
+
 [v.1.0.3]
     - added default logo storing and showing;
     - added OTA
+
 [v.1.0.4]
     - fix version that sending to the server;
     - change default refresh rate to 15 minutes;
+
 [v.1.0.5]
     - fix WiFi connection with wrong credentials;
     - change default AP name;
