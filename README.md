@@ -108,3 +108,22 @@ In case it will sleep all the time it can sleep 18000 hours which is 750 days
     - fix WiFi connection with wrong credentials;
     - change default AP name;
     - fix starting config portal in backend if connection is wrong;
+
+    
+**Compilation guide**
+1. Install the VScode https://code.visualstudio.com
+2. Install PlatformIO https://platformio.org/install/ide?install=vscode
+3. Install Git https://git-scm.com/book/en/v2/Appendix-A%3A-Git-in-Other-Environments-Git-in-Visual-Studio-Code
+4. clone repository from github https://github.com/usetrmnl/firmware
+5. After cloning “Open” project in workspace
+6. After configuring the project, click on the PlatformIO -> Build button located at the bottom of the screen
+
+![Image Alt text](/pics/build_icon.jpg "OTA")
+
+8. After the compilation process is complete, you should expect to see a message in the console.
+
+![Image Alt text](/pics/console.jpg "OTA")
+
+9. You can find the compiled file in the folder shown in the picture
+
+![Image Alt text](/pics/bin_folder.jpg "OTA")
