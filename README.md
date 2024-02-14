@@ -114,16 +114,30 @@ In case it will sleep all the time it can sleep 18000 hours which is 750 days
 1. Install the VScode https://code.visualstudio.com
 2. Install PlatformIO https://platformio.org/install/ide?install=vscode
 3. Install Git https://git-scm.com/book/en/v2/Appendix-A%3A-Git-in-Other-Environments-Git-in-Visual-Studio-Code
-4. clone repository from github https://github.com/usetrmnl/firmware
+4. Clone repository from github https://github.com/usetrmnl/firmware
 5. After cloning “Open” project in workspace
 6. After configuring the project, click on the PlatformIO -> Build button located at the bottom of the screen
 
-![Image Alt text](/pics/build_icon.jpg "OTA")
+![Image Alt text](/pics/build_icon.jpg "Build")
 
 8. After the compilation process is complete, you should expect to see a message in the console.
 
-![Image Alt text](/pics/console.jpg "OTA")
+![Image Alt text](/pics/console.jpg "Console")
 
 9. You can find the compiled file in the folder shown in the picture
 
-![Image Alt text](/pics/bin_folder.jpg "OTA")
+![Image Alt text](/pics/bin_folder.jpg "Bin")
+
+**Uploading guide**
+
+1. Connect PCB to PC using USB cable.
+2. Open VSCode and navigate to the PlatformIO icon and click on it, then Click on  "Build Filesystem Image"
+
+![Image Alt text](/pics/fs.jpg "FS")
+
+3. After building select the proper COM port from drop-down list and click on "Upload Filesystem Image"
+4. After uploading the image click on "PlatformIO: Upload" button 
+
+!!! WARNING
+
+If the board does not want to be flashed, then try to enter the flashing mode manually. To do this, turn off the board using the switch, hold the button and turn on the board. After it you can try to upload firmware again
