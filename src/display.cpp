@@ -129,8 +129,8 @@ void display_show_msg(uint8_t * image_buffer, MSG message_type)
     break;
     case FW_UPDATE:
     {
-        Paint_DrawString_EN(0, 400, "Firmware update is available! Starting update...", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(170, 430, "This may take up to 5 minutes.", &Font24, WHITE, BLACK); 
+        Paint_DrawString_EN(0, 400, "Firmware update is available! Starting now.", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(170, 430, "This may take up to 5 minutes...", &Font24, WHITE, BLACK); 
     }
     break;
     case FW_UPDATE_FAILED:
