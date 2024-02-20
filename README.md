@@ -131,11 +131,12 @@ In case it will sleep all the time it can sleep 18000 hours which is 750 days
 ## **Uploading guide (PlatformIO)**
 
 1. Connect PCB to PC using USB cable.
-2. Open VSCode and navigate to the PlatformIO icon and click on it, then Click on  "Build Filesystem Image"
+! NOTE ! It is not necessary to perform steps 2 and 3 for the latest version of the firmware.
+~~2. Open VSCode and navigate to the PlatformIO icon and click on it, then Click on  "Build Filesystem Image"~~
 
 ![Image Alt text](/pics/fs.jpg "FS")
 
-3. After building select the proper COM port from drop-down list and click on "Upload Filesystem Image"
+~~3. After building select the proper COM port from drop-down list and click on "Upload Filesystem Image"~~
 4. After uploading the image click on "PlatformIO: Upload" button 
 
 > [!WARNING]
