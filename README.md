@@ -109,6 +109,9 @@ In case it will sleep all the time it can sleep 18000 hours which is 750 days
     - change default AP name;
     - fix starting config portal in backend if connection is wrong;
 
+[v.1.0.6]
+    - change picture file path to absolute path;
+
     
 ## **Compilation guide**
 1. Install the VScode https://code.visualstudio.com

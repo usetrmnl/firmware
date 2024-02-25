@@ -24,7 +24,7 @@ WiFiManager wm;
 
 // timers
 uint8_t buffer[48130];
-char filename[100];
+char filename[200];
 char binUrl[200];
 
 bool status = false;
@@ -536,12 +536,12 @@ static void downloadAndSaveToFile(const char *url)
       if (status && !update_firmware)
       {
         status = false;
-        memset(new_url, 0, sizeof(new_url));
-        strcpy(new_url, url);
-        strcat(new_url, filename);
+        //memset(new_url, 0, sizeof(new_url));
+        //strcpy(new_url, url);
+        //strcat(new_url, filename);
 
-        Log.info("%s [%d]: [HTTPS] Request to %s\r\n", TAG, __LINE__, new_url);
-        if (https.begin(*client, new_url))
+        Log.info("%s [%d]: [HTTPS] Request to %s\r\n", TAG, __LINE__, filename);
+        if (https.begin(*client, filename))
         { // HTTPS
           Log.info("%s [%d]: [HTTPS] GET..\r\n", TAG, __LINE__);
           // start connection and send HTTP header
@@ -823,13 +823,13 @@ static void getDeviceCredentials(const char *url)
       if (status)
       {
         status = false;
-        memset(new_url, 0, sizeof(new_url));
-        strcpy(new_url, url);
-        strcat(new_url, filename);
+        //memset(new_url, 0, sizeof(new_url));
+        //strcpy(new_url, url);
+        //strcat(new_url, filename);
         Log.info("%s [%d]: filename - %s\r\n", TAG, __LINE__, filename);
 
-        Log.info("%s [%d]: [HTTPS] Request to %s\r\n", TAG, __LINE__, new_url);
-        if (https.begin(*client, new_url))
+        Log.info("%s [%d]: [HTTPS] Request to %s\r\n", TAG, __LINE__, filename);
+        if (https.begin(*client, filename))
         { // HTTPS
           Log.info("%s [%d]: [HTTPS] GET..\r\n", TAG, __LINE__);
           // start connection and send HTTP header
