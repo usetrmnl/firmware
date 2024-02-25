@@ -100,37 +100,37 @@ void display_show_msg(uint8_t * image_buffer, MSG message_type)
     case WIFI_CONNECT:
     {
         Paint_DrawString_EN(225, 400, "Connect to TRMNL WiFi", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(260, 430, "And plug USB in", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(260, 430, "and plug in USB cable", &Font24, WHITE, BLACK);
     }
     break;
     case WIFI_FAILED:
     {
-        Paint_DrawString_EN(0, 400, "Can't establsih WiFi connection with saved WiFi", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(0, 400, "Can't establsih WiFi connection with saved credentials", &Font24, WHITE, BLACK);
         Paint_DrawString_EN(75, 430, "Hold button on the back to reset WiFi", &Font24, WHITE, BLACK);
     }
     break;
     case WIFI_INTERNAL_ERROR:
     {
         Paint_DrawString_EN(300, 400, "WiFi connected", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(100, 430, "But API connection cannot be stablished", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(100, 430, "But API connection cannot be established", &Font24, WHITE, BLACK);
     }
     break;
     case API_ERROR:
     {
         Paint_DrawString_EN(50, 400, "WiFi connected, TRMNL API not responding.", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(25, 430, "Wait or reset WiFi holding button on the back", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(25, 430, "Wait or reset WiFi by holding button on the back", &Font24, WHITE, BLACK);
     }
     break;
     case API_SIZE_ERROR:
     {
-        Paint_DrawString_EN(15, 400, "WiFi connected, TRMNL API responded bad value.", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(15, 430, "Wait or reset WiFi holding button on the back.", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(15, 400, "WiFi connected, TRMNL API content malformed.", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(15, 430, "Wait or reset by holding down BOOT button.", &Font24, WHITE, BLACK);
     }
     break;
     case FW_UPDATE:
     {
-        Paint_DrawString_EN(0, 400, "Firmware update is available! Starting update..", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(170, 430, "It may take up to 5 minutes...", &Font24, WHITE, BLACK); 
+        Paint_DrawString_EN(0, 400, "Firmware update is available! Starting now.", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(170, 430, "This may take up to 5 minutes...", &Font24, WHITE, BLACK); 
     }
     break;
     case FW_UPDATE_FAILED:
