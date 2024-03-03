@@ -118,13 +118,13 @@ void display_show_msg(uint8_t * image_buffer, MSG message_type)
     case API_ERROR:
     {
         Paint_DrawString_EN(50, 400, "WiFi connected, TRMNL API not responding.", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(25, 430, "Wait or reset WiFi by holding button on the back", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(25, 430, "Wait or reset WiFi by holding BOOT button.", &Font24, WHITE, BLACK);
     }
     break;
     case API_SIZE_ERROR:
     {
         Paint_DrawString_EN(15, 400, "WiFi connected, TRMNL API content malformed.", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(15, 430, "Wait or reset by holding down BOOT button.", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(15, 430, "Wait or reset by holding BOOT button.", &Font24, WHITE, BLACK);
     }
     break;
     case FW_UPDATE:
