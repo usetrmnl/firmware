@@ -184,8 +184,8 @@ void display_show_msg(uint8_t * image_buffer, MSG message_type, String friendly_
     {
         Paint_DrawString_EN(250, 370, "Friendly ID: ", &Font24, WHITE, BLACK);
         Paint_DrawString_EN(460, 370, friendly_id.c_str(), &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(225, 400, "Connect to trmnl WiFi", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(270, 430, "And plug USB in", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(225, 400, "Connect to TRMNL WiFi", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(270, 430, "And plug in USB", &Font24, WHITE, BLACK);
     }
     break;
     case WIFI_FAILED:
