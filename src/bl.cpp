@@ -23,7 +23,7 @@ bool pref_clear = false;
 WiFiManager wm;
 
 // timers
-uint8_t buffer[48130];
+uint8_t buffer[48062];
 char filename[200];
 char binUrl[200];
 
@@ -561,12 +561,12 @@ static void downloadAndSaveToFile(const char *url)
 
               uint32_t counter = 0;
               // Read and save BMP data to buffer
-              if (stream->available() && https.getSize() == sizeof(buffer))
+              if (stream->available() && https.getSize() == DISPLAY_BMP_IMAGE_SIZE)
               {
                 counter = stream->readBytes(buffer, sizeof(buffer));
               }
 
-              if (counter == sizeof(buffer))
+              if (counter == DISPLAY_BMP_IMAGE_SIZE)
               {
                 Log.info("%s [%d]: Received successfully\r\n", TAG, __LINE__);
                 // EPD_7IN5_V2_Clear();

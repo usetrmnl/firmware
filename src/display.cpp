@@ -60,7 +60,7 @@ void display_show_image(uint8_t *image_buffer)
     Log.info("%s [%d]: show image for array\r\n", TAG, __LINE__);
     Paint_SelectImage(BlackImage);
     Paint_Clear(WHITE);
-    Paint_DrawBitMap(image_buffer + 130);
+    Paint_DrawBitMap(image_buffer + 62);
     EPD_7IN5_V2_Display(BlackImage);
     Log.info("%s [%d]: display\r\n", TAG, __LINE__);
     // printf("Goto Sleep...\r\n");
@@ -94,7 +94,7 @@ void display_show_msg(uint8_t * image_buffer, MSG message_type)
     Log.info("%s [%d]: show image for array\r\n", TAG, __LINE__);
     Paint_SelectImage(BlackImage);
     Paint_Clear(WHITE);
-    Paint_DrawBitMap(image_buffer + 130);
+    Paint_DrawBitMap(image_buffer + 62);
     switch (message_type)
     {
     case WIFI_CONNECT:
@@ -123,24 +123,24 @@ void display_show_msg(uint8_t * image_buffer, MSG message_type)
     break;
     case API_SIZE_ERROR:
     {
-        Paint_DrawString_EN(15, 400, "WiFi connected, TRMNL API content malformed.", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(15, 430, "Wait or reset by holding BOOT button.", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(30, 400, "WiFi connected, TRMNL API content malformed.", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(55, 430, "Wait or reset by holding BOOT button.", &Font24, WHITE, BLACK);
     }
     break;
     case FW_UPDATE:
     {
-        Paint_DrawString_EN(0, 400, "Firmware update is available! Starting now.", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(25, 400, "Firmware update is available! Starting now...", &Font24, WHITE, BLACK);
         Paint_DrawString_EN(170, 430, "This may take up to 5 minutes...", &Font24, WHITE, BLACK); 
     }
     break;
     case FW_UPDATE_FAILED:
     {
-        Paint_DrawString_EN(5, 400, "Firmware update failed. Device will restart...", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(15, 400, "Firmware update failed. Device will restart...", &Font24, WHITE, BLACK);
     }
     break;
     case FW_UPDATE_SUCCESS:
     {
-        Paint_DrawString_EN(5, 400, "Firmware update success. Device will restart..", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(15, 400, "Firmware update success. Device will restart..", &Font24, WHITE, BLACK);
     }
     break;
     default:
@@ -177,7 +177,7 @@ void display_show_msg(uint8_t * image_buffer, MSG message_type, String friendly_
     Log.info("%s [%d]: show image for array\r\n", TAG, __LINE__);
     Paint_SelectImage(BlackImage);
     Paint_Clear(WHITE);
-    Paint_DrawBitMap(image_buffer + 130);
+    Paint_DrawBitMap(image_buffer + 62);
     switch (message_type)
     {
     case WIFI_CONNECT:

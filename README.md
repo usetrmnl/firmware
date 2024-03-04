@@ -112,6 +112,12 @@ In case it will sleep all the time it can sleep 18000 hours which is 750 days
 [v.1.0.6]
     - change picture file path to absolute path;
 
+[v.1.0.7]
+    - fix an uknown bag with OTA update;
+
+[v.1.0.8]
+    - change BMP header length;
+
     
 ## **Compilation guide**
 1. Install the VScode https://code.visualstudio.com
