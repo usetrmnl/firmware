@@ -118,6 +118,10 @@ In case it will sleep all the time it can sleep 18000 hours which is 750 days
 [v.1.0.8]
     - change BMP header length;
 
+[v.1.0.9]
+    - fix loop error on receiving image from the new server(added timeout loop that waiting for stream available);
+    - localization problem with inversion of the color with new server(relative with difference headers);
+
     
 ## **Compilation guide**
 1. Install the VScode https://code.visualstudio.com

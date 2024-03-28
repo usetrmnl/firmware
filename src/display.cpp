@@ -158,7 +158,7 @@ void display_show_msg(uint8_t * image_buffer, MSG message_type)
  * @param image_buffer - pointer to the uint8_t image buffer
  * @return bool true - if success; false - if failed
  */
-void display_show_msg(uint8_t * image_buffer, MSG message_type, String friendly_id)
+void display_show_msg(uint8_t * image_buffer, MSG message_type, String friendly_id, const char * fw_version)
 {
     UBYTE *BlackImage;
     /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
@@ -182,8 +182,10 @@ void display_show_msg(uint8_t * image_buffer, MSG message_type, String friendly_
     {
     case WIFI_CONNECT:
     {
-        Paint_DrawString_EN(250, 370, "Friendly ID: ", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(460, 370, friendly_id.c_str(), &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(150, 370, "FW: ", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(205, 370, fw_version, &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(350, 370, "Friendly ID: ", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(560, 370, friendly_id.c_str(), &Font24, WHITE, BLACK);
         Paint_DrawString_EN(225, 400, "Connect to TRMNL WiFi", &Font24, WHITE, BLACK);
         Paint_DrawString_EN(270, 430, "And plug in USB", &Font24, WHITE, BLACK);
     }

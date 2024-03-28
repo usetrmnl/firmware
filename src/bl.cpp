@@ -24,8 +24,8 @@ WiFiManager wm;
 
 // timers
 uint8_t buffer[48062];
-char filename[200];
-char binUrl[200];
+char filename[1024];
+char binUrl[1024];
 
 bool status = false;
 bool keys_stored = false;
@@ -223,6 +223,15 @@ void bl_init(void)
   else
   {
     Log.info("%s [%d]: WiFi NOT saved\r\n", TAG, __LINE__);
+
+    char fw_version[20];
+
+    sprintf(fw_version, "%d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
+
+    String fw = fw_version;
+
+    Log.info("%s [%d]: FW version %s\r\n", TAG, __LINE__, fw_version);
+    Log.info("%s [%d]: FW version %s\r\n", TAG, __LINE__, fw.c_str());
     res = readBufferFromFile(buffer);
     if (res)
     {
@@ -231,11 +240,12 @@ void bl_init(void)
       {
         Log.info("%s [%d]: friendly ID exists\r\n", TAG, __LINE__);
         String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
-        display_show_msg(buffer, WIFI_CONNECT, friendly_id);
+
+        display_show_msg(buffer, WIFI_CONNECT, friendly_id, fw.c_str());
       }
       else
       {
-        display_show_msg(buffer, WIFI_CONNECT, "NOT SAVED");
+        display_show_msg(buffer, WIFI_CONNECT, "NOT SAVED", fw.c_str());
       }
     }
     else
@@ -245,12 +255,12 @@ void bl_init(void)
       {
         Log.info("%s [%d]: friendly ID exists\r\n", TAG, __LINE__);
         String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
-        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_CONNECT, friendly_id);
+        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_CONNECT, friendly_id, fw.c_str());
       }
       else
       {
-        Log.error("%s [%d]: friendly ID exists\r\n", TAG, __LINE__);
-        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_CONNECT, "NOT SAVED");
+        Log.error("%s [%d]: friendly ID NOT exists\r\n", TAG, __LINE__);
+        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_CONNECT, "NOT SAVED", fw.c_str());
       }
     }
     wm.setClass("invert");
@@ -454,6 +464,8 @@ static void downloadAndSaveToFile(const char *url)
         https.addHeader("Battery-Voltage", String(battery_voltage));
         https.addHeader("FW-Version", fw_version);
 
+        delay(5);
+
         int httpCode = https.GET();
 
         // httpCode will be negative on error
@@ -536,9 +548,9 @@ static void downloadAndSaveToFile(const char *url)
       if (status && !update_firmware)
       {
         status = false;
-        //memset(new_url, 0, sizeof(new_url));
-        //strcpy(new_url, url);
-        //strcat(new_url, filename);
+        // memset(new_url, 0, sizeof(new_url));
+        // strcpy(new_url, url);
+        // strcat(new_url, filename);
 
         Log.info("%s [%d]: [HTTPS] Request to %s\r\n", TAG, __LINE__, filename);
         if (https.begin(*client, filename))
@@ -558,8 +570,15 @@ static void downloadAndSaveToFile(const char *url)
               Log.info("%s [%d]: Content size: %d\r\n", TAG, __LINE__, https.getSize());
 
               WiFiClient *stream = https.getStreamPtr();
-
+              Log.info("%s [%d]: Stream timeout: %d\r\n", TAG, __LINE__, stream->getTimeout());
               uint32_t counter = 0;
+              Log.info("%s [%d]: Stream available: %d\r\n", TAG, __LINE__, stream->available());
+
+              uint32_t timer = millis();
+              while (!stream->available() && millis() - timer < 1000)
+                ;
+              
+              Log.info("%s [%d]: Stream available: %d\r\n", TAG, __LINE__, stream->available());
               // Read and save BMP data to buffer
               if (stream->available() && https.getSize() == DISPLAY_BMP_IMAGE_SIZE)
               {
@@ -571,6 +590,11 @@ static void downloadAndSaveToFile(const char *url)
                 Log.info("%s [%d]: Received successfully\r\n", TAG, __LINE__);
                 // EPD_7IN5_V2_Clear();
                 // DEV_Delay_ms(500);
+                for(uint32_t i = 0; i < sizeof(buffer); i++)
+                {
+                  Serial.print(buffer[i], HEX);
+                }
+                Serial.println();
 
                 // show the image
                 display_show_image(buffer);
@@ -823,9 +847,9 @@ static void getDeviceCredentials(const char *url)
       if (status)
       {
         status = false;
-        //memset(new_url, 0, sizeof(new_url));
-        //strcpy(new_url, url);
-        //strcat(new_url, filename);
+        // memset(new_url, 0, sizeof(new_url));
+        // strcpy(new_url, url);
+        // strcat(new_url, filename);
         Log.info("%s [%d]: filename - %s\r\n", TAG, __LINE__, filename);
 
         Log.info("%s [%d]: [HTTPS] Request to %s\r\n", TAG, __LINE__, filename);
