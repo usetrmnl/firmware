@@ -37,6 +37,7 @@ uint32_t button_timer = 0;
 
 Preferences preferences;
 
+static bool parseBMPHeader(uint8_t *data, bool &reserved);
 static void downloadAndSaveToFile(const char *url);
 static void getDeviceCredentials(const char *url);
 static bool readBufferFromFile(uint8_t *out_buffer);
@@ -577,7 +578,7 @@ static void downloadAndSaveToFile(const char *url)
               uint32_t timer = millis();
               while (!stream->available() && millis() - timer < 1000)
                 ;
-              
+
               Log.info("%s [%d]: Stream available: %d\r\n", TAG, __LINE__, stream->available());
               // Read and save BMP data to buffer
               if (stream->available() && https.getSize() == DISPLAY_BMP_IMAGE_SIZE)
@@ -590,14 +591,21 @@ static void downloadAndSaveToFile(const char *url)
                 Log.info("%s [%d]: Received successfully\r\n", TAG, __LINE__);
                 // EPD_7IN5_V2_Clear();
                 // DEV_Delay_ms(500);
-                for(uint32_t i = 0; i < sizeof(buffer); i++)
+                bool image_reverse = false;
+                bool res = parseBMPHeader(buffer, image_reverse);
+                if (res)
                 {
-                  Serial.print(buffer[i], HEX);
+                  // show the image
+                  display_show_image(buffer, image_reverse);
                 }
-                Serial.println();
-
-                // show the image
-                display_show_image(buffer);
+                else
+                {
+                  res = readBufferFromFile(buffer);
+                  if (res)
+                    display_show_msg(buffer, BMP_FORMAT_ERROR);
+                  else
+                    display_show_msg(const_cast<uint8_t *>(default_icon), BMP_FORMAT_ERROR);
+                }
               }
               else
               {
@@ -736,6 +744,67 @@ static void checkAndPerformFirmwareUpdate(void)
     }
   }
   delete client;
+}
+
+static bool parseBMPHeader(uint8_t *data, bool &reserved)
+{
+  // Check if the file is a BMP image
+  if (data[0] != 'B' || data[1] != 'M')
+  {
+    Log.fatal("%s [%d]: It is not a BMP file\r\n", __FILE__, __LINE__);
+    return false;
+  }
+
+  // Get width and height from the header
+  uint32_t width = *(uint32_t *)&data[18];
+  uint32_t height = *(uint32_t *)&data[22];
+  uint16_t bitsPerPixel = *(uint16_t *)&data[28];
+  uint32_t compressionMethod = *(uint32_t *)&data[30];
+  uint32_t imageDataSize = *(uint32_t *)&data[34];
+  uint32_t colorTableEntries = *(uint32_t *)&data[46];
+
+  if (width != 800 || height != 480 || bitsPerPixel != 1 || imageDataSize != 48000 || colorTableEntries != 2)
+    return false;
+  // Get the offset of the pixel data
+  uint32_t dataOffset = *(uint32_t *)&data[10];
+
+  // Display BMP information
+  Log.info("%s [%d]: BMP Header Information:\r\nWidth: %d\r\nHeight: %d\r\nBits per Pixel: %d\r\nCompression Method: %d\r\nImage Data Size: %d\r\nColor Table Entries: %d\r\nData offset: %d\r\n", __FILE__, __LINE__, width, height, bitsPerPixel, compressionMethod, imageDataSize, colorTableEntries, dataOffset);
+
+  // Check if there's a color table
+  if (dataOffset > 54)
+  {
+    // Read color table entries
+    uint32_t colorTableSize = colorTableEntries * 4; // Each color entry is 4 bytes
+
+    // Display color table
+    Log.info("%s [%d]: Color table\r\n", __FILE__, __LINE__);
+    for (uint32_t i = 0; i < colorTableSize; i += 4)
+    {
+      Log.info("%s [%d]: Color %d: B-%d, R-%d, G-%d\r\n", __FILE__, __LINE__, i / 4 + 1, data[54 + 4 * i], data[55 + 4 * i], data[56 + 4 * i], data[57 + 4 * i]);
+    }
+
+    if (data[54] == 0 && data[55] == 0 && data[56] == 0 && data[57] == 0 && data[58] == 255 && data[59] == 255 && data[60] == 255 && data[61] == 0)
+    {
+      Log.info("%s [%d]: Color scheme standart\r\n", __FILE__, __LINE__);
+      reserved = false;
+    }
+    else if (data[54] == 255 && data[55] == 255 && data[56] == 255 && data[57] == 0 && data[58] == 0 && data[59] == 0 && data[60] == 0 && data[61] == 0)
+    {
+      Log.info("%s [%d]: Color scheme reversed\r\n", __FILE__, __LINE__);
+      reserved = true;
+    }
+    else
+    {
+      Log.info("%s [%d]: Color scheme demaged\r\n", __FILE__, __LINE__);
+      return false;
+    }
+    return true;
+  }
+  else
+  {
+    return false;
+  }
 }
 
 static void getDeviceCredentials(const char *url)
@@ -891,7 +960,7 @@ static void getDeviceCredentials(const char *url)
                   Log.error("%s [%d]: File not written!\r\n", TAG, __LINE__);
 
                 // show the image
-                display_show_image(buffer);
+                display_show_image(buffer, false);
               }
               else
               {

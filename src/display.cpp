@@ -41,7 +41,7 @@ void display_reset(void)
  * @param image_buffer - pointer to the uint8_t bmp image buffer with header
  * @return bool true - if success; false - if failed
  */
-void display_show_image(uint8_t *image_buffer)
+void display_show_image(uint8_t *image_buffer, bool reverse)
 {
     //  Create a new image cache
     UBYTE *BlackImage;
@@ -54,12 +54,22 @@ void display_show_image(uint8_t *image_buffer)
         while (1)
             ;
     }
-    Log.info("%s [%d]: Paint_NewImage\r\n", TAG, __LINE__);
+    Log.info("%s [%d]: Paint_NewImage %d\r\n", TAG, __LINE__, reverse);
+    // if (reverse)
+    //     Paint_NewImage(BlackImage, EPD_7IN5_V2_WIDTH, EPD_7IN5_V2_HEIGHT, 0, BLACK);
+    // else
     Paint_NewImage(BlackImage, EPD_7IN5_V2_WIDTH, EPD_7IN5_V2_HEIGHT, 0, WHITE);
 
     Log.info("%s [%d]: show image for array\r\n", TAG, __LINE__);
     Paint_SelectImage(BlackImage);
     Paint_Clear(WHITE);
+    if (reverse)
+    {
+        for (size_t i = 0; i < DISPLAY_BMP_IMAGE_SIZE; i++)
+        {
+            image_buffer[i] = ~image_buffer[i];
+        }
+    }
     Paint_DrawBitMap(image_buffer + 62);
     EPD_7IN5_V2_Display(BlackImage);
     Log.info("%s [%d]: display\r\n", TAG, __LINE__);
@@ -75,7 +85,7 @@ void display_show_image(uint8_t *image_buffer)
  * @param image_buffer - pointer to the uint8_t image buffer
  * @return bool true - if success; false - if failed
  */
-void display_show_msg(uint8_t * image_buffer, MSG message_type)
+void display_show_msg(uint8_t *image_buffer, MSG message_type)
 {
     UBYTE *BlackImage;
     /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
@@ -130,7 +140,7 @@ void display_show_msg(uint8_t * image_buffer, MSG message_type)
     case FW_UPDATE:
     {
         Paint_DrawString_EN(25, 400, "Firmware update is available! Starting now...", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(170, 430, "This may take up to 5 minutes...", &Font24, WHITE, BLACK); 
+        Paint_DrawString_EN(170, 430, "This may take up to 5 minutes...", &Font24, WHITE, BLACK);
     }
     break;
     case FW_UPDATE_FAILED:
@@ -141,6 +151,11 @@ void display_show_msg(uint8_t * image_buffer, MSG message_type)
     case FW_UPDATE_SUCCESS:
     {
         Paint_DrawString_EN(15, 400, "Firmware update success. Device will restart..", &Font24, WHITE, BLACK);
+    }
+    break;
+    case BMP_FORMAT_ERROR:
+    {
+        Paint_DrawString_EN(100, 400, "The image format is incorrect", &Font24, WHITE, BLACK);
     }
     break;
     default:
@@ -158,7 +173,7 @@ void display_show_msg(uint8_t * image_buffer, MSG message_type)
  * @param image_buffer - pointer to the uint8_t image buffer
  * @return bool true - if success; false - if failed
  */
-void display_show_msg(uint8_t * image_buffer, MSG message_type, String friendly_id, const char * fw_version)
+void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, const char *fw_version)
 {
     UBYTE *BlackImage;
     /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */

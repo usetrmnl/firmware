@@ -94,33 +94,37 @@ In case it will sleep all the time it can sleep 18000 hours which is 750 days
     - added battery reading;
     - added new errors messages;
     - added key to requests;
-    - add dynamic refresh rate;
+    - added dynamic refresh rate;
 
 [v.1.0.3]
     - added default logo storing and showing;
     - added OTA
 
 [v.1.0.4]
-    - fix version that sending to the server;
-    - change default refresh rate to 15 minutes;
+    - fixeD version that sending to the server;
+    - changed default refresh rate to 15 minutes;
 
 [v.1.0.5]
-    - fix WiFi connection with wrong credentials;
-    - change default AP name;
-    - fix starting config portal in backend if connection is wrong;
+    - fixed WiFi connection with wrong credentials;
+    - changed default AP name;
+    - fixed starting config portal in backend if connection is wrong;
 
 [v.1.0.6]
-    - change picture file path to absolute path;
+    - changed picture file path to absolute path;
 
 [v.1.0.7]
-    - fix an uknown bag with OTA update;
+    - fixed an uknown bag with OTA update;
 
 [v.1.0.8]
-    - change BMP header length;
+    - changeed BMP header length;
 
 [v.1.0.9]
-    - fix loop error on receiving image from the new server(added timeout loop that waiting for stream available);
+    - fixed loop error on receiving image from the new server(added timeout loop that waiting for stream available);
     - localization problem with inversion of the color with new server(relative with difference headers);
+
+[v.1.1.0]
+    - added bmp header parser;
+    - added new error relative with incorrect bmp format - bad width, height, bpp, color table size, color; 
 
     
 ## **Compilation guide**

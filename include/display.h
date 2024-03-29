@@ -12,6 +12,7 @@ enum MSG {
   FW_UPDATE,
   FW_UPDATE_FAILED,
   FW_UPDATE_SUCCESS,
+  BMP_FORMAT_ERROR,
 };
 
 /**
@@ -33,7 +34,7 @@ void display_reset(void);
  * @param image_buffer - pointer to the uint8_t image buffer
  * @return none
  */
-void display_show_image(uint8_t * image_buffer);
+void display_show_image(uint8_t * image_buffer, bool reverse);
 
 /**
  * @brief Function to show the image with message on the display
