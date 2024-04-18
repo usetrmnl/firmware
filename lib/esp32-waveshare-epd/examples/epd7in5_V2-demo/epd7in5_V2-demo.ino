@@ -27,7 +27,7 @@ void setup()
   printf("Paint_NewImage\r\n");
   Paint_NewImage(BlackImage, EPD_7IN5_V2_WIDTH, EPD_7IN5_V2_HEIGHT, 0, WHITE);
 
-#if 1   // show image for array   
+#if 1   // show image for array
   printf("show image for array\r\n");
   Paint_SelectImage(BlackImage);
   Paint_Clear(WHITE);

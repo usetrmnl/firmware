@@ -184,7 +184,13 @@ void bl_init(void)
   Log.info("%s [%d]: Display clear\r\n", TAG, __LINE__);
   display_reset();
 
-  // Download file and save to SPIFFS
+  //Log.info("%s [%d]: Display start\r\n", TAG, __LINE__);
+  //display_show_image(const_cast<uint8_t *>(default_icon), false); // Download file and save to SPIFFS
+  //Log.info("%s [%d]: Display finish\r\n", TAG, __LINE__);
+
+  //delay(1000);
+
+
   // downloadAndSaveToFile("https://usetrmnl.com");
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
   // DEV_Delay_ms(500);
@@ -576,7 +582,7 @@ static void downloadAndSaveToFile(const char *url)
               Log.info("%s [%d]: Stream available: %d\r\n", TAG, __LINE__, stream->available());
 
               uint32_t timer = millis();
-              while (!stream->available() && millis() - timer < 1000)
+              while (stream->available() < 4000 && millis() - timer < 1000)
                 ;
 
               Log.info("%s [%d]: Stream available: %d\r\n", TAG, __LINE__, stream->available());

@@ -21,7 +21,7 @@ void display_init(void)
     DEV_Module_Init();
 
     Log.info("%s [%d]: e-Paper Init and Clear...\r\n", TAG, __LINE__);
-    EPD_7IN5_V2_Init();
+    EPD_7IN5_V2_Init_New();
 }
 
 /**
@@ -226,8 +226,9 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     default:
         break;
     }
-
+    Log.info("%s [%d]: Start drawing...\r\n", TAG, __LINE__);
     EPD_7IN5_V2_Display(BlackImage);
+    Log.info("%s [%d]: Drawing finished\r\n", TAG, __LINE__);
     // DEV_Delay_ms(500);
     free(BlackImage);
     BlackImage = NULL;

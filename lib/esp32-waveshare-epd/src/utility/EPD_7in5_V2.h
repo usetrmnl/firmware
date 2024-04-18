@@ -41,6 +41,8 @@
 #define EPD_7IN5_V2_HEIGHT      480
 
 UBYTE EPD_7IN5_V2_Init(void);
+UBYTE EPD_7IN5_V2_Init_New(void);
+UBYTE EPD_7IN5_V2_Init_Fast(void);
 void EPD_7IN5_V2_Clear(void);
 void EPD_7IN5_V2_ClearBlack(void);
 void EPD_7IN5_V2_Display(const UBYTE *blackimage);
