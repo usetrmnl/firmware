@@ -17,8 +17,6 @@
 #include <Preferences.h>
 #include <cstdint>
 
-static const char *TAG = "bl.cpp";
-
 bool pref_clear = false;
 WiFiManager wm;
 
@@ -37,7 +35,7 @@ uint32_t button_timer = 0;
 
 Preferences preferences;
 
-static bool parseBMPHeader(uint8_t *data, bool &reserved);
+static bmp_err_e parseBMPHeader(uint8_t *data, bool &reserved);
 static void downloadAndSaveToFile(const char *url);
 static void getDeviceCredentials(const char *url);
 static bool readBufferFromFile(uint8_t *out_buffer);
@@ -46,6 +44,78 @@ static void checkAndPerformFirmwareUpdate(void);
 static void goToSleep(void);
 static void setClock(void);
 static float readBatteryVoltage(void);
+static void log_POST(String &log);
+
+static void log_POST(String &log)
+{
+  WiFiClientSecure *client = new WiFiClientSecure;
+  if (client)
+  {
+    client->setInsecure();
+
+    {
+      // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
+      HTTPClient https;
+
+      Serial.print("[HTTPS] begin...\n");
+      if (https.begin(*client, "https://usetrmnl.com/api/log"))
+      { // HTTPS
+        Serial.print("[HTTPS] POST...\n");
+
+        String api_key = "";
+        if (preferences.isKey(PREFERENCES_API_KEY))
+        {
+          api_key = preferences.getString(PREFERENCES_API_KEY, PREFERENCES_API_KEY_DEFAULT);
+          Log.info("%s [%d]: %s key exists. Value - %s\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY, api_key.c_str());
+        }
+        else
+        {
+          Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY);
+        }
+
+        https.addHeader("Accept", "application/json");
+        https.addHeader("Access-Token", api_key);
+        https.addHeader("Content-Type", "application/json");
+        Serial.print("Send log:");
+        Serial.println(log);
+        // start connection and send HTTP header
+        int httpCode = https.POST(log);
+
+        // httpCode will be negative on error
+        if (httpCode > 0)
+        {
+          // HTTP header has been send and Server response header has been handled
+          Serial.printf("[HTTPS] POST... code: %d\n", httpCode);
+
+          // file found at server
+          if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
+          {
+            String payload = https.getString();
+            Serial.println(payload);
+          }
+        }
+        else
+        {
+          Serial.printf("[HTTPS] POST... failed, error: %s\n", https.errorToString(httpCode).c_str());
+        }
+
+        https.end();
+      }
+      else
+      {
+        Serial.printf("[HTTPS] Unable to connect\n");
+      }
+
+      // End extra scoping block
+    }
+
+    delete client;
+  }
+  else
+  {
+    Serial.println("Unable to create client");
+  }
+}
 
 static float readBatteryVoltage(void)
 {
@@ -129,20 +199,20 @@ void bl_init(void)
 {
   Serial.begin(115200);
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
-  Log.info("%s [%d]: BL init success\r\n", TAG, __LINE__);
-  Log.info("%s [%d]: Firware version %d.%d.%d\r\n", TAG, __LINE__, FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
+  Log.info("%s [%d]: BL init success\r\n", __FILE__, __LINE__);
+  Log.info("%s [%d]: Firware version %d.%d.%d\r\n", __FILE__, __LINE__, FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
   pins_init();
   button_timer = millis();
 
   bool res = preferences.begin("data", false);
   if (res)
   {
-    Log.info("%s [%d]: preferences init success\r\n", TAG, __LINE__);
+    Log.info("%s [%d]: preferences init success\r\n", __FILE__, __LINE__);
     // preferences.clear();
   }
   else
   {
-    Log.fatal("%s [%d]: preferences init failed\r\n", TAG, __LINE__);
+    Log.fatal("%s [%d]: preferences init failed\r\n", __FILE__, __LINE__);
     while (1)
       ;
   }
@@ -152,13 +222,13 @@ void bl_init(void)
   {
     if (digitalRead(PIN_INTERRUPT) == LOW && millis() - button_timer > BUTTON_HOLD_TIME)
     {
-      Log.info("%s [%d]: WiFi reset\r\n", TAG, __LINE__);
+      Log.info("%s [%d]: WiFi reset\r\n", __FILE__, __LINE__);
       wm.resetSettings();
       break;
     }
     else if (digitalRead(PIN_INTERRUPT) == HIGH)
     {
-      Log.info("%s [%d]: WiFi NOT reset\r\n", TAG, __LINE__);
+      Log.info("%s [%d]: WiFi NOT reset\r\n", __FILE__, __LINE__);
       break;
     }
   }
@@ -166,41 +236,40 @@ void bl_init(void)
   // Mount SPIFFS
   if (!SPIFFS.begin(true))
   {
-    Log.fatal("%s [%d]: Failed to mount SPIFFS\r\n", TAG, __LINE__);
+    Log.fatal("%s [%d]: Failed to mount SPIFFS\r\n", __FILE__, __LINE__);
     while (1)
       ;
   }
   else
   {
-    Log.info("%s [%d]: SPIFFS mounted\r\n", TAG, __LINE__);
+    Log.info("%s [%d]: SPIFFS mounted\r\n", __FILE__, __LINE__);
     listDir(SPIFFS, "/", 0);
   }
 
   // EPD init
   // EPD clear
-  Log.info("%s [%d]: Display init\r\n", TAG, __LINE__);
+  Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
   display_init();
 
-  Log.info("%s [%d]: Display clear\r\n", TAG, __LINE__);
+  Log.info("%s [%d]: Display clear\r\n", __FILE__, __LINE__);
   display_reset();
 
-  //Log.info("%s [%d]: Display start\r\n", TAG, __LINE__);
-  //display_show_image(const_cast<uint8_t *>(default_icon), false); // Download file and save to SPIFFS
-  //Log.info("%s [%d]: Display finish\r\n", TAG, __LINE__);
+  // Log.info("%s [%d]: Display start\r\n", __FILE__, __LINE__);
+  // display_show_image(const_cast<uint8_t *>(default_icon), false); // Download file and save to SPIFFS
+  // Log.info("%s [%d]: Display finish\r\n", __FILE__, __LINE__);
 
-  //delay(1000);
-
+  // delay(1000);
 
   // downloadAndSaveToFile("https://usetrmnl.com");
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
   // DEV_Delay_ms(500);
   if (wm.getWiFiIsSaved())
   {
-    Log.info("%s [%d]: WiFi saved\r\n", TAG, __LINE__);
+    Log.info("%s [%d]: WiFi saved\r\n", __FILE__, __LINE__);
     WiFi.begin(wm.getWiFiSSID(), wm.getWiFiPass());
 
     uint8_t attepmts = 0;
-    Log.info("%s [%d]: wifi connection...\r\n", TAG, __LINE__);
+    Log.info("%s [%d]: wifi connection...\r\n", __FILE__, __LINE__);
     while (WiFi.status() != WL_CONNECTED && attepmts < WIFI_CONNECTION_ATTEMPTS)
     {
       delay(1000);
@@ -211,11 +280,11 @@ void bl_init(void)
     if (WiFi.status() == WL_CONNECTED)
     {
       String ip = String(WiFi.localIP());
-      Log.info("%s [%d]:wifi_connection [DEBUG]: Connected: %s\r\n", TAG, __LINE__, ip.c_str());
+      Log.info("%s [%d]:wifi_connection [DEBUG]: Connected: %s\r\n", __FILE__, __LINE__, ip.c_str());
     }
     else
     {
-      Log.fatal("%s [%d]: Connection failed!\r\n", TAG, __LINE__);
+      Log.fatal("%s [%d]: Connection failed!\r\n", __FILE__, __LINE__);
       WiFi.disconnect();
       res = readBufferFromFile(buffer);
       if (res)
@@ -229,7 +298,7 @@ void bl_init(void)
   }
   else
   {
-    Log.info("%s [%d]: WiFi NOT saved\r\n", TAG, __LINE__);
+    Log.info("%s [%d]: WiFi NOT saved\r\n", __FILE__, __LINE__);
 
     char fw_version[20];
 
@@ -237,15 +306,15 @@ void bl_init(void)
 
     String fw = fw_version;
 
-    Log.info("%s [%d]: FW version %s\r\n", TAG, __LINE__, fw_version);
-    Log.info("%s [%d]: FW version %s\r\n", TAG, __LINE__, fw.c_str());
+    Log.info("%s [%d]: FW version %s\r\n", __FILE__, __LINE__, fw_version);
+    Log.info("%s [%d]: FW version %s\r\n", __FILE__, __LINE__, fw.c_str());
     res = readBufferFromFile(buffer);
     if (res)
     {
-      Log.info("%s [%d]: logo not exists. Use default\r\n", TAG, __LINE__);
+      Log.info("%s [%d]: logo not exists. Use default\r\n", __FILE__, __LINE__);
       if (preferences.isKey(PREFERENCES_FRIENDLY_ID))
       {
-        Log.info("%s [%d]: friendly ID exists\r\n", TAG, __LINE__);
+        Log.info("%s [%d]: friendly ID exists\r\n", __FILE__, __LINE__);
         String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
 
         display_show_msg(buffer, WIFI_CONNECT, friendly_id, fw.c_str());
@@ -257,16 +326,16 @@ void bl_init(void)
     }
     else
     {
-      Log.info("%s [%d]: logo not exists. Use default\r\n", TAG, __LINE__);
+      Log.info("%s [%d]: logo not exists. Use default\r\n", __FILE__, __LINE__);
       if (preferences.isKey(PREFERENCES_FRIENDLY_ID))
       {
-        Log.info("%s [%d]: friendly ID exists\r\n", TAG, __LINE__);
+        Log.info("%s [%d]: friendly ID exists\r\n", __FILE__, __LINE__);
         String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
         display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_CONNECT, friendly_id, fw.c_str());
       }
       else
       {
-        Log.error("%s [%d]: friendly ID NOT exists\r\n", TAG, __LINE__);
+        Log.error("%s [%d]: friendly ID NOT exists\r\n", __FILE__, __LINE__);
         display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_CONNECT, "NOT SAVED", fw.c_str());
       }
     }
@@ -277,7 +346,7 @@ void bl_init(void)
     res = wm.startConfigPortal("TRMNL"); // password protected ap
     if (!res)
     {
-      Log.error("%s [%d]: Failed to connect or hit timeout\r\n", TAG, __LINE__);
+      Log.error("%s [%d]: Failed to connect or hit timeout\r\n", __FILE__, __LINE__);
       wm.disconnect();
       wm.stopWebPortal();
       WiFi.disconnect();
@@ -292,20 +361,20 @@ void bl_init(void)
       display_sleep();
       goToSleep();
     }
-    Log.info("%s [%d]: WiFi connected\r\n", TAG, __LINE__);
+    Log.info("%s [%d]: WiFi connected\r\n", __FILE__, __LINE__);
   }
 
   setClock();
 
   if (!preferences.isKey(PREFERENCES_API_KEY) || !preferences.isKey(PREFERENCES_FRIENDLY_ID))
   {
-    Log.info("%s [%d]: API key or friendly ID not saved\r\n", TAG, __LINE__);
+    Log.info("%s [%d]: API key or friendly ID not saved\r\n", __FILE__, __LINE__);
     // lets get the api key and friendly ID
     getDeviceCredentials("https://usetrmnl.com");
   }
   else
   {
-    Log.info("%s [%d]: API key and friendly ID saved\r\n", TAG, __LINE__);
+    Log.info("%s [%d]: API key and friendly ID saved\r\n", __FILE__, __LINE__);
   }
 
   downloadAndSaveToFile("https://usetrmnl.com");
@@ -335,15 +404,15 @@ static bool writeBufferToFile(const char *name, uint8_t *in_buffer, uint16_t siz
 {
   if (SPIFFS.exists(name))
   {
-    Log.info("%s [%d]: file %s exists. Deleting...\r\n", TAG, __LINE__, name);
+    Log.info("%s [%d]: file %s exists. Deleting...\r\n", __FILE__, __LINE__, name);
     if (SPIFFS.remove(name))
-      Log.info("%s [%d]: file %s deleted\r\n", TAG, __LINE__, name);
+      Log.info("%s [%d]: file %s deleted\r\n", __FILE__, __LINE__, name);
     else
-      Log.info("%s [%d]: file %s deleting failed\r\n", TAG, __LINE__, name);
+      Log.info("%s [%d]: file %s deleting failed\r\n", __FILE__, __LINE__, name);
   }
   else
   {
-    Log.info("%s [%d]: file %s not exists.\r\n", TAG, __LINE__, name);
+    Log.info("%s [%d]: file %s not exists.\r\n", __FILE__, __LINE__, name);
   }
   File file = SPIFFS.open(name, FILE_APPEND);
   Serial.println(file);
@@ -353,18 +422,18 @@ static bool writeBufferToFile(const char *name, uint8_t *in_buffer, uint16_t siz
     file.close();
     if (res)
     {
-      Log.info("%s [%d]: file %s writing success\r\n", TAG, __LINE__, name);
+      Log.info("%s [%d]: file %s writing success\r\n", __FILE__, __LINE__, name);
       return true;
     }
     else
     {
-      Log.error("%s [%d]: file %s writing error\r\n", TAG, __LINE__, name);
+      Log.error("%s [%d]: file %s writing error\r\n", __FILE__, __LINE__, name);
       return false;
     }
   }
   else
   {
-    Log.error("%s [%d]: File open ERROR\r\n", TAG, __LINE__);
+    Log.error("%s [%d]: File open ERROR\r\n", __FILE__, __LINE__);
     return false;
   }
 }
@@ -373,18 +442,18 @@ static bool readBufferFromFile(uint8_t *out_buffer)
 {
   if (SPIFFS.exists("/logo.bmp"))
   {
-    Log.info("%s [%d]: icon exists\r\n", TAG, __LINE__);
+    Log.info("%s [%d]: icon exists\r\n", __FILE__, __LINE__);
     File file = SPIFFS.open("/logo.bmp", FILE_READ);
     if (file)
     {
       if (file.size() == DISPLAY_BMP_IMAGE_SIZE)
       {
-        Log.info("%s [%d]: the size is the same\r\n", TAG, __LINE__);
+        Log.info("%s [%d]: the size is the same\r\n", __FILE__, __LINE__);
         file.readBytes((char *)out_buffer, DISPLAY_BMP_IMAGE_SIZE);
       }
       else
       {
-        Log.error("%s [%d]: the size is NOT the same %d\r\n", TAG, __LINE__, file.size());
+        Log.error("%s [%d]: the size is NOT the same %d\r\n", __FILE__, __LINE__, file.size());
         return false;
       }
       file.close();
@@ -392,13 +461,13 @@ static bool readBufferFromFile(uint8_t *out_buffer)
     }
     else
     {
-      Log.error("%s [%d]: File open ERROR\r\n", TAG, __LINE__);
+      Log.error("%s [%d]: File open ERROR\r\n", __FILE__, __LINE__);
       return false;
     }
   }
   else
   {
-    Log.error("%s [%d]: icon DOESN\'T exists\r\n", TAG, __LINE__);
+    Log.error("%s [%d]: icon DOESN\'T exists\r\n", __FILE__, __LINE__);
     return false;
   }
 }
@@ -415,7 +484,7 @@ static void downloadAndSaveToFile(const char *url)
       // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
       HTTPClient https;
 
-      Log.info("%s [%d]: [HTTPS] begin...\r\n", TAG, __LINE__);
+      Log.info("%s [%d]: [HTTPS] begin...\r\n", __FILE__, __LINE__);
       char new_url[200];
       strcpy(new_url, url);
       strcat(new_url, "/api/display");
@@ -424,46 +493,46 @@ static void downloadAndSaveToFile(const char *url)
       if (preferences.isKey(PREFERENCES_API_KEY))
       {
         api_key = preferences.getString(PREFERENCES_API_KEY, PREFERENCES_API_KEY_DEFAULT);
-        Log.info("%s [%d]: %s key exists. Value - %s\r\n", TAG, __LINE__, PREFERENCES_API_KEY, api_key.c_str());
+        Log.info("%s [%d]: %s key exists. Value - %s\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY, api_key.c_str());
       }
       else
       {
-        Log.error("%s [%d]: %s key not exists.\r\n", TAG, __LINE__, PREFERENCES_API_KEY);
+        Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY);
       }
 
       String friendly_id = "";
       if (preferences.isKey(PREFERENCES_FRIENDLY_ID))
       {
         friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
-        Log.info("%s [%d]: %s key exists. Value - %s\r\n", TAG, __LINE__, PREFERENCES_FRIENDLY_ID, friendly_id);
+        Log.info("%s [%d]: %s key exists. Value - %s\r\n", __FILE__, __LINE__, PREFERENCES_FRIENDLY_ID, friendly_id);
       }
       else
       {
-        Log.error("%s [%d]: %s key not exists.\r\n", TAG, __LINE__, PREFERENCES_FRIENDLY_ID);
+        Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_FRIENDLY_ID);
       }
 
       uint64_t refresh_rate = SLEEP_TIME_TO_SLEEP;
       if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))
       {
         refresh_rate = preferences.getLong64(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
-        Log.info("%s [%d]: %s key exists. Value - %s\r\n", TAG, __LINE__, PREFERENCES_SLEEP_TIME_KEY, api_key);
+        Log.info("%s [%d]: %s key exists. Value - %s\r\n", __FILE__, __LINE__, PREFERENCES_SLEEP_TIME_KEY, api_key);
       }
       else
       {
-        Log.error("%s [%d]: %s key not exists.\r\n", TAG, __LINE__, PREFERENCES_SLEEP_TIME_KEY);
+        Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_SLEEP_TIME_KEY);
       }
 
       String fw_version = String(FW_MAJOR_VERSION) + "." + String(FW_MINOR_VERSION) + "." + String(FW_PATCH_VERSION);
 
       float battery_voltage = readBatteryVoltage();
-      Log.info("%s [%d]: %s battery voltage - %f\r\n", TAG, __LINE__, PREFERENCES_SLEEP_TIME_KEY, battery_voltage);
+      Log.info("%s [%d]: %s battery voltage - %f\r\n", __FILE__, __LINE__, PREFERENCES_SLEEP_TIME_KEY, battery_voltage);
 
-      Log.info("%s [%d]: Added headers:\n\rID: %s\n\rAccess-Token: %s\n\rRefresh_Rate: %s\n\rBattery-Voltage: %s\n\rFW-Version: %s\r\n", TAG, __LINE__, WiFi.macAddress().c_str(), api_key.c_str(), String(refresh_rate).c_str(), String(battery_voltage).c_str(), fw_version.c_str());
+      Log.info("%s [%d]: Added headers:\n\rID: %s\n\rAccess-Token: %s\n\rRefresh_Rate: %s\n\rBattery-Voltage: %s\n\rFW-Version: %s\r\n", __FILE__, __LINE__, WiFi.macAddress().c_str(), api_key.c_str(), String(refresh_rate).c_str(), String(battery_voltage).c_str(), fw_version.c_str());
 
       // if (https.begin(*client, new_url))
       if (https.begin(*client, "https://usetrmnl.com/api/display"))
       { // HTTPS
-        Log.info("%s [%d]: [HTTPS] GET...\r\n", TAG, __LINE__);
+        Log.info("%s [%d]: [HTTPS] GET...\r\n", __FILE__, __LINE__);
         // start connection and send HTTP header
         https.addHeader("ID", WiFi.macAddress());
         https.addHeader("Access-Token", api_key);
@@ -479,7 +548,7 @@ static void downloadAndSaveToFile(const char *url)
         if (httpCode > 0)
         {
           // HTTP header has been send and Server response header has been handled
-          Log.info("%s [%d]: GET... code: %d\r\n", TAG, __LINE__, httpCode);
+          Log.info("%s [%d]: GET... code: %d\r\n", __FILE__, __LINE__, httpCode);
           // file found at server
           if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
           {
@@ -487,8 +556,8 @@ static void downloadAndSaveToFile(const char *url)
             Serial.print("Payload: ");
             Serial.println(payload);
             size_t size = https.getSize();
-            Log.info("%s [%d]: Content size: %d\r\n", TAG, __LINE__, size);
-            Log.info("%s [%d]: Free heap size: %d\r\n", TAG, __LINE__, ESP.getFreeHeap());
+            Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, size);
+            Log.info("%s [%d]: Free heap size: %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
 
             JsonDocument doc;
             DeserializationError error = deserializeJson(doc, payload);
@@ -501,26 +570,26 @@ static void downloadAndSaveToFile(const char *url)
 
             if (image_url.length() > 0)
             {
-              Log.info("%s [%d]: image_url: %s\r\n", TAG, __LINE__, image_url.c_str());
+              Log.info("%s [%d]: image_url: %s\r\n", __FILE__, __LINE__, image_url.c_str());
               image_url.toCharArray(filename, image_url.length() + 1);
             }
-            Log.info("%s [%d]: update_firmware: %d\r\n", TAG, __LINE__, update_firmware);
+            Log.info("%s [%d]: update_firmware: %d\r\n", __FILE__, __LINE__, update_firmware);
             if (firmware_url.length() > 0)
             {
-              Log.info("%s [%d]: firmware_url: %s\r\n", TAG, __LINE__, firmware_url.c_str());
+              Log.info("%s [%d]: firmware_url: %s\r\n", __FILE__, __LINE__, firmware_url.c_str());
               firmware_url.toCharArray(binUrl, firmware_url.length() + 1);
             }
-            Log.info("%s [%d]: refresh_rate: %d\r\n", TAG, __LINE__, rate);
+            Log.info("%s [%d]: refresh_rate: %d\r\n", __FILE__, __LINE__, rate);
             if (rate != preferences.getLong64(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP))
             {
-              Log.info("%s [%d]: write new refresh rate: %d\r\n", TAG, __LINE__, rate);
+              Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, rate);
               preferences.putULong64(PREFERENCES_SLEEP_TIME_KEY, rate);
             }
             status = true;
           }
           else
           {
-            Log.info("%s [%d]: [HTTPS] Unable to connect\r\n", TAG, __LINE__);
+            Log.info("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
             bool res = readBufferFromFile(buffer);
             if (res)
               display_show_msg(buffer, API_ERROR);
@@ -531,7 +600,7 @@ static void downloadAndSaveToFile(const char *url)
         }
         else
         {
-          Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", TAG, __LINE__, https.errorToString(httpCode).c_str());
+          Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
           bool res = readBufferFromFile(buffer);
           if (res)
             display_show_msg(buffer, WIFI_INTERNAL_ERROR);
@@ -543,7 +612,7 @@ static void downloadAndSaveToFile(const char *url)
       }
       else
       {
-        Log.error("%s [%d]: [HTTPS] Unable to connect\r\n", TAG, __LINE__);
+        Log.error("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
         bool res = readBufferFromFile(buffer);
         if (res)
           display_show_msg(buffer, API_ERROR);
@@ -559,10 +628,10 @@ static void downloadAndSaveToFile(const char *url)
         // strcpy(new_url, url);
         // strcat(new_url, filename);
 
-        Log.info("%s [%d]: [HTTPS] Request to %s\r\n", TAG, __LINE__, filename);
+        Log.info("%s [%d]: [HTTPS] Request to %s\r\n", __FILE__, __LINE__, filename);
         if (https.begin(*client, filename))
         { // HTTPS
-          Log.info("%s [%d]: [HTTPS] GET..\r\n", TAG, __LINE__);
+          Log.info("%s [%d]: [HTTPS] GET..\r\n", __FILE__, __LINE__);
           // start connection and send HTTP header
           int httpCode = https.GET();
 
@@ -570,22 +639,22 @@ static void downloadAndSaveToFile(const char *url)
           if (httpCode > 0)
           {
             // HTTP header has been send and Server response header has been handled
-            Log.error("%s [%d]: [HTTPS] GET... code: %d\r\n", TAG, __LINE__, httpCode);
+            Log.error("%s [%d]: [HTTPS] GET... code: %d\r\n", __FILE__, __LINE__, httpCode);
             // file found at server
             if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
             {
-              Log.info("%s [%d]: Content size: %d\r\n", TAG, __LINE__, https.getSize());
+              Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
 
               WiFiClient *stream = https.getStreamPtr();
-              Log.info("%s [%d]: Stream timeout: %d\r\n", TAG, __LINE__, stream->getTimeout());
+              Log.info("%s [%d]: Stream timeout: %d\r\n", __FILE__, __LINE__, stream->getTimeout());
               uint32_t counter = 0;
-              Log.info("%s [%d]: Stream available: %d\r\n", TAG, __LINE__, stream->available());
+              Log.info("%s [%d]: Stream available: %d\r\n", __FILE__, __LINE__, stream->available());
 
               uint32_t timer = millis();
               while (stream->available() < 4000 && millis() - timer < 1000)
                 ;
 
-              Log.info("%s [%d]: Stream available: %d\r\n", TAG, __LINE__, stream->available());
+              Log.info("%s [%d]: Stream available: %d\r\n", __FILE__, __LINE__, stream->available());
               // Read and save BMP data to buffer
               if (stream->available() && https.getSize() == DISPLAY_BMP_IMAGE_SIZE)
               {
@@ -594,20 +663,53 @@ static void downloadAndSaveToFile(const char *url)
 
               if (counter == DISPLAY_BMP_IMAGE_SIZE)
               {
-                Log.info("%s [%d]: Received successfully\r\n", TAG, __LINE__);
+                Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
                 // EPD_7IN5_V2_Clear();
                 // DEV_Delay_ms(500);
                 bool image_reverse = false;
-                bool res = parseBMPHeader(buffer, image_reverse);
-                if (res)
+                bmp_err_e res = parseBMPHeader(buffer, image_reverse);
+                String error = "";
+                switch (res)
+                {
+                case BMP_NO_ERR:
                 {
                   // show the image
                   display_show_image(buffer, image_reverse);
                 }
-                else
+                break;
+                case BMP_NOT_BMP:
                 {
-                  res = readBufferFromFile(buffer);
-                  if (res)
+                  error = "First two header bytes are invalid!";
+                }
+                break;
+                case BMP_BAD_SIZE:
+                {
+                  error = "BMP width, height or size are invalid";
+                }
+                break;
+                case BMP_COLOR_SCHEME_FAILED:
+                {
+                  error = "BMP color scheme is invalid";
+                }
+                break;
+                case BMP_INVALID_OFFSET:
+                {
+                  error = "BMP header offset is invalid";
+                }
+                break;
+                default:
+                  break;
+                }
+
+                if (res != BMP_NO_ERR)
+                {
+                  String log = "{\"log\":{\"dump\":{\"error\": \"";
+                  log.concat("\"bmp_header_error\":\"");
+                  log.concat(error);
+                  log.concat("\"\"}}}");
+                  log_POST(log);
+                  bool rs = readBufferFromFile(buffer);
+                  if (rs)
                     display_show_msg(buffer, BMP_FORMAT_ERROR);
                   else
                     display_show_msg(const_cast<uint8_t *>(default_icon), BMP_FORMAT_ERROR);
@@ -615,27 +717,50 @@ static void downloadAndSaveToFile(const char *url)
               }
               else
               {
-                Log.error("%s [%d]: Receiving failed. Readed: %d\r\n", TAG, __LINE__, counter);
+                Log.error("%s [%d]: Receiving failed. Readed: %d\r\n", __FILE__, __LINE__, counter);
+                String log = "{\"log\":{\"dump\":{\"error\":\"";
+                log.concat("\"returned_code\":\"");
+                log.concat(httpCode);
+                log.concat("\",\"content_size\":");
+                log.concat(https.getSize());
+                log.concat(",\"available_stream_size\":");
+                log.concat(stream->available());
+                log.concat(",\"readed\":");
+                log.concat(counter);
+                log.concat("\"}}}");
+                log_POST(log);
                 bool res = readBufferFromFile(buffer);
                 if (res)
-                  display_show_msg(buffer, API_SIZE_ERROR);
+                  display_show_msg(buffer, NONE);
+                // display_show_msg(buffer, API_SIZE_ERROR);
                 else
-                  display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
+                  display_show_msg(const_cast<uint8_t *>(default_icon), NONE);
+                // display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
               }
             }
             else
             {
-              Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", TAG, __LINE__, https.errorToString(httpCode).c_str());
+              Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
               bool res = readBufferFromFile(buffer);
               if (res)
-                display_show_msg(buffer, API_ERROR);
+                display_show_msg(buffer, NONE);
+              // display_show_msg(buffer, API_ERROR);
               else
-                display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+                // display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+                display_show_msg(const_cast<uint8_t *>(default_icon), NONE);
             }
           }
           else
           {
-            Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", TAG, __LINE__, https.errorToString(httpCode).c_str());
+            Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
+
+            String log = "{\"log\":{\"dump\":{\"error\": \"";
+            log.concat("HTTPS request failed:");
+            log.concat("returned code:");
+            log.concat(https.errorToString(httpCode));
+            log.concat("\"}}}");
+            log_POST(log);
+
             bool res = readBufferFromFile(buffer);
             if (res)
               display_show_msg(buffer, API_ERROR);
@@ -647,7 +772,7 @@ static void downloadAndSaveToFile(const char *url)
         }
         else
         {
-          Log.error("%s [%d]: unable to connect\r\n", TAG, __LINE__);
+          Log.error("%s [%d]: unable to connect\r\n", __FILE__, __LINE__);
           bool res = readBufferFromFile(buffer);
           if (res)
             display_show_msg(buffer, API_ERROR);
@@ -662,7 +787,7 @@ static void downloadAndSaveToFile(const char *url)
   }
   else
   {
-    Log.error("%s [%d]: Unable to create client\r\n", TAG, __LINE__);
+    Log.error("%s [%d]: Unable to create client\r\n", __FILE__, __LINE__);
     bool res = readBufferFromFile(buffer);
     if (res)
       display_show_msg(buffer, WIFI_INTERNAL_ERROR);
@@ -684,13 +809,13 @@ static void checkAndPerformFirmwareUpdate(void)
       int httpCode = https.GET();
       if (httpCode == HTTP_CODE_OK)
       {
-        Log.info("%s [%d]: Downloading .bin file...\r\n", TAG, __LINE__);
+        Log.info("%s [%d]: Downloading .bin file...\r\n", __FILE__, __LINE__);
 
         size_t contentLength = https.getSize();
         // Perform firmware update
         if (Update.begin(contentLength))
         {
-          Log.info("%s [%d]: Firmware update start\r\n", TAG, __LINE__);
+          Log.info("%s [%d]: Firmware update start\r\n", __FILE__, __LINE__);
           bool res = readBufferFromFile(buffer);
           if (res)
             display_show_msg(buffer, FW_UPDATE);
@@ -700,7 +825,7 @@ static void checkAndPerformFirmwareUpdate(void)
           {
             if (Update.end(true))
             {
-              Log.info("%s [%d]: Firmware update successful. Rebooting...\r\n", TAG, __LINE__);
+              Log.info("%s [%d]: Firmware update successful. Rebooting...\r\n", __FILE__, __LINE__);
               bool res = readBufferFromFile(buffer);
               if (res)
                 display_show_msg(buffer, FW_UPDATE_SUCCESS);
@@ -709,7 +834,7 @@ static void checkAndPerformFirmwareUpdate(void)
             }
             else
             {
-              Log.fatal("%s [%d]: Firmware update failed!\r\n", TAG, __LINE__);
+              Log.fatal("%s [%d]: Firmware update failed!\r\n", __FILE__, __LINE__);
               bool res = readBufferFromFile(buffer);
               if (res)
                 display_show_msg(buffer, FW_UPDATE_FAILED);
@@ -719,7 +844,7 @@ static void checkAndPerformFirmwareUpdate(void)
           }
           else
           {
-            Log.fatal("%s [%d]: Write to firmware update stream failed!\r\n", TAG, __LINE__);
+            Log.fatal("%s [%d]: Write to firmware update stream failed!\r\n", __FILE__, __LINE__);
             bool res = readBufferFromFile(buffer);
             if (res)
               display_show_msg(buffer, FW_UPDATE_FAILED);
@@ -729,7 +854,7 @@ static void checkAndPerformFirmwareUpdate(void)
         }
         else
         {
-          Log.fatal("%s [%d]: Begin firmware update failed!\r\n", TAG, __LINE__);
+          Log.fatal("%s [%d]: Begin firmware update failed!\r\n", __FILE__, __LINE__);
           bool res = readBufferFromFile(buffer);
           if (res)
             display_show_msg(buffer, FW_UPDATE_FAILED);
@@ -739,7 +864,7 @@ static void checkAndPerformFirmwareUpdate(void)
       }
       else
       {
-        Log.fatal("%s [%d]: HTTP GET failed!\r\n", TAG, __LINE__);
+        Log.fatal("%s [%d]: HTTP GET failed!\r\n", __FILE__, __LINE__);
         bool res = readBufferFromFile(buffer);
         if (res)
           display_show_msg(buffer, API_ERROR);
@@ -752,13 +877,13 @@ static void checkAndPerformFirmwareUpdate(void)
   delete client;
 }
 
-static bool parseBMPHeader(uint8_t *data, bool &reserved)
+static bmp_err_e parseBMPHeader(uint8_t *data, bool &reserved)
 {
   // Check if the file is a BMP image
   if (data[0] != 'B' || data[1] != 'M')
   {
     Log.fatal("%s [%d]: It is not a BMP file\r\n", __FILE__, __LINE__);
-    return false;
+    return BMP_NOT_BMP;
   }
 
   // Get width and height from the header
@@ -770,7 +895,7 @@ static bool parseBMPHeader(uint8_t *data, bool &reserved)
   uint32_t colorTableEntries = *(uint32_t *)&data[46];
 
   if (width != 800 || height != 480 || bitsPerPixel != 1 || imageDataSize != 48000 || colorTableEntries != 2)
-    return false;
+    return BMP_BAD_SIZE;
   // Get the offset of the pixel data
   uint32_t dataOffset = *(uint32_t *)&data[10];
 
@@ -803,13 +928,13 @@ static bool parseBMPHeader(uint8_t *data, bool &reserved)
     else
     {
       Log.info("%s [%d]: Color scheme demaged\r\n", __FILE__, __LINE__);
-      return false;
+      return BMP_COLOR_SCHEME_FAILED;
     }
-    return true;
+    return BMP_NO_ERR;
   }
   else
   {
-    return false;
+    return BMP_INVALID_OFFSET;
   }
 }
 
@@ -824,35 +949,35 @@ static void getDeviceCredentials(const char *url)
       // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
       HTTPClient https;
 
-      Log.info("%s [%d]: [HTTPS] begin...\r\n", TAG, __LINE__);
+      Log.info("%s [%d]: [HTTPS] begin...\r\n", __FILE__, __LINE__);
       char new_url[200];
       strcpy(new_url, url);
       strcat(new_url, "/api/setup");
       https.addHeader("ID", WiFi.macAddress());
       if (https.begin(*client, new_url))
       { // HTTPS
-        Log.info("%s [%d]: [HTTPS] GET...\r\n", TAG, __LINE__);
+        Log.info("%s [%d]: [HTTPS] GET...\r\n", __FILE__, __LINE__);
         // start connection and send HTTP header
 
-        Log.info("%s [%d]: Device MAC address: %s\r\n", TAG, __LINE__, WiFi.macAddress().c_str());
+        Log.info("%s [%d]: Device MAC address: %s\r\n", __FILE__, __LINE__, WiFi.macAddress().c_str());
         int httpCode = https.GET();
 
         // httpCode will be negative on error
         if (httpCode > 0)
         {
           // HTTP header has been send and Server response header has been handled
-          Log.info("%s [%d]: GET... code: %d\r\n", TAG, __LINE__, httpCode);
+          Log.info("%s [%d]: GET... code: %d\r\n", __FILE__, __LINE__, httpCode);
           // file found at server
           if (httpCode == HTTP_CODE_OK)
           {
-            Log.info("%s [%d]: Content size: %d\r\n", TAG, __LINE__, https.getSize());
+            Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
             String payload = https.getString();
-            Log.info("%s [%d]: Payload: %s\r\n", TAG, __LINE__, payload.c_str());
+            Log.info("%s [%d]: Payload: %s\r\n", __FILE__, __LINE__, payload.c_str());
             JsonDocument doc;
             DeserializationError error = deserializeJson(doc, payload);
             if (error)
             {
-              Log.error("%s [%d]: JSON deserialization error.\r\n", TAG, __LINE__);
+              Log.error("%s [%d]: JSON deserialization error.\r\n", __FILE__, __LINE__);
               https.end();
               client->stop();
               return;
@@ -861,32 +986,32 @@ static void getDeviceCredentials(const char *url)
             if (url_status == 200)
             {
               status = true;
-              Log.info("%s [%d]: status OK.\r\n", TAG, __LINE__);
+              Log.info("%s [%d]: status OK.\r\n", __FILE__, __LINE__);
 
               String api_key = doc["api_key"];
-              Log.info("%s [%d]: API key - %s\r\n", TAG, __LINE__, api_key.c_str());
+              Log.info("%s [%d]: API key - %s\r\n", __FILE__, __LINE__, api_key.c_str());
               size_t res = preferences.putString(PREFERENCES_API_KEY, api_key);
-              Log.info("%s [%d]: api key saved in the preferences - %d\r\n", TAG, __LINE__, res);
+              Log.info("%s [%d]: api key saved in the preferences - %d\r\n", __FILE__, __LINE__, res);
 
               String friendly_id = doc["friendly_id"];
-              Log.info("%s [%d]: friendly ID - %s\r\n", TAG, __LINE__, friendly_id.c_str());
+              Log.info("%s [%d]: friendly ID - %s\r\n", __FILE__, __LINE__, friendly_id.c_str());
               res = preferences.putString(PREFERENCES_FRIENDLY_ID, friendly_id);
-              Log.info("%s [%d]: friendly ID saved in the preferences - %d\r\n", TAG, __LINE__, res);
+              Log.info("%s [%d]: friendly ID saved in the preferences - %d\r\n", __FILE__, __LINE__, res);
 
               String image_url = doc["image_url"];
-              Log.info("%s [%d]: image_url - %s\r\n", TAG, __LINE__, image_url.c_str());
+              Log.info("%s [%d]: image_url - %s\r\n", __FILE__, __LINE__, image_url.c_str());
               image_url.toCharArray(filename, image_url.length() + 1);
-              Log.info("%s [%d]: status - %d\r\n", TAG, __LINE__, status);
+              Log.info("%s [%d]: status - %d\r\n", __FILE__, __LINE__, status);
             }
             else
             {
-              Log.info("%s [%d]: status FAIL.\r\n", TAG, __LINE__);
+              Log.info("%s [%d]: status FAIL.\r\n", __FILE__, __LINE__);
               status = false;
             }
           }
           else
           {
-            Log.info("%s [%d]: [HTTPS] Unable to connect\r\n", TAG, __LINE__);
+            Log.info("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
             bool res = readBufferFromFile(buffer);
             if (res)
               display_show_msg(buffer, API_ERROR);
@@ -897,7 +1022,7 @@ static void getDeviceCredentials(const char *url)
         }
         else
         {
-          Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", TAG, __LINE__, https.errorToString(httpCode).c_str());
+          Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
           bool res = readBufferFromFile(buffer);
           if (res)
             display_show_msg(buffer, API_ERROR);
@@ -910,7 +1035,7 @@ static void getDeviceCredentials(const char *url)
       }
       else
       {
-        Log.error("%s [%d]: [HTTPS] Unable to connect\r\n", TAG, __LINE__);
+        Log.error("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
         bool res = readBufferFromFile(buffer);
         if (res)
           display_show_msg(buffer, WIFI_INTERNAL_ERROR);
@@ -918,19 +1043,19 @@ static void getDeviceCredentials(const char *url)
           display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_INTERNAL_ERROR);
         // display_sleep();
       }
-      Log.info("%s [%d]: status - %d\r\n", TAG, __LINE__, status);
+      Log.info("%s [%d]: status - %d\r\n", __FILE__, __LINE__, status);
       if (status)
       {
         status = false;
         // memset(new_url, 0, sizeof(new_url));
         // strcpy(new_url, url);
         // strcat(new_url, filename);
-        Log.info("%s [%d]: filename - %s\r\n", TAG, __LINE__, filename);
+        Log.info("%s [%d]: filename - %s\r\n", __FILE__, __LINE__, filename);
 
-        Log.info("%s [%d]: [HTTPS] Request to %s\r\n", TAG, __LINE__, filename);
+        Log.info("%s [%d]: [HTTPS] Request to %s\r\n", __FILE__, __LINE__, filename);
         if (https.begin(*client, filename))
         { // HTTPS
-          Log.info("%s [%d]: [HTTPS] GET..\r\n", TAG, __LINE__);
+          Log.info("%s [%d]: [HTTPS] GET..\r\n", __FILE__, __LINE__);
           // start connection and send HTTP header
           int httpCode = https.GET();
 
@@ -938,11 +1063,11 @@ static void getDeviceCredentials(const char *url)
           if (httpCode > 0)
           {
             // HTTP header has been send and Server response header has been handled
-            Log.error("%s [%d]: [HTTPS] GET... code: %d\r\n", TAG, __LINE__, httpCode);
+            Log.error("%s [%d]: [HTTPS] GET... code: %d\r\n", __FILE__, __LINE__, httpCode);
             // file found at server
             if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
             {
-              Log.info("%s [%d]: Content size: %d\r\n", TAG, __LINE__, https.getSize());
+              Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
 
               WiFiClient *stream = https.getStreamPtr();
 
@@ -955,22 +1080,22 @@ static void getDeviceCredentials(const char *url)
               https.end();
               if (counter == sizeof(buffer))
               {
-                Log.info("%s [%d]: Received successfully\r\n", TAG, __LINE__);
+                Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
                 // EPD_7IN5_V2_Clear();
                 // DEV_Delay_ms(500);
 
                 bool res = writeBufferToFile("/logo.bmp", buffer, sizeof(buffer));
                 if (res)
-                  Log.info("%s [%d]: File written!\r\n", TAG, __LINE__);
+                  Log.info("%s [%d]: File written!\r\n", __FILE__, __LINE__);
                 else
-                  Log.error("%s [%d]: File not written!\r\n", TAG, __LINE__);
+                  Log.error("%s [%d]: File not written!\r\n", __FILE__, __LINE__);
 
                 // show the image
                 display_show_image(buffer, false);
               }
               else
               {
-                Log.error("%s [%d]: Receiving failed. Readed: %d\r\n", TAG, __LINE__, counter);
+                Log.error("%s [%d]: Receiving failed. Readed: %d\r\n", __FILE__, __LINE__, counter);
                 bool res = readBufferFromFile(buffer);
                 if (res)
                   display_show_msg(buffer, API_SIZE_ERROR);
@@ -980,7 +1105,7 @@ static void getDeviceCredentials(const char *url)
             }
             else
             {
-              Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", TAG, __LINE__, https.errorToString(httpCode).c_str());
+              Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
               https.end();
               bool res = readBufferFromFile(buffer);
               if (res)
@@ -991,7 +1116,7 @@ static void getDeviceCredentials(const char *url)
           }
           else
           {
-            Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", TAG, __LINE__, https.errorToString(httpCode).c_str());
+            Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
             bool res = readBufferFromFile(buffer);
             if (res)
               display_show_msg(buffer, API_ERROR);
@@ -1001,7 +1126,7 @@ static void getDeviceCredentials(const char *url)
         }
         else
         {
-          Log.error("%s [%d]: unable to connect\r\n", TAG, __LINE__);
+          Log.error("%s [%d]: unable to connect\r\n", __FILE__, __LINE__);
           bool res = readBufferFromFile(buffer);
           if (res)
             display_show_msg(buffer, API_ERROR);
@@ -1016,7 +1141,7 @@ static void getDeviceCredentials(const char *url)
   }
   else
   {
-    Log.error("%s [%d]: Unable to create client\r\n", TAG, __LINE__);
+    Log.error("%s [%d]: Unable to create client\r\n", __FILE__, __LINE__);
     bool res = readBufferFromFile(buffer);
     if (res)
       display_show_msg(buffer, WIFI_INTERNAL_ERROR);
@@ -1028,7 +1153,7 @@ static void getDeviceCredentials(const char *url)
 static void goToSleep(void)
 {
   uint64_t time_to_sleep = preferences.getLong64(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
-  Log.info("%s [%d]: time to sleep - %d\r\n", TAG, __LINE__, time_to_sleep);
+  Log.info("%s [%d]: time to sleep - %d\r\n", __FILE__, __LINE__, time_to_sleep);
   preferences.end();
   esp_sleep_enable_timer_wakeup(time_to_sleep * SLEEP_uS_TO_S_FACTOR);
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT,

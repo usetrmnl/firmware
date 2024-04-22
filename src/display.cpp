@@ -8,8 +8,6 @@
 #include <config.h>
 #include <ImageData.h>
 
-static const char *TAG = "display.cpp";
-
 /**
  * @brief Function to init the display
  * @param none
@@ -17,10 +15,10 @@ static const char *TAG = "display.cpp";
  */
 void display_init(void)
 {
-    Log.info("%s [%d]: EPD_7IN5_V2_test Demo\r\n", TAG, __LINE__);
+    Log.info("%s [%d]: EPD_7IN5_V2_test Demo\r\n", __FILE__, __LINE__);
     DEV_Module_Init();
 
-    Log.info("%s [%d]: e-Paper Init and Clear...\r\n", TAG, __LINE__);
+    Log.info("%s [%d]: e-Paper Init and Clear...\r\n", __FILE__, __LINE__);
     EPD_7IN5_V2_Init_New();
 }
 
@@ -31,7 +29,7 @@ void display_init(void)
  */
 void display_reset(void)
 {
-    Log.info("%s [%d]: e-Paper Clear...\r\n", TAG, __LINE__);
+    Log.info("%s [%d]: e-Paper Clear...\r\n", __FILE__, __LINE__);
     EPD_7IN5_V2_Clear();
     DEV_Delay_ms(500);
 }
@@ -49,18 +47,18 @@ void display_show_image(uint8_t *image_buffer, bool reverse)
     UWORD Imagesize = ((EPD_7IN5_V2_WIDTH % 8 == 0) ? (EPD_7IN5_V2_WIDTH / 8) : (EPD_7IN5_V2_WIDTH / 8 + 1)) * EPD_7IN5_V2_HEIGHT;
     if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
     {
-        Log.error("%s [%d]: free heap - %d\r\n", TAG, __LINE__, ESP.getFreeHeap());
-        Log.fatal("%s [%d]: Failed to apply for black memory...\r\n", TAG, __LINE__);
+        Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
+        Log.fatal("%s [%d]: Failed to apply for black memory...\r\n", __FILE__, __LINE__);
         while (1)
             ;
     }
-    Log.info("%s [%d]: Paint_NewImage %d\r\n", TAG, __LINE__, reverse);
+    Log.info("%s [%d]: Paint_NewImage %d\r\n", __FILE__, __LINE__, reverse);
     // if (reverse)
     //     Paint_NewImage(BlackImage, EPD_7IN5_V2_WIDTH, EPD_7IN5_V2_HEIGHT, 0, BLACK);
     // else
     Paint_NewImage(BlackImage, EPD_7IN5_V2_WIDTH, EPD_7IN5_V2_HEIGHT, 0, WHITE);
 
-    Log.info("%s [%d]: show image for array\r\n", TAG, __LINE__);
+    Log.info("%s [%d]: show image for array\r\n", __FILE__, __LINE__);
     Paint_SelectImage(BlackImage);
     Paint_Clear(WHITE);
     if (reverse)
@@ -72,7 +70,7 @@ void display_show_image(uint8_t *image_buffer, bool reverse)
     }
     Paint_DrawBitMap(image_buffer + 62);
     EPD_7IN5_V2_Display(BlackImage);
-    Log.info("%s [%d]: display\r\n", TAG, __LINE__);
+    Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
     // printf("Goto Sleep...\r\n");
     // DEV_Delay_ms(2000);
     // EPD_7IN5_V2_Sleep();
@@ -92,16 +90,16 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     UWORD Imagesize = ((EPD_7IN5_V2_WIDTH % 8 == 0) ? (EPD_7IN5_V2_WIDTH / 8) : (EPD_7IN5_V2_WIDTH / 8 + 1)) * EPD_7IN5_V2_HEIGHT;
     if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
     {
-        Log.error("%s [%d]: free heap - %d\r\n", TAG, __LINE__, ESP.getFreeHeap());
-        Log.fatal("%s [%d]: Failed to apply for black memory...\r\n", TAG, __LINE__);
+        Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
+        Log.fatal("%s [%d]: Failed to apply for black memory...\r\n", __FILE__, __LINE__);
         while (1)
             ;
     }
 
-    Log.info("%s [%d]: Paint_NewImage\r\n", TAG, __LINE__);
+    Log.info("%s [%d]: Paint_NewImage\r\n", __FILE__, __LINE__);
     Paint_NewImage(BlackImage, EPD_7IN5_V2_WIDTH, EPD_7IN5_V2_HEIGHT, 0, WHITE);
 
-    Log.info("%s [%d]: show image for array\r\n", TAG, __LINE__);
+    Log.info("%s [%d]: show image for array\r\n", __FILE__, __LINE__);
     Paint_SelectImage(BlackImage);
     Paint_Clear(WHITE);
     Paint_DrawBitMap(image_buffer + 62);
@@ -180,16 +178,16 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     UWORD Imagesize = ((EPD_7IN5_V2_WIDTH % 8 == 0) ? (EPD_7IN5_V2_WIDTH / 8) : (EPD_7IN5_V2_WIDTH / 8 + 1)) * EPD_7IN5_V2_HEIGHT;
     if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
     {
-        Log.error("%s [%d]: free heap - %d\r\n", TAG, __LINE__, ESP.getFreeHeap());
-        Log.fatal("%s [%d]: Failed to apply for black memory...\r\n", TAG, __LINE__);
+        Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
+        Log.fatal("%s [%d]: Failed to apply for black memory...\r\n", __FILE__, __LINE__);
         while (1)
             ;
     }
 
-    Log.info("%s [%d]: Paint_NewImage\r\n", TAG, __LINE__);
+    Log.info("%s [%d]: Paint_NewImage\r\n", __FILE__, __LINE__);
     Paint_NewImage(BlackImage, EPD_7IN5_V2_WIDTH, EPD_7IN5_V2_HEIGHT, 0, WHITE);
 
-    Log.info("%s [%d]: show image for array\r\n", TAG, __LINE__);
+    Log.info("%s [%d]: show image for array\r\n", __FILE__, __LINE__);
     Paint_SelectImage(BlackImage);
     Paint_Clear(WHITE);
     Paint_DrawBitMap(image_buffer + 62);
@@ -226,9 +224,9 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     default:
         break;
     }
-    Log.info("%s [%d]: Start drawing...\r\n", TAG, __LINE__);
+    Log.info("%s [%d]: Start drawing...\r\n", __FILE__, __LINE__);
     EPD_7IN5_V2_Display(BlackImage);
-    Log.info("%s [%d]: Drawing finished\r\n", TAG, __LINE__);
+    Log.info("%s [%d]: Drawing finished\r\n", __FILE__, __LINE__);
     // DEV_Delay_ms(500);
     free(BlackImage);
     BlackImage = NULL;
@@ -241,6 +239,6 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
  */
 void display_sleep(void)
 {
-    Log.info("%s [%d]: Goto Sleep...\r\n", TAG, __LINE__);
+    Log.info("%s [%d]: Goto Sleep...\r\n", __FILE__, __LINE__);
     EPD_7IN5B_V2_Sleep();
 }

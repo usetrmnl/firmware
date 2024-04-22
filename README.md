@@ -128,6 +128,9 @@ In case it will sleep all the time it can sleep 18000 hours which is 750 days
 
 [v.1.2.0]
     - added new initial sequence for e-paper display(from RPi code. Now in the code are 3 initialization sequences: - default function from ESP32 code; default function from RPi code (2.2 s for Chinese displays, 10 s for waveshare displays); fast function from RPi code(3.4 s for Chinese displays, 1.8 s for waveshare displays));
+
+[v.1.2.1]
+    - added log POST request for failed GET requests;
     
 ## **Compilation guide**
 1. Install the VScode https://code.visualstudio.com

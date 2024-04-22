@@ -15,4 +15,14 @@ typedef enum
   MODE_DEFAULT,
   MODE_BLE,
 } MODE;
+
+enum bmp_err_e
+{
+    BMP_NO_ERR,
+    BMP_NOT_BMP,
+    BMP_BAD_SIZE,
+    BMP_COLOR_SCHEME_FAILED,
+    BMP_INVALID_OFFSET,
+};
+
 #endif

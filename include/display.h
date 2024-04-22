@@ -4,6 +4,7 @@
 #include <Arduino.h>
 
 enum MSG {
+  NONE,
   WIFI_CONNECT,
   WIFI_FAILED,
   WIFI_INTERNAL_ERROR,

@@ -13,9 +13,6 @@
 #include <ArduinoLog.h>
 
 
-
-static const char *TAG = "main.cpp";
-
 void setup()
 {
   bl_init();
