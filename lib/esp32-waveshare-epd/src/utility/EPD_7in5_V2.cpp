@@ -520,6 +520,7 @@ parameter:
 ******************************************************************************/
 void EPD_7IN5_V2_Clear(void)
 {
+    /*
     UWORD Width, Height;
     Width = (EPD_7IN5_V2_WIDTH % 8 == 0) ? (EPD_7IN5_V2_WIDTH / 8) : (EPD_7IN5_V2_WIDTH / 8 + 1);
     Height = EPD_7IN5_V2_HEIGHT;
@@ -535,6 +536,7 @@ void EPD_7IN5_V2_Clear(void)
     {
         EPD_SendData(0x00);
     }
+    */
     EPD_7IN5_V2_TurnOnDisplay();
 }
 

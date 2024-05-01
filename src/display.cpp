@@ -15,11 +15,13 @@
  */
 void display_init(void)
 {
-    Log.info("%s [%d]: EPD_7IN5_V2_test Demo\r\n", __FILE__, __LINE__);
+    Log.info("%s [%d]: dev module start\r\n", __FILE__, __LINE__);
     DEV_Module_Init();
+    Log.info("%s [%d]: dev module end\r\n", __FILE__, __LINE__);
 
-    Log.info("%s [%d]: e-Paper Init and Clear...\r\n", __FILE__, __LINE__);
+    Log.info("%s [%d]: screen hw start\r\n", __FILE__, __LINE__);
     EPD_7IN5_V2_Init_New();
+    Log.info("%s [%d]: screen hw end\r\n", __FILE__, __LINE__);
 }
 
 /**
@@ -29,9 +31,10 @@ void display_init(void)
  */
 void display_reset(void)
 {
-    Log.info("%s [%d]: e-Paper Clear...\r\n", __FILE__, __LINE__);
+    Log.info("%s [%d]: e-Paper Clear start\r\n", __FILE__, __LINE__);
     EPD_7IN5_V2_Clear();
-    DEV_Delay_ms(500);
+    Log.info("%s [%d]:  e-Paper Clear end\r\n", __FILE__, __LINE__);
+    //DEV_Delay_ms(500);
 }
 
 /**
