@@ -143,6 +143,16 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
 
 [v.1.2.1]
     - added log POST request for failed GET requests;
+
+[v.1.2.2]
+    - changed the sequence of actions when sending logs;
+    - removed menu items from WiFI manager;
+    - removed Friendly ID from boot image;
+    - done small copywriting edits for prompt messages;
+    - improved battery voltage reading(added information about basic voltage to README);
+    - 
+
+
     
 ## **Compilation guide**
 1. Install the VScode https://code.visualstudio.com

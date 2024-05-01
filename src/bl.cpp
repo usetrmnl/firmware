@@ -24,6 +24,7 @@ WiFiManager wm;
 uint8_t buffer[48062];
 char filename[1024];
 char binUrl[1024];
+char log_array[512];
 
 bool status = false;
 bool keys_stored = false;
@@ -45,9 +46,9 @@ static void checkAndPerformFirmwareUpdate(void);
 static void goToSleep(void);
 static void setClock(void);
 static float readBatteryVoltage(void);
-static void log_POST(String &log);
+static void log_POST(char *log_buffer, size_t size);
 
-static void log_POST(String &log)
+static void log_POST(char *log_buffer, size_t size)
 {
   WiFiClientSecure *client = new WiFiClientSecure;
   if (client)
@@ -78,9 +79,9 @@ static void log_POST(String &log)
         https.addHeader("Access-Token", api_key);
         https.addHeader("Content-Type", "application/json");
         Serial.print("Send log:");
-        Serial.println(log);
+        Serial.println(log_buffer);
         // start connection and send HTTP header
-        int httpCode = https.POST(log);
+        int httpCode = https.POST(log_buffer);
 
         // httpCode will be negative on error
         if (httpCode > 0)
@@ -291,7 +292,7 @@ void bl_init(void)
     else
     {
       Log.fatal("%s [%d]: Connection failed!\r\n", __FILE__, __LINE__);
-      WiFi.disconnect();
+
       res = readBufferFromFile(buffer);
       if (res)
         display_show_msg(buffer, WIFI_FAILED);
@@ -323,11 +324,11 @@ void bl_init(void)
         Log.info("%s [%d]: friendly ID exists\r\n", __FILE__, __LINE__);
         String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
 
-        display_show_msg(buffer, WIFI_CONNECT, friendly_id, fw.c_str());
+        display_show_msg(buffer, WIFI_CONNECT, friendly_id, true, fw.c_str());
       }
       else
       {
-        display_show_msg(buffer, WIFI_CONNECT, "NOT SAVED", fw.c_str());
+        display_show_msg(buffer, WIFI_CONNECT, "NOT SAVED", false, fw.c_str());
       }
     }
     else
@@ -337,12 +338,12 @@ void bl_init(void)
       {
         Log.info("%s [%d]: friendly ID exists\r\n", __FILE__, __LINE__);
         String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
-        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_CONNECT, friendly_id, fw.c_str());
+        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_CONNECT, friendly_id, true, fw.c_str());
       }
       else
       {
         Log.error("%s [%d]: friendly ID NOT exists\r\n", __FILE__, __LINE__);
-        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_CONNECT, "NOT SAVED", fw.c_str());
+        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_CONNECT, "NOT SAVED", false, fw.c_str());
       }
     }
     wm.setClass("invert");
@@ -359,7 +360,10 @@ void bl_init(void)
       Log.error("%s [%d]: Failed to connect or hit timeout\r\n", __FILE__, __LINE__);
       wm.disconnect();
       wm.stopWebPortal();
+
       WiFi.disconnect();
+      // WiFi.mode(WIFI_OFF);
+
       // wm.resetSettings();
       //  show logo with string
       res = readBufferFromFile(buffer);
@@ -654,6 +658,7 @@ static void downloadAndSaveToFile(const char *url)
             if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
             {
               Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
+              uint32_t counter = 0;
               if (https.getSize() == DISPLAY_BMP_IMAGE_SIZE)
               /*uint32_t counter = 0;
               if (https.getSize() == DISPLAY_BMP_IMAGE_SIZE)
@@ -673,7 +678,7 @@ static void downloadAndSaveToFile(const char *url)
               {
                 WiFiClient *stream = https.getStreamPtr();
                 Log.info("%s [%d]: Stream timeout: %d\r\n", __FILE__, __LINE__, stream->getTimeout());
-                uint32_t counter = 0;
+
                 Log.info("%s [%d]: Stream available: %d\r\n", __FILE__, __LINE__, stream->available());
 
                 uint32_t timer = millis();
@@ -730,16 +735,16 @@ static void downloadAndSaveToFile(const char *url)
 
                   if (res != BMP_NO_ERR)
                   {
-                    String log = "{\"log\":{\"dump\":{\"error\": \"";
-                    log.concat("\"bmp_header_error\":\"");
-                    log.concat(error);
-                    log.concat("\"\"}}}");
-                    log_POST(log);
                     bool rs = readBufferFromFile(buffer);
                     if (rs)
                       display_show_msg(buffer, BMP_FORMAT_ERROR);
                     else
                       display_show_msg(const_cast<uint8_t *>(default_icon), BMP_FORMAT_ERROR);
+
+                    memset(log_array, 0, sizeof(log_array));
+                    sprintf(log_array, "{\"log\":{\"dump\":{\"error\":\"\"bmp_header_error\":\"%s\"\"}}}", error.c_str());
+                    log_POST(log_array, strlen(log_array));
+                    delay(100);
                   }
                 }
                 else
@@ -747,15 +752,6 @@ static void downloadAndSaveToFile(const char *url)
 
                   Log.error("%s [%d]: Receiving failed. Readed: %d\r\n", __FILE__, __LINE__, counter);
 
-                  String log = "{\"log\":{\"dump\":{\"error\":\"";
-                  log.concat("\"returned_code\":\"");
-                  log.concat(httpCode);
-                  log.concat("\",\"content_size\":");
-                  log.concat(https.getSize());
-                  log.concat(",\"readed\":");
-                  log.concat(counter);
-                  log.concat("\"}}}");
-                  log_POST(log);
                   bool res = readBufferFromFile(buffer);
                   if (res)
                     display_show_msg(buffer, NONE);
@@ -763,28 +759,26 @@ static void downloadAndSaveToFile(const char *url)
                   else
                     display_show_msg(const_cast<uint8_t *>(default_icon), NONE);
                   // display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
+                  memset(log_array, 0, sizeof(log_array));
+                  sprintf(log_array, "{\"log\":{\"dump\":{\"error\":\"\"returned_code\":%d,\"content_size\":%d,\"readed\":%d\"}}}", httpCode, https.getSize(), counter);
+                  log_POST(log_array, strlen(log_array));
+                  delay(100);
                 }
               }
               else
               {
                 Log.error("%s [%d]: Receiving failed. Bad file size\r\n", __FILE__, __LINE__);
 
-                String log = "{\"log\":{\"dump\":{\"error\":\"";
-                log.concat("\"returned_code\":\"");
-                log.concat(httpCode);
-                log.concat("\",\"content_size\":");
-                log.concat(https.getSize());
-                log.concat(",\"readed\":");
-                log.concat(counter);
-                log.concat("\"}}}");
-                log_POST(log);
                 bool res = readBufferFromFile(buffer);
                 if (res)
-                  display_show_msg(buffer, NONE);
+                  display_show_msg(buffer, API_SIZE_ERROR);
                 // display_show_msg(buffer, API_SIZE_ERROR);
                 else
-                  display_show_msg(const_cast<uint8_t *>(default_icon), NONE);
+                  display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
                 // display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
+                memset(log_array, 0, sizeof(log_array));
+                sprintf(log_array, "{\"log\":{\"dump\":{\"error\":\"\"returned_code\":%d,\"content_size\":%d,\"readed\":%d\"}}}", httpCode, https.getSize(), counter);
+                log_POST(log_array, strlen(log_array));
               }
             }
             else
@@ -803,13 +797,9 @@ static void downloadAndSaveToFile(const char *url)
           {
             Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
 
-            String log = "{\"log\":{\"dump\":{\"error\": \"";
-            log.concat("HTTPS request failed:");
-            log.concat("returned code:");
-            log.concat(https.errorToString(httpCode));
-            log.concat("\"}}}");
-
-            log_POST(log);
+            memset(log_array, 0, sizeof(log_array));
+            sprintf(log_array, "{\"log\":{\"dump\":{\"error\":\"\"returned_code\":%d,\"code_to_string\":%s\"}}}", httpCode, https.errorToString(httpCode));
+            log_POST(log_array, strlen(log_array));
 
             bool res = readBufferFromFile(buffer);
             if (res)

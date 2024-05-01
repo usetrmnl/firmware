@@ -34,7 +34,7 @@ void display_reset(void)
     Log.info("%s [%d]: e-Paper Clear start\r\n", __FILE__, __LINE__);
     EPD_7IN5_V2_Clear();
     Log.info("%s [%d]:  e-Paper Clear end\r\n", __FILE__, __LINE__);
-    //DEV_Delay_ms(500);
+    // DEV_Delay_ms(500);
 }
 
 /**
@@ -48,12 +48,12 @@ void display_show_image(uint8_t *image_buffer, bool reverse)
     UBYTE *BlackImage;
     /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
     UWORD Imagesize = ((EPD_7IN5_V2_WIDTH % 8 == 0) ? (EPD_7IN5_V2_WIDTH / 8) : (EPD_7IN5_V2_WIDTH / 8 + 1)) * EPD_7IN5_V2_HEIGHT;
+    Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
+    Log.error("%s [%d]: free alloc heap - %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
     if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
     {
-        Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
         Log.fatal("%s [%d]: Failed to apply for black memory...\r\n", __FILE__, __LINE__);
-        while (1)
-            ;
+        ESP.restart();
     }
     Log.info("%s [%d]: Paint_NewImage %d\r\n", __FILE__, __LINE__, reverse);
     // if (reverse)
@@ -91,12 +91,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     UBYTE *BlackImage;
     /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
     UWORD Imagesize = ((EPD_7IN5_V2_WIDTH % 8 == 0) ? (EPD_7IN5_V2_WIDTH / 8) : (EPD_7IN5_V2_WIDTH / 8 + 1)) * EPD_7IN5_V2_HEIGHT;
+    Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
+    Log.error("%s [%d]: free alloc heap - %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
     if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
     {
-        Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
         Log.fatal("%s [%d]: Failed to apply for black memory...\r\n", __FILE__, __LINE__);
-        while (1)
-            ;
+        ESP.restart();
     }
 
     Log.info("%s [%d]: Paint_NewImage\r\n", __FILE__, __LINE__);
@@ -110,53 +110,74 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     {
     case WIFI_CONNECT:
     {
-        Paint_DrawString_EN(225, 400, "Connect to TRMNL WiFi", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(260, 430, "on your phone or computer", &Font24, WHITE, BLACK);
+        char string1[] = "Connect to TRMNL WiFi";
+        Paint_DrawString_EN((800 - sizeof(string1) * 17 > 9) ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 400, string1, &Font24, WHITE, BLACK);
+        char string2[] = "on your phone or computer";
+        Paint_DrawString_EN((800 - sizeof(string2) * 17 > 9) ? (800 - sizeof(string2) * 17) / 2 + 9 : 0, 430, string2, &Font24, WHITE, BLACK);
     }
     break;
     case WIFI_FAILED:
     {
-        Paint_DrawString_EN(0, 400, "Can't establish WiFi connection", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(75, 430, "Hold button on the back to reset WiFi", &Font24, WHITE, BLACK);
+        char string1[] = "Can't establish WiFi connection";
+        Paint_DrawString_EN((800 - sizeof(string1) * 17 > 9) ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 400, string1, &Font24, WHITE, BLACK);
+        char string2[] = "Hold button on the back to reset WiFi";
+        Paint_DrawString_EN((800 - sizeof(string2) * 17 > 9) ? (800 - sizeof(string2) * 17) / 2 + 9 : 0, 430, string2, &Font24, WHITE, BLACK);
     }
     break;
     case WIFI_INTERNAL_ERROR:
     {
-        Paint_DrawString_EN(300, 400, "WiFi connected", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(100, 430, "But API connection cannot be established", &Font24, WHITE, BLACK);
+        char string1[] = "WiFi connected";
+        Paint_DrawString_EN((800 - sizeof(string1) > 9) * 17 ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 400, string1, &Font24, WHITE, BLACK);
+        char string2[] = "But API connection cannot be established";
+        Paint_DrawString_EN((800 - sizeof(string2) > 9) * 17 ? (800 - sizeof(string2) * 17) / 2 + 9 : 0, 430, string2, &Font24, WHITE, BLACK);
     }
     break;
     case API_ERROR:
     {
-        Paint_DrawString_EN(50, 400, "WiFi connected, TRMNL not responding.", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(25, 430, "Wait or reset by holding button on back.", &Font24, WHITE, BLACK);
+        char string1[] = "WiFi connected, TRMNL not responding.";
+        Paint_DrawString_EN((800 - sizeof(string1) > 9) * 17 ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 400, string1, &Font24, WHITE, BLACK);
+        char string2[] = "Wait or reset by holding button on back.";
+        Paint_DrawString_EN((800 - sizeof(string2) > 9) * 17 ? (800 - sizeof(string2) * 17) / 2 + 9 : 0, 430, string2, &Font24, WHITE, BLACK);
     }
     break;
     case API_SIZE_ERROR:
     {
-        Paint_DrawString_EN(30, 400, "WiFi connected, TRMNL content malformed.", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(55, 430, "Wait or reset by holding button on back.", &Font24, WHITE, BLACK);
+        char string1[] = "WiFi connected, TRMNL content malformed.";
+        Paint_DrawString_EN((800 - sizeof(string1) > 9) * 17 ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 400, string1, &Font24, WHITE, BLACK);
+        char string2[] = "Wait or reset by holding button on back.";
+        Paint_DrawString_EN((800 - sizeof(string2) > 9) * 17 ? (800 - sizeof(string2) * 17) / 2 + 9 : 0, 430, string2, &Font24, WHITE, BLACK);
     }
     break;
     case FW_UPDATE:
     {
-        Paint_DrawString_EN(25, 400, "Firmware update available! Starting now...", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(170, 430, "This may take up to 5 minutes", &Font24, WHITE, BLACK);
+        char string1[] = "Firmware update available! Starting now...";
+        Paint_DrawString_EN((800 - sizeof(string1) > 9) * 17 ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 400, string1, &Font24, WHITE, BLACK);
     }
     break;
     case FW_UPDATE_FAILED:
     {
-        Paint_DrawString_EN(15, 400, "Firmware update failed. Device will restart...", &Font24, WHITE, BLACK);
+        char string1[] = "Firmware update failed. Device will restart...";
+        Paint_DrawString_EN((800 - sizeof(string1) > 9) * 17 ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 400, string1, &Font24, WHITE, BLACK);
     }
     break;
     case FW_UPDATE_SUCCESS:
     {
-        Paint_DrawString_EN(15, 400, "Firmware update success. Device will restart..", &Font24, WHITE, BLACK);
+        char string1[] = "Firmware update success. Device will restart..";
+        Paint_DrawString_EN((800 - sizeof(string1) > 9) * 17 ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 400, string1, &Font24, WHITE, BLACK);
     }
     break;
     case BMP_FORMAT_ERROR:
     {
-        Paint_DrawString_EN(100, 400, "The image format is incorrect", &Font24, WHITE, BLACK);
+        char string1[] = "The image format is incorrect";
+        Paint_DrawString_EN((800 - sizeof(string1) > 9) * 17 ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 400, string1, &Font24, WHITE, BLACK);
+    }
+    break;
+    case TEST:
+    {
+        Paint_DrawString_EN(0, 0, "ABCDEFGHIYABCDEFGHIYABCDEFGHIYABCDEFGHIYABCDEFGHIY", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(0, 40, "abcdefghiyabcdefghiyabcdefghiyabcdefghiyabcdefghiy", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(0, 80, "A B C D E F G H I Y A B C D E F G H I Y A B C D E", &Font24, WHITE, BLACK);
+        Paint_DrawString_EN(0, 120, "a b c d e f g h i y a b c d e f g h i y a b c d e", &Font24, WHITE, BLACK);
     }
     break;
     default:
@@ -164,7 +185,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     }
 
     EPD_7IN5_V2_Display(BlackImage);
-    // DEV_Delay_ms(500);
+    Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
     free(BlackImage);
     BlackImage = NULL;
 }
@@ -174,17 +195,17 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
  * @param image_buffer - pointer to the uint8_t image buffer
  * @return bool true - if success; false - if failed
  */
-void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, const char *fw_version)
+void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char *fw_version)
 {
     UBYTE *BlackImage;
     /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
     UWORD Imagesize = ((EPD_7IN5_V2_WIDTH % 8 == 0) ? (EPD_7IN5_V2_WIDTH / 8) : (EPD_7IN5_V2_WIDTH / 8 + 1)) * EPD_7IN5_V2_HEIGHT;
+    Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
+    Log.error("%s [%d]: free alloc heap - %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
     if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
     {
-        Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
         Log.fatal("%s [%d]: Failed to apply for black memory...\r\n", __FILE__, __LINE__);
-        while (1)
-            ;
+        ESP.restart();
     }
 
     Log.info("%s [%d]: Paint_NewImage\r\n", __FILE__, __LINE__);
@@ -198,30 +219,17 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     {
     case WIFI_CONNECT:
     {
-        Paint_DrawString_EN(150, 370, "FW: ", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(205, 370, fw_version, &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(350, 370, "Friendly ID: ", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(560, 370, friendly_id.c_str(), &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(225, 400, "Connect to TRMNL WiFi", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(270, 430, "And plug in USB", &Font24, WHITE, BLACK);
-    }
-    break;
-    case WIFI_FAILED:
-    {
-        Paint_DrawString_EN(0, 400, "Can't establsih WiFi connection with saved WiFi", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(75, 430, "Hold button on the back to reset WiFi", &Font24, WHITE, BLACK);
-    }
-    break;
-    case API_ERROR:
-    {
-        Paint_DrawString_EN(50, 400, "WiFI connected, TRMNL API not responding.", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(25, 430, "Wait or reset WiFi holding button on the back", &Font24, WHITE, BLACK);
-    }
-    break;
-    case API_SIZE_ERROR:
-    {
-        Paint_DrawString_EN(15, 400, "WiFI connected, TRMNL API responded bad value.", &Font24, WHITE, BLACK);
-        Paint_DrawString_EN(15, 430, "Wait or reset WiFi holding button on the back.", &Font24, WHITE, BLACK);
+        String string1 = "FW: ";
+        string1 += fw_version;
+        if (id)
+        {
+            string1 += " Friendly ID: ";
+            string1 += friendly_id;
+        }
+        Log.info("%s [%d]: size of string1 - %d\r\n", __FILE__, __LINE__, string1.length());
+        Paint_DrawString_EN((800 - string1.length() * 17 > 9) ? (800 - string1.length() * 17) / 2 + 9 : 0, 400, string1.c_str(), &Font24, WHITE, BLACK);
+        char string2[] = "Connect to TRMNL WiFi";
+        Paint_DrawString_EN((800 - sizeof(string2) * 17 > 9) ? (800 - sizeof(string2) * 17) / 2 + 9 : 0, 430, string2, &Font24, WHITE, BLACK);
     }
     break;
     default:
@@ -229,8 +237,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     }
     Log.info("%s [%d]: Start drawing...\r\n", __FILE__, __LINE__);
     EPD_7IN5_V2_Display(BlackImage);
-    Log.info("%s [%d]: Drawing finished\r\n", __FILE__, __LINE__);
-    // DEV_Delay_ms(500);
+    Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
     free(BlackImage);
     BlackImage = NULL;
 }
