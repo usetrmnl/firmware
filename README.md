@@ -80,6 +80,18 @@ In case it will sleep all the time it can sleep 18000 hours which is 750 days
 15 min refresh = 78 days
 5 min refresh = 29 days
 
+## **Low Battery Level**
+
+
+The image shows that the battery disconnects when the voltage reaches 2.75 V
+
+![Image Alt text](/pics/battery_3v3.jpg "Voltage battery&3.3V")
+
+
+The pulse on the graph shows the voltage on the divider in sleep mode, further on the graph it can be seen that at the moment of disconnection of the battery on the divider under load the voltage is equal to 1V, i.e. a voltage of 1.2V under load on the divider can be considered extremely critical, which corresponds to a voltage of 1.5V in the state sleep on the divider and 3V on the battery
+
+![Image Alt text](/pics/battery_divider.jpg "Voltage battery&divider")
+
 ## **Version Log**
 
 [v.1.0.0]
@@ -131,6 +143,16 @@ In case it will sleep all the time it can sleep 18000 hours which is 750 days
 
 [v.1.2.1]
     - added log POST request for failed GET requests;
+
+[v.1.2.2]
+    - changed the sequence of actions when sending logs;
+    - removed menu items from WiFI manager;
+    - removed Friendly ID from boot image;
+    - done small copywriting edits for prompt messages;
+    - improved battery voltage reading(added information about basic voltage to README);
+    - 
+
+
     
 ## **Compilation guide**
 1. Install the VScode https://code.visualstudio.com

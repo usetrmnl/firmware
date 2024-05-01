@@ -24,10 +24,12 @@ WiFiManager wm;
 uint8_t buffer[48062];
 char filename[1024];
 char binUrl[1024];
+char log_array[512];
 
 bool status = false;
 bool keys_stored = false;
 bool update_firmware = false;
+bool send_log = false;
 
 // timers
 uint32_t timer = 0;
@@ -44,9 +46,9 @@ static void checkAndPerformFirmwareUpdate(void);
 static void goToSleep(void);
 static void setClock(void);
 static float readBatteryVoltage(void);
-static void log_POST(String &log);
+static void log_POST(char *log_buffer, size_t size);
 
-static void log_POST(String &log)
+static void log_POST(char *log_buffer, size_t size)
 {
   WiFiClientSecure *client = new WiFiClientSecure;
   if (client)
@@ -77,9 +79,9 @@ static void log_POST(String &log)
         https.addHeader("Access-Token", api_key);
         https.addHeader("Content-Type", "application/json");
         Serial.print("Send log:");
-        Serial.println(log);
+        Serial.println(log_buffer);
         // start connection and send HTTP header
-        int httpCode = https.POST(log);
+        int httpCode = https.POST(log_buffer);
 
         // httpCode will be negative on error
         if (httpCode > 0)
@@ -119,14 +121,15 @@ static void log_POST(String &log)
 
 static float readBatteryVoltage(void)
 {
-  uint32_t adc = 0;
-  for (uint8_t i = 0; i < 255; i++)
+  int32_t adc = 0;
+  for (uint8_t i = 0; i < 128; i++)
   {
-    adc += analogRead(PIN_BATTERY);
+    adc += analogReadMilliVolts(PIN_BATTERY);
   }
-  adc = adc / 255;
 
-  float voltage = adc * 3.3 / 4096 * 2;
+  int32_t sensorValue = adc / 128;
+
+  float voltage = sensorValue / 1000.0;
   return voltage;
 }
 
@@ -204,6 +207,7 @@ void bl_init(void)
   pins_init();
   button_timer = millis();
 
+  Log.info("%s [%d]: pref start\r\n", __FILE__, __LINE__);
   bool res = preferences.begin("data", false);
   if (res)
   {
@@ -216,7 +220,9 @@ void bl_init(void)
     while (1)
       ;
   }
+  Log.info("%s [%d]: pref end\r\n", __FILE__, __LINE__);
 
+  Log.info("%s [%d]: button start\r\n", __FILE__, __LINE__);
   // handling reset
   while (1)
   {
@@ -232,6 +238,15 @@ void bl_init(void)
       break;
     }
   }
+  Log.info("%s [%d]: button end\r\n", __FILE__, __LINE__);
+
+  // EPD init
+  // EPD clear
+  Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
+  display_init();
+
+  Log.info("%s [%d]: Display clear\r\n", __FILE__, __LINE__);
+  display_reset();
 
   // Mount SPIFFS
   if (!SPIFFS.begin(true))
@@ -245,14 +260,6 @@ void bl_init(void)
     Log.info("%s [%d]: SPIFFS mounted\r\n", __FILE__, __LINE__);
     listDir(SPIFFS, "/", 0);
   }
-
-  // EPD init
-  // EPD clear
-  Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
-  display_init();
-
-  Log.info("%s [%d]: Display clear\r\n", __FILE__, __LINE__);
-  display_reset();
 
   // Log.info("%s [%d]: Display start\r\n", __FILE__, __LINE__);
   // display_show_image(const_cast<uint8_t *>(default_icon), false); // Download file and save to SPIFFS
@@ -285,7 +292,7 @@ void bl_init(void)
     else
     {
       Log.fatal("%s [%d]: Connection failed!\r\n", __FILE__, __LINE__);
-      WiFi.disconnect();
+
       res = readBufferFromFile(buffer);
       if (res)
         display_show_msg(buffer, WIFI_FAILED);
@@ -317,11 +324,11 @@ void bl_init(void)
         Log.info("%s [%d]: friendly ID exists\r\n", __FILE__, __LINE__);
         String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
 
-        display_show_msg(buffer, WIFI_CONNECT, friendly_id, fw.c_str());
+        display_show_msg(buffer, WIFI_CONNECT, friendly_id, true, fw.c_str());
       }
       else
       {
-        display_show_msg(buffer, WIFI_CONNECT, "NOT SAVED", fw.c_str());
+        display_show_msg(buffer, WIFI_CONNECT, "NOT SAVED", false, fw.c_str());
       }
     }
     else
@@ -331,25 +338,32 @@ void bl_init(void)
       {
         Log.info("%s [%d]: friendly ID exists\r\n", __FILE__, __LINE__);
         String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
-        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_CONNECT, friendly_id, fw.c_str());
+        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_CONNECT, friendly_id, true, fw.c_str());
       }
       else
       {
         Log.error("%s [%d]: friendly ID NOT exists\r\n", __FILE__, __LINE__);
-        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_CONNECT, "NOT SAVED", fw.c_str());
+        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_CONNECT, "NOT SAVED", false, fw.c_str());
       }
     }
     wm.setClass("invert");
     // wm.setConnectRetries(1);
     wm.setConnectTimeout(10);
     // wm.setBreakAfterConfig(true);  // always exit configportal even if wifi save fails
+
+    std::vector<const char *> menu = {"wifi"};
+    wm.setMenu(menu);
+
     res = wm.startConfigPortal("TRMNL"); // password protected ap
     if (!res)
     {
       Log.error("%s [%d]: Failed to connect or hit timeout\r\n", __FILE__, __LINE__);
       wm.disconnect();
       wm.stopWebPortal();
+
       WiFi.disconnect();
+      // WiFi.mode(WIFI_OFF);
+
       // wm.resetSettings();
       //  show logo with string
       res = readBufferFromFile(buffer);
@@ -644,98 +658,127 @@ static void downloadAndSaveToFile(const char *url)
             if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
             {
               Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
-
-              WiFiClient *stream = https.getStreamPtr();
-              Log.info("%s [%d]: Stream timeout: %d\r\n", __FILE__, __LINE__, stream->getTimeout());
               uint32_t counter = 0;
-              Log.info("%s [%d]: Stream available: %d\r\n", __FILE__, __LINE__, stream->available());
-
-              uint32_t timer = millis();
-              while (stream->available() < 4000 && millis() - timer < 1000)
-                ;
-
-              Log.info("%s [%d]: Stream available: %d\r\n", __FILE__, __LINE__, stream->available());
-              // Read and save BMP data to buffer
-              if (stream->available() && https.getSize() == DISPLAY_BMP_IMAGE_SIZE)
+              if (https.getSize() == DISPLAY_BMP_IMAGE_SIZE)
+              /*uint32_t counter = 0;
+              if (https.getSize() == DISPLAY_BMP_IMAGE_SIZE)
               {
-                counter = stream->readBytes(buffer, sizeof(buffer));
+                String payload = https.getString();
+                if (payload.length() > 0)
+                {
+                  for (size_t i = 0; i < payload.length(); i++)
+                  {
+                    buffer[i] = payload.charAt(i); // Convert each character to its ASCII value
+                  }
+                  counter = payload.length();
+                }
               }
+              */
 
-              if (counter == DISPLAY_BMP_IMAGE_SIZE)
               {
-                Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
-                // EPD_7IN5_V2_Clear();
-                // DEV_Delay_ms(500);
-                bool image_reverse = false;
-                bmp_err_e res = parseBMPHeader(buffer, image_reverse);
-                String error = "";
-                switch (res)
+                WiFiClient *stream = https.getStreamPtr();
+                Log.info("%s [%d]: Stream timeout: %d\r\n", __FILE__, __LINE__, stream->getTimeout());
+
+                Log.info("%s [%d]: Stream available: %d\r\n", __FILE__, __LINE__, stream->available());
+
+                uint32_t timer = millis();
+                while (stream->available() < 4000 && millis() - timer < 1000)
+                  ;
+
+                Log.info("%s [%d]: Stream available: %d\r\n", __FILE__, __LINE__, stream->available());
+                //  Read and save BMP data to buffer
+                if (stream->available() && https.getSize() == DISPLAY_BMP_IMAGE_SIZE)
                 {
-                case BMP_NO_ERR:
-                {
-                  // show the image
-                  display_show_image(buffer, image_reverse);
-                }
-                break;
-                case BMP_NOT_BMP:
-                {
-                  error = "First two header bytes are invalid!";
-                }
-                break;
-                case BMP_BAD_SIZE:
-                {
-                  error = "BMP width, height or size are invalid";
-                }
-                break;
-                case BMP_COLOR_SCHEME_FAILED:
-                {
-                  error = "BMP color scheme is invalid";
-                }
-                break;
-                case BMP_INVALID_OFFSET:
-                {
-                  error = "BMP header offset is invalid";
-                }
-                break;
-                default:
-                  break;
+                  counter = stream->readBytes(buffer, sizeof(buffer));
                 }
 
-                if (res != BMP_NO_ERR)
+                if (counter == DISPLAY_BMP_IMAGE_SIZE)
                 {
-                  String log = "{\"log\":{\"dump\":{\"error\": \"";
-                  log.concat("\"bmp_header_error\":\"");
-                  log.concat(error);
-                  log.concat("\"\"}}}");
-                  log_POST(log);
-                  bool rs = readBufferFromFile(buffer);
-                  if (rs)
-                    display_show_msg(buffer, BMP_FORMAT_ERROR);
+                  Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
+
+                  // EPD_7IN5_V2_Clear();
+                  // DEV_Delay_ms(500);
+                  bool image_reverse = false;
+                  bmp_err_e res = parseBMPHeader(buffer, image_reverse);
+                  String error = "";
+                  switch (res)
+                  {
+                  case BMP_NO_ERR:
+                  {
+                    // show the image
+                    display_show_image(buffer, image_reverse);
+                  }
+                  break;
+                  case BMP_NOT_BMP:
+                  {
+                    error = "First two header bytes are invalid!";
+                  }
+                  break;
+                  case BMP_BAD_SIZE:
+                  {
+                    error = "BMP width, height or size are invalid";
+                  }
+                  break;
+                  case BMP_COLOR_SCHEME_FAILED:
+                  {
+                    error = "BMP color scheme is invalid";
+                  }
+                  break;
+                  case BMP_INVALID_OFFSET:
+                  {
+                    error = "BMP header offset is invalid";
+                  }
+                  break;
+                  default:
+                    break;
+                  }
+
+                  if (res != BMP_NO_ERR)
+                  {
+                    bool rs = readBufferFromFile(buffer);
+                    if (rs)
+                      display_show_msg(buffer, BMP_FORMAT_ERROR);
+                    else
+                      display_show_msg(const_cast<uint8_t *>(default_icon), BMP_FORMAT_ERROR);
+
+                    memset(log_array, 0, sizeof(log_array));
+                    sprintf(log_array, "{\"log\":{\"dump\":{\"error\":\"\"bmp_header_error\":\"%s\"\"}}}", error.c_str());
+                    log_POST(log_array, strlen(log_array));
+                    delay(100);
+                  }
+                }
+                else
+                {
+
+                  Log.error("%s [%d]: Receiving failed. Readed: %d\r\n", __FILE__, __LINE__, counter);
+
+                  bool res = readBufferFromFile(buffer);
+                  if (res)
+                    display_show_msg(buffer, NONE);
+                  // display_show_msg(buffer, API_SIZE_ERROR);
                   else
-                    display_show_msg(const_cast<uint8_t *>(default_icon), BMP_FORMAT_ERROR);
+                    display_show_msg(const_cast<uint8_t *>(default_icon), NONE);
+                  // display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
+                  memset(log_array, 0, sizeof(log_array));
+                  sprintf(log_array, "{\"log\":{\"dump\":{\"error\":\"\"returned_code\":%d,\"content_size\":%d,\"readed\":%d\"}}}", httpCode, https.getSize(), counter);
+                  log_POST(log_array, strlen(log_array));
+                  delay(100);
                 }
               }
               else
               {
-                Log.error("%s [%d]: Receiving failed. Readed: %d\r\n", __FILE__, __LINE__, counter);
-                String log = "{\"log\":{\"dump\":{\"error\":\"";
-                log.concat("\"returned_code\":\"");
-                log.concat(httpCode);
-                log.concat("\",\"content_size\":");
-                log.concat(https.getSize());
-                log.concat(",\"available_stream_size\":");
-                log.concat(stream->available());
-                log.concat(",\"readed\":");
-                log.concat(counter);
-                log.concat("\"}}}");
-                log_POST(log);
+                Log.error("%s [%d]: Receiving failed. Bad file size\r\n", __FILE__, __LINE__);
+
                 bool res = readBufferFromFile(buffer);
                 if (res)
-                  display_show_msg(buffer, NONE);
+                  display_show_msg(buffer, API_SIZE_ERROR);
                 // display_show_msg(buffer, API_SIZE_ERROR);
                 else
-                  display_show_msg(const_cast<uint8_t *>(default_icon), NONE);
+                  display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
                 // display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
+                memset(log_array, 0, sizeof(log_array));
+                sprintf(log_array, "{\"log\":{\"dump\":{\"error\":\"\"returned_code\":%d,\"content_size\":%d,\"readed\":%d\"}}}", httpCode, https.getSize(), counter);
+                log_POST(log_array, strlen(log_array));
               }
             }
             else
@@ -754,12 +797,9 @@ static void downloadAndSaveToFile(const char *url)
           {
             Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
 
-            String log = "{\"log\":{\"dump\":{\"error\": \"";
-            log.concat("HTTPS request failed:");
-            log.concat("returned code:");
-            log.concat(https.errorToString(httpCode));
-            log.concat("\"}}}");
-            log_POST(log);
+            memset(log_array, 0, sizeof(log_array));
+            sprintf(log_array, "{\"log\":{\"dump\":{\"error\":\"\"returned_code\":%d,\"code_to_string\":%s\"}}}", httpCode, https.errorToString(httpCode));
+            log_POST(log_array, strlen(log_array));
 
             bool res = readBufferFromFile(buffer);
             if (res)
@@ -794,7 +834,11 @@ static void downloadAndSaveToFile(const char *url)
     else
       display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_INTERNAL_ERROR);
   }
-  // display_sleep();
+
+  if (send_log)
+  {
+    send_log = false;
+  }
 }
 
 static void checkAndPerformFirmwareUpdate(void)
@@ -882,6 +926,10 @@ static bmp_err_e parseBMPHeader(uint8_t *data, bool &reserved)
   // Check if the file is a BMP image
   if (data[0] != 'B' || data[1] != 'M')
   {
+    Serial.print("data[0]: ");
+    Serial.println(data[0]);
+    Serial.print("data[1]: ");
+    Serial.println(data[1]);
     Log.fatal("%s [%d]: It is not a BMP file\r\n", __FILE__, __LINE__);
     return BMP_NOT_BMP;
   }

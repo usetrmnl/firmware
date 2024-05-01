@@ -14,6 +14,7 @@ enum MSG {
   FW_UPDATE_FAILED,
   FW_UPDATE_SUCCESS,
   BMP_FORMAT_ERROR,
+  TEST,
 };
 
 /**
@@ -49,7 +50,7 @@ void display_show_msg(uint8_t * image_buffer, MSG message_type);
  * @param image_buffer - pointer to the uint8_t image buffer
  * @return none
  */
-void display_show_msg(uint8_t * image_buffer, MSG message_type, String friendly_id, const char * fw_version);
+void display_show_msg(uint8_t * image_buffer, MSG message_type, String friendly_id, bool id, const char * fw_version);
 
 /**
  * @brief Function to got the display to the sleep

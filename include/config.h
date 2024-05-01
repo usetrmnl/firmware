@@ -3,7 +3,7 @@
 
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 2
-#define FW_PATCH_VERSION 1
+#define FW_PATCH_VERSION 2
 
 #define PREFERENCES_API_KEY "api_key"
 #define PREFERENCES_API_KEY_DEFAULT ""
@@ -23,7 +23,7 @@
 #define PIN_INTERRUPT 2
 #define PIN_BATTERY 3
 
-#define BUTTON_HOLD_TIME 1000
+#define BUTTON_HOLD_TIME 300
 
 #define SERVER_MAX_RETRIES 2
 
