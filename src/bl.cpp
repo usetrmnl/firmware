@@ -38,7 +38,7 @@ uint32_t button_timer = 0;
 Preferences preferences;
 
 static bmp_err_e parseBMPHeader(uint8_t *data, bool &reserved);
-static void downloadAndSaveToFile(const char *url);
+static https_request_err_e downloadAndSaveToFile(const char *url);
 static void getDeviceCredentials(const char *url);
 static bool readBufferFromFile(uint8_t *out_buffer);
 static bool writeBufferToFile(const char *name, uint8_t *in_buffer, uint16_t size);
@@ -391,11 +391,80 @@ void bl_init(void)
     Log.info("%s [%d]: API key and friendly ID saved\r\n", __FILE__, __LINE__);
   }
 
-  downloadAndSaveToFile("https://usetrmnl.com");
+  https_request_err_e request_result = HTTPS_NO_ERR;
+  uint8_t retries = 0;
+  while (request_result != HTTPS_SUCCES && retries < SERVER_MAX_RETRIES)
+  {
+    Log.info("%s [%d]: request retry %d...\r\n", __FILE__, __LINE__, retries);
+    request_result = downloadAndSaveToFile("https://usetrmnl.com");
+    Log.info("%s [%d]: request result - %d\r\n", __FILE__, __LINE__, request_result);
+    retries++;
+  }
 
   if (update_firmware)
   {
     checkAndPerformFirmwareUpdate();
+  }
+
+  switch (request_result)
+  {
+  case HTTPS_REQUEST_FAILED:
+  {
+    bool res = readBufferFromFile(buffer);
+    if (res)
+      display_show_msg(buffer, API_ERROR);
+    else
+      display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+  }
+  break;
+  case HTTPS_RESPONSE_CODE_INVALID:
+  {
+    bool res = readBufferFromFile(buffer);
+    if (res)
+      display_show_msg(buffer, WIFI_INTERNAL_ERROR);
+    else
+      display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_INTERNAL_ERROR);
+  }
+  break;
+  case HTTPS_UNABLE_TO_CONNECT:
+  {
+    bool res = readBufferFromFile(buffer);
+    if (res)
+      display_show_msg(buffer, API_ERROR);
+    else
+      display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+  }
+  break;
+  case HTTPS_WRONG_IMAGE_FORMAT:
+  {
+    bool rs = readBufferFromFile(buffer);
+    if (rs)
+      display_show_msg(buffer, BMP_FORMAT_ERROR);
+    else
+      display_show_msg(const_cast<uint8_t *>(default_icon), BMP_FORMAT_ERROR);
+  }
+  break;
+  case HTTPS_WRONG_IMAGE_SIZE:
+  {
+    bool res = readBufferFromFile(buffer);
+    if (res)
+      display_show_msg(buffer, API_SIZE_ERROR);
+    // display_show_msg(buffer, API_SIZE_ERROR);
+    else
+      display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
+  }
+  break;
+  case HTTPS_CLIENT_FAILED:
+  {
+    bool res = readBufferFromFile(buffer);
+    if (res)
+      display_show_msg(buffer, WIFI_INTERNAL_ERROR);
+    else
+      display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_INTERNAL_ERROR);
+  }
+  break;
+  default:
+    break;
   }
 
   display_sleep();
@@ -486,9 +555,9 @@ static bool readBufferFromFile(uint8_t *out_buffer)
   }
 }
 
-static void downloadAndSaveToFile(const char *url)
+static https_request_err_e downloadAndSaveToFile(const char *url)
 {
-
+  https_request_err_e result = HTTPS_NO_ERR;
   WiFiClientSecure *client = new WiFiClientSecure;
   if (client)
   {
@@ -576,50 +645,50 @@ static void downloadAndSaveToFile(const char *url)
             JsonDocument doc;
             DeserializationError error = deserializeJson(doc, payload);
             if (error)
-              return;
-            String image_url = doc["image_url"];
-            update_firmware = doc["update_firmware"];
-            String firmware_url = doc["firmware_url"];
-            uint64_t rate = doc["refresh_rate"];
+            {
+              result = HTTPS_JSON_PARSING_ERR;
+            }
+            else
+            {
+              String image_url = doc["image_url"];
+              update_firmware = doc["update_firmware"];
+              String firmware_url = doc["firmware_url"];
+              uint64_t rate = doc["refresh_rate"];
 
-            if (image_url.length() > 0)
-            {
-              Log.info("%s [%d]: image_url: %s\r\n", __FILE__, __LINE__, image_url.c_str());
-              image_url.toCharArray(filename, image_url.length() + 1);
+              if (image_url.length() > 0)
+              {
+                Log.info("%s [%d]: image_url: %s\r\n", __FILE__, __LINE__, image_url.c_str());
+                image_url.toCharArray(filename, image_url.length() + 1);
+              }
+              Log.info("%s [%d]: update_firmware: %d\r\n", __FILE__, __LINE__, update_firmware);
+              if (firmware_url.length() > 0)
+              {
+                Log.info("%s [%d]: firmware_url: %s\r\n", __FILE__, __LINE__, firmware_url.c_str());
+                firmware_url.toCharArray(binUrl, firmware_url.length() + 1);
+              }
+              Log.info("%s [%d]: refresh_rate: %d\r\n", __FILE__, __LINE__, rate);
+              if (rate != preferences.getLong64(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP))
+              {
+                Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, rate);
+                preferences.putULong64(PREFERENCES_SLEEP_TIME_KEY, rate);
+              }
+
+              status = true;
+
+              if (update_firmware)
+                result = HTTPS_SUCCES;
             }
-            Log.info("%s [%d]: update_firmware: %d\r\n", __FILE__, __LINE__, update_firmware);
-            if (firmware_url.length() > 0)
-            {
-              Log.info("%s [%d]: firmware_url: %s\r\n", __FILE__, __LINE__, firmware_url.c_str());
-              firmware_url.toCharArray(binUrl, firmware_url.length() + 1);
-            }
-            Log.info("%s [%d]: refresh_rate: %d\r\n", __FILE__, __LINE__, rate);
-            if (rate != preferences.getLong64(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP))
-            {
-              Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, rate);
-              preferences.putULong64(PREFERENCES_SLEEP_TIME_KEY, rate);
-            }
-            status = true;
           }
           else
           {
             Log.info("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
-            bool res = readBufferFromFile(buffer);
-            if (res)
-              display_show_msg(buffer, API_ERROR);
-            else
-              display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
-            // display_sleep();
+            result = HTTPS_REQUEST_FAILED;
           }
         }
         else
         {
           Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
-          bool res = readBufferFromFile(buffer);
-          if (res)
-            display_show_msg(buffer, WIFI_INTERNAL_ERROR);
-          else
-            display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_INTERNAL_ERROR);
+          result = HTTPS_RESPONSE_CODE_INVALID;
         }
 
         https.end();
@@ -627,20 +696,12 @@ static void downloadAndSaveToFile(const char *url)
       else
       {
         Log.error("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
-        bool res = readBufferFromFile(buffer);
-        if (res)
-          display_show_msg(buffer, API_ERROR);
-        else
-          display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
-        // display_sleep();
+        result = HTTPS_UNABLE_TO_CONNECT;
       }
 
       if (status && !update_firmware)
       {
         status = false;
-        // memset(new_url, 0, sizeof(new_url));
-        // strcpy(new_url, url);
-        // strcat(new_url, filename);
 
         Log.info("%s [%d]: [HTTPS] Request to %s\r\n", __FILE__, __LINE__, filename);
         if (https.begin(*client, filename))
@@ -660,21 +721,6 @@ static void downloadAndSaveToFile(const char *url)
               Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
               uint32_t counter = 0;
               if (https.getSize() == DISPLAY_BMP_IMAGE_SIZE)
-              /*uint32_t counter = 0;
-              if (https.getSize() == DISPLAY_BMP_IMAGE_SIZE)
-              {
-                String payload = https.getString();
-                if (payload.length() > 0)
-                {
-                  for (size_t i = 0; i < payload.length(); i++)
-                  {
-                    buffer[i] = payload.charAt(i); // Convert each character to its ASCII value
-                  }
-                  counter = payload.length();
-                }
-              }
-              */
-
               {
                 WiFiClient *stream = https.getStreamPtr();
                 Log.info("%s [%d]: Stream timeout: %d\r\n", __FILE__, __LINE__, stream->getTimeout());
@@ -696,8 +742,6 @@ static void downloadAndSaveToFile(const char *url)
                 {
                   Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
 
-                  // EPD_7IN5_V2_Clear();
-                  // DEV_Delay_ms(500);
                   bool image_reverse = false;
                   bmp_err_e res = parseBMPHeader(buffer, image_reverse);
                   String error = "";
@@ -707,6 +751,7 @@ static void downloadAndSaveToFile(const char *url)
                   {
                     // show the image
                     display_show_image(buffer, image_reverse);
+                    result = HTTPS_SUCCES;
                   }
                   break;
                   case BMP_NOT_BMP:
@@ -735,16 +780,11 @@ static void downloadAndSaveToFile(const char *url)
 
                   if (res != BMP_NO_ERR)
                   {
-                    bool rs = readBufferFromFile(buffer);
-                    if (rs)
-                      display_show_msg(buffer, BMP_FORMAT_ERROR);
-                    else
-                      display_show_msg(const_cast<uint8_t *>(default_icon), BMP_FORMAT_ERROR);
-
                     memset(log_array, 0, sizeof(log_array));
                     sprintf(log_array, "{\"log\":{\"dump\":{\"error\":\"\"bmp_header_error\":\"%s\"\"}}}", error.c_str());
                     log_POST(log_array, strlen(log_array));
-                    delay(100);
+
+                    result = HTTPS_WRONG_IMAGE_FORMAT;
                   }
                 }
                 else
@@ -752,45 +792,30 @@ static void downloadAndSaveToFile(const char *url)
 
                   Log.error("%s [%d]: Receiving failed. Readed: %d\r\n", __FILE__, __LINE__, counter);
 
-                  bool res = readBufferFromFile(buffer);
-                  if (res)
-                    display_show_msg(buffer, NONE);
-                  // display_show_msg(buffer, API_SIZE_ERROR);
-                  else
-                    display_show_msg(const_cast<uint8_t *>(default_icon), NONE);
                   // display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
                   memset(log_array, 0, sizeof(log_array));
                   sprintf(log_array, "{\"log\":{\"dump\":{\"error\":\"\"returned_code\":%d,\"content_size\":%d,\"readed\":%d\"}}}", httpCode, https.getSize(), counter);
                   log_POST(log_array, strlen(log_array));
-                  delay(100);
+
+                  result = HTTPS_WRONG_IMAGE_SIZE;
                 }
               }
               else
               {
                 Log.error("%s [%d]: Receiving failed. Bad file size\r\n", __FILE__, __LINE__);
 
-                bool res = readBufferFromFile(buffer);
-                if (res)
-                  display_show_msg(buffer, API_SIZE_ERROR);
-                // display_show_msg(buffer, API_SIZE_ERROR);
-                else
-                  display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
-                // display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
                 memset(log_array, 0, sizeof(log_array));
                 sprintf(log_array, "{\"log\":{\"dump\":{\"error\":\"\"returned_code\":%d,\"content_size\":%d,\"readed\":%d\"}}}", httpCode, https.getSize(), counter);
                 log_POST(log_array, strlen(log_array));
+
+                result = HTTPS_REQUEST_FAILED;
               }
             }
             else
             {
               Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
-              bool res = readBufferFromFile(buffer);
-              if (res)
-                display_show_msg(buffer, NONE);
-              // display_show_msg(buffer, API_ERROR);
-              else
-                // display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
-                display_show_msg(const_cast<uint8_t *>(default_icon), NONE);
+              
+              result = HTTPS_REQUEST_FAILED;
             }
           }
           else
@@ -801,11 +826,7 @@ static void downloadAndSaveToFile(const char *url)
             sprintf(log_array, "{\"log\":{\"dump\":{\"error\":\"\"returned_code\":%d,\"code_to_string\":%s\"}}}", httpCode, https.errorToString(httpCode));
             log_POST(log_array, strlen(log_array));
 
-            bool res = readBufferFromFile(buffer);
-            if (res)
-              display_show_msg(buffer, API_ERROR);
-            else
-              display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+            result = HTTPS_REQUEST_FAILED;
           }
 
           https.end();
@@ -813,11 +834,8 @@ static void downloadAndSaveToFile(const char *url)
         else
         {
           Log.error("%s [%d]: unable to connect\r\n", __FILE__, __LINE__);
-          bool res = readBufferFromFile(buffer);
-          if (res)
-            display_show_msg(buffer, API_ERROR);
-          else
-            display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+          
+          result = HTTPS_UNABLE_TO_CONNECT;
         }
       }
       // End extra scoping block
@@ -828,17 +846,15 @@ static void downloadAndSaveToFile(const char *url)
   else
   {
     Log.error("%s [%d]: Unable to create client\r\n", __FILE__, __LINE__);
-    bool res = readBufferFromFile(buffer);
-    if (res)
-      display_show_msg(buffer, WIFI_INTERNAL_ERROR);
-    else
-      display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_INTERNAL_ERROR);
+    
+    result = HTTPS_UNABLE_TO_CONNECT;
   }
 
   if (send_log)
   {
     send_log = false;
   }
+  return result;
 }
 
 static void checkAndPerformFirmwareUpdate(void)

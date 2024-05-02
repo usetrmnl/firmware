@@ -3,7 +3,7 @@
 
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 2
-#define FW_PATCH_VERSION 2
+#define FW_PATCH_VERSION 3
 
 #define PREFERENCES_API_KEY "api_key"
 #define PREFERENCES_API_KEY_DEFAULT ""
@@ -25,7 +25,7 @@
 
 #define BUTTON_HOLD_TIME 300
 
-#define SERVER_MAX_RETRIES 2
+#define SERVER_MAX_RETRIES 3
 
 #define API_LOG_LINK "https://usetrmnl.com/api/log"
 #endif

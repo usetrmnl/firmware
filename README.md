@@ -98,14 +98,14 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
     - initial work version;
 
 [v.1.0.1]
-    - added version control;
+    - added version control;\n
     - added reading the default logo from flash, not from SPIFFS; 
 
 [v.1.0.2]
-    - added setup request and response handling;
-    - added battery reading;
-    - added new errors messages;
-    - added key to requests;
+    - added setup request and response handling;\n
+    - added battery reading;\n
+    - added new errors messages;\n
+    - added key to requests;\n
     - added dynamic refresh rate;
 
 [v.1.0.3]
@@ -113,12 +113,12 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
     - added OTA
 
 [v.1.0.4]
-    - fixeD version that sending to the server;
+    - fixeD version that sending to the server;\n
     - changed default refresh rate to 15 minutes;
 
 [v.1.0.5]
-    - fixed WiFi connection with wrong credentials;
-    - changed default AP name;
+    - fixed WiFi connection with wrong credentials;\n
+    - changed default AP name;\n
     - fixed starting config portal in backend if connection is wrong;
 
 [v.1.0.6]
@@ -131,26 +131,28 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
     - changeed BMP header length;
 
 [v.1.0.9]
-    - fixed loop error on receiving image from the new server(added timeout loop that waiting for stream available);
+    - fixed loop error on receiving image from the new server(added timeout loop that waiting for stream available);\n
     - localization problem with inversion of the color with new server(relative with difference headers);
 
 [v.1.1.0]
-    - added bmp header parser;
+    - added bmp header parser;\n
     - added new error relative with incorrect bmp format - bad width, height, bpp, color table size, color; 
 
 [v.1.2.0]
     - added new initial sequence for e-paper display(from RPi code. Now in the code are 3 initialization sequences: - default function from ESP32 code; default function from RPi code (2.2 s for Chinese displays, 10 s for waveshare displays); fast function from RPi code(3.4 s for Chinese displays, 1.8 s for waveshare displays));
 
 [v.1.2.1]
-    - added log POST request for failed GET requests;
+    - added log POST request for failed GET requests;\n
 
 [v.1.2.2]
-    - changed the sequence of actions when sending logs;
-    - removed menu items from WiFI manager;
-    - removed Friendly ID from boot image;
-    - done small copywriting edits for prompt messages;
-    - improved battery voltage reading(added information about basic voltage to README);
-    - 
+    - changed the sequence of actions when sending logs;\n
+    - removed menu items from WiFI manager;\n
+    - removed Friendly ID from boot image;\n
+    - done small copywriting edits for prompt messages;\n
+    - improved battery voltage reading(added information about basic voltage to README);\n
+
+[v.1.2.3]
+    - added retries for https queries;
 
 
     
