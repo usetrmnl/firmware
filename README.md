@@ -14,10 +14,10 @@ headers = {
 }
 
 response example (success):
-{ "status" => 200, "api_key" => "2r--SahjsAKCFksVcped2Q", friendly_id: "917F0B", image_url: '/images/setup/setup-logo.bmp' }
+{ "status" => 200, "api_key" => "2r--SahjsAKCFksVcped2Q", friendly_id: "917F0B", image_url: "https://usetrmnl.com/images/setup/setup-logo.bmp" }
 
 response example (fail, device with this Mac Address not found)
-{ "status" => 404, "api_key" => nil, friendly_id: nil }
+{ "status" => 404, "api_key" => nil, "friendly_id" => nil, "image_url" => nil }
 ```
 request for image / display content
 
@@ -29,12 +29,13 @@ headers = {
   'Access-Token' => '2r--SahjsAKCFksVcped2Q',
   'Refresh-Rate' => '1800' 
   'Battery-Voltage' => '4.1'
-  'FW-Version' => '0.1.3'
+  'FW-Version' => '2.1.3'
 }
 
 response example (success, device found with this access token):
 {
   "image_url"=>"https://trmnl.s3.us-east-2.amazonaws.com/path-to-img.bmp",
+  "update_firmware"=>false,
   "firmware_url"=>nil,
   "refresh_rate"=>"1800"
 }
@@ -42,14 +43,15 @@ response example (success, device found with this access token):
 response example (success, device found AND needs firmware update):
 {
  "image_url"=>"https://trmnl.s3.us-east-2.amazonaws.com/path-to-img.bmp",
+ "update_firmware"=>true,
  "firmware_url"=>"https://trmnl.s3.us-east-2.amazonaws.com/path-to-firmware.bin",
  "refresh_rate"=>"1800"
 }
 
 response example (fail, device not found for this access token):
-{"image_url"=>nil, "firmware_url"=>nil, "refresh_rate"=>nil}
+{"status"=>500, "error"=>"Device not found"}
 
-if 'FW-Version' header and web server `Setting.firmware_download_url` do not match, server will respond with endpoint from which to download new Firmware.
+if 'FW-Version' header != web server `Setting.firmware_download_url`, server will include absolute URL from which to download firmware.
 ```
 
 ## **Power consumption**
