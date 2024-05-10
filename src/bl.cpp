@@ -127,7 +127,7 @@ static float readBatteryVoltage(void)
     adc += analogReadMilliVolts(PIN_BATTERY);
   }
 
-  int32_t sensorValue = adc / 128;
+  int32_t sensorValue = (adc / 128) * 2;
 
   float voltage = sensorValue / 1000.0;
   return voltage;
@@ -594,11 +594,11 @@ static https_request_err_e downloadAndSaveToFile(const char *url)
         Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_FRIENDLY_ID);
       }
 
-      uint64_t refresh_rate = SLEEP_TIME_TO_SLEEP;
+      uint32_t refresh_rate = SLEEP_TIME_TO_SLEEP;
       if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))
       {
-        refresh_rate = preferences.getLong64(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
-        Log.info("%s [%d]: %s key exists. Value - %s\r\n", __FILE__, __LINE__, PREFERENCES_SLEEP_TIME_KEY, api_key);
+        refresh_rate = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+        Log.info("%s [%d]: %s key exists. Value - %d\r\n", __FILE__, __LINE__, PREFERENCES_SLEEP_TIME_KEY, refresh_rate);
       }
       else
       {
@@ -608,7 +608,6 @@ static https_request_err_e downloadAndSaveToFile(const char *url)
       String fw_version = String(FW_MAJOR_VERSION) + "." + String(FW_MINOR_VERSION) + "." + String(FW_PATCH_VERSION);
 
       float battery_voltage = readBatteryVoltage();
-      Log.info("%s [%d]: %s battery voltage - %f\r\n", __FILE__, __LINE__, PREFERENCES_SLEEP_TIME_KEY, battery_voltage);
 
       Log.info("%s [%d]: Added headers:\n\rID: %s\n\rAccess-Token: %s\n\rRefresh_Rate: %s\n\rBattery-Voltage: %s\n\rFW-Version: %s\r\n", __FILE__, __LINE__, WiFi.macAddress().c_str(), api_key.c_str(), String(refresh_rate).c_str(), String(battery_voltage).c_str(), fw_version.c_str());
 
@@ -667,10 +666,11 @@ static https_request_err_e downloadAndSaveToFile(const char *url)
                 firmware_url.toCharArray(binUrl, firmware_url.length() + 1);
               }
               Log.info("%s [%d]: refresh_rate: %d\r\n", __FILE__, __LINE__, rate);
-              if (rate != preferences.getLong64(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP))
+              if (rate != preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP))
               {
                 Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, rate);
-                preferences.putULong64(PREFERENCES_SLEEP_TIME_KEY, rate);
+                size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, rate);
+                Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
               }
 
               status = true;
@@ -1216,7 +1216,7 @@ static void getDeviceCredentials(const char *url)
 
 static void goToSleep(void)
 {
-  uint64_t time_to_sleep = preferences.getLong64(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+  uint32_t time_to_sleep = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
   Log.info("%s [%d]: time to sleep - %d\r\n", __FILE__, __LINE__, time_to_sleep);
   preferences.end();
   esp_sleep_enable_timer_wakeup(time_to_sleep * SLEEP_uS_TO_S_FACTOR);

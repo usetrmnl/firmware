@@ -154,6 +154,14 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
 [v.1.2.3]
     - added retries for https queries;
 
+[v.1.2.4]
+    - fixed delay after power ON from PC USB;
+    - debug hidden;
+    - fixed refresh rate;
+
+[v.1.2.5]
+    - changed battery read function;
+
 
     
 ## **Compilation guide**
