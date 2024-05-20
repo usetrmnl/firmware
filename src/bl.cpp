@@ -20,178 +20,30 @@
 bool pref_clear = false;
 WiFiManager wm;
 
-// timers
-uint8_t buffer[48062];
-char filename[1024];
-char binUrl[1024];
-char log_array[512];
+uint8_t buffer[48062]; // image buffer
+char filename[1024];   // image URL
+char binUrl[1024];     // update URL
+char log_array[512];   // log
 
-bool status = false;
-bool keys_stored = false;
-bool update_firmware = false;
-bool send_log = false;
+bool status = false;          // need to download a new image
+bool update_firmware = false; // need to download a new firmaware
+bool send_log = false;        // need to send logs
 
 // timers
-uint32_t timer = 0;
 uint32_t button_timer = 0;
 
 Preferences preferences;
 
-static bmp_err_e parseBMPHeader(uint8_t *data, bool &reserved);
-static https_request_err_e downloadAndSaveToFile(const char *url);
-static void getDeviceCredentials(const char *url);
-static bool readBufferFromFile(uint8_t *out_buffer);
-static bool writeBufferToFile(const char *name, uint8_t *in_buffer, uint16_t size);
-static void checkAndPerformFirmwareUpdate(void);
-static void goToSleep(void);
-static void setClock(void);
-static float readBatteryVoltage(void);
-static void log_POST(char *log_buffer, size_t size);
-
-static void log_POST(char *log_buffer, size_t size)
-{
-  WiFiClientSecure *client = new WiFiClientSecure;
-  if (client)
-  {
-    client->setInsecure();
-
-    {
-      // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
-      HTTPClient https;
-
-      Serial.print("[HTTPS] begin...\n");
-      if (https.begin(*client, "https://usetrmnl.com/api/log"))
-      { // HTTPS
-        Serial.print("[HTTPS] POST...\n");
-
-        String api_key = "";
-        if (preferences.isKey(PREFERENCES_API_KEY))
-        {
-          api_key = preferences.getString(PREFERENCES_API_KEY, PREFERENCES_API_KEY_DEFAULT);
-          Log.info("%s [%d]: %s key exists. Value - %s\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY, api_key.c_str());
-        }
-        else
-        {
-          Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY);
-        }
-
-        https.addHeader("Accept", "application/json");
-        https.addHeader("Access-Token", api_key);
-        https.addHeader("Content-Type", "application/json");
-        Serial.print("Send log:");
-        Serial.println(log_buffer);
-        // start connection and send HTTP header
-        int httpCode = https.POST(log_buffer);
-
-        // httpCode will be negative on error
-        if (httpCode > 0)
-        {
-          // HTTP header has been send and Server response header has been handled
-          Serial.printf("[HTTPS] POST... code: %d\n", httpCode);
-
-          // file found at server
-          if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
-          {
-            String payload = https.getString();
-            Serial.println(payload);
-          }
-        }
-        else
-        {
-          Serial.printf("[HTTPS] POST... failed, error: %s\n", https.errorToString(httpCode).c_str());
-        }
-
-        https.end();
-      }
-      else
-      {
-        Serial.printf("[HTTPS] Unable to connect\n");
-      }
-
-      // End extra scoping block
-    }
-
-    delete client;
-  }
-  else
-  {
-    Serial.println("Unable to create client");
-  }
-}
-
-static float readBatteryVoltage(void)
-{
-  int32_t adc = 0;
-  for (uint8_t i = 0; i < 128; i++)
-  {
-    adc += analogReadMilliVolts(PIN_BATTERY);
-  }
-
-  int32_t sensorValue = (adc / 128) * 2;
-
-  float voltage = sensorValue / 1000.0;
-  return voltage;
-}
-
-// Not sure if WiFiClientSecure checks the validity date of the certificate.
-// Setting clock just to be sure...
-static void setClock()
-{
-  configTime(0, 0, "pool.ntp.org");
-
-  Serial.print(F("Waiting for NTP time sync: "));
-  time_t nowSecs = time(nullptr);
-  while (nowSecs < 8 * 3600 * 2)
-  {
-    delay(500);
-    Serial.print(F("."));
-    yield();
-    nowSecs = time(nullptr);
-  }
-
-  Serial.println();
-  struct tm timeinfo;
-  gmtime_r(&nowSecs, &timeinfo);
-  Serial.print(F("Current time: "));
-  Serial.print(asctime(&timeinfo));
-}
-
-void listDir(fs::FS &fs, const char *dirname, uint8_t levels)
-{
-  Serial.printf("Listing directory: %s\r\n", dirname);
-  File root = fs.open(dirname);
-  if (!root)
-  {
-    Serial.println("- failed to open directory");
-    return;
-  }
-  if (!root.isDirectory())
-  {
-    Serial.println(" - not a directory");
-    return;
-  }
-  File file = root.openNextFile();
-  while (file)
-  {
-    if (file.isDirectory())
-    {
-      Serial.print("  DIR : ");
-      Serial.println(file.name());
-      if (levels)
-      {
-        listDir(fs, file.name(), levels - 1);
-      }
-    }
-    else
-    {
-      Serial.print("  FILE: ");
-      Serial.print(file.name());
-      Serial.print("\tSIZE: ");
-      Serial.println(file.size());
-    }
-    file = root.openNextFile();
-  }
-}
+static bmp_err_e parseBMPHeader(uint8_t *data, bool &reserved);                     // .bmp file validation
+static https_request_err_e downloadAndShow(const char *url);                        // download and show the image
+static void getDeviceCredentials(const char *url);                                  // receiveing API key and Friendly ID
+static bool readBufferFromFile(const char *name, uint8_t *out_buffer);              // file reading
+static bool writeBufferToFile(const char *name, uint8_t *in_buffer, uint16_t size); // filw writing
+static void checkAndPerformFirmwareUpdate(void);                                    // OTA update
+static void goToSleep(void);                                                        // sleep prepearing
+static void setClock(void);                                                         // clock synchrinization
+static float readBatteryVoltage(void);                                              // battery voltage reading
+static void log_POST(char *log_buffer, size_t size);                                // log sending
 
 /**
  * @brief Function to init business logic module
@@ -207,22 +59,21 @@ void bl_init(void)
   pins_init();
   button_timer = millis();
 
-  Log.info("%s [%d]: pref start\r\n", __FILE__, __LINE__);
+  Log.info("%s [%d]: preferences start\r\n", __FILE__, __LINE__);
   bool res = preferences.begin("data", false);
   if (res)
   {
     Log.info("%s [%d]: preferences init success\r\n", __FILE__, __LINE__);
-    // preferences.clear();
+    // preferences.clear(); // if needed to clear the saved data
   }
   else
   {
     Log.fatal("%s [%d]: preferences init failed\r\n", __FILE__, __LINE__);
-    while (1)
-      ;
+    ESP.restart();
   }
-  Log.info("%s [%d]: pref end\r\n", __FILE__, __LINE__);
+  Log.info("%s [%d]: preferences end\r\n", __FILE__, __LINE__);
 
-  Log.info("%s [%d]: button start\r\n", __FILE__, __LINE__);
+  Log.info("%s [%d]: button handling start\r\n", __FILE__, __LINE__);
   // handling reset
   while (1)
   {
@@ -238,7 +89,7 @@ void bl_init(void)
       break;
     }
   }
-  Log.info("%s [%d]: button end\r\n", __FILE__, __LINE__);
+  Log.info("%s [%d]: button handling end\r\n", __FILE__, __LINE__);
 
   // EPD init
   // EPD clear
@@ -252,26 +103,17 @@ void bl_init(void)
   if (!SPIFFS.begin(true))
   {
     Log.fatal("%s [%d]: Failed to mount SPIFFS\r\n", __FILE__, __LINE__);
-    while (1)
-      ;
+    ESP.restart();
   }
   else
   {
     Log.info("%s [%d]: SPIFFS mounted\r\n", __FILE__, __LINE__);
-    listDir(SPIFFS, "/", 0);
   }
 
-  // Log.info("%s [%d]: Display start\r\n", __FILE__, __LINE__);
-  // display_show_image(const_cast<uint8_t *>(default_icon), false); // Download file and save to SPIFFS
-  // Log.info("%s [%d]: Display finish\r\n", __FILE__, __LINE__);
-
-  // delay(1000);
-
-  // downloadAndSaveToFile("https://usetrmnl.com");
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
-  // DEV_Delay_ms(500);
   if (wm.getWiFiIsSaved())
   {
+    // WiFi saved, connection
     Log.info("%s [%d]: WiFi saved\r\n", __FILE__, __LINE__);
     WiFi.begin(wm.getWiFiSSID(), wm.getWiFiPass());
 
@@ -282,7 +124,7 @@ void bl_init(void)
       delay(1000);
       attepmts++;
     }
-    Serial.println();
+    Log.infoln("");
     // Check if connected
     if (WiFi.status() == WL_CONNECTED)
     {
@@ -293,7 +135,7 @@ void bl_init(void)
     {
       Log.fatal("%s [%d]: Connection failed!\r\n", __FILE__, __LINE__);
 
-      res = readBufferFromFile(buffer);
+      res = readBufferFromFile("/logo.bmp", buffer);
       if (res)
         display_show_msg(buffer, WIFI_FAILED);
       else
@@ -305,6 +147,7 @@ void bl_init(void)
   }
   else
   {
+    // WiFi credentials are not saved - start captive portal
     Log.info("%s [%d]: WiFi NOT saved\r\n", __FILE__, __LINE__);
 
     char fw_version[20];
@@ -314,8 +157,7 @@ void bl_init(void)
     String fw = fw_version;
 
     Log.info("%s [%d]: FW version %s\r\n", __FILE__, __LINE__, fw_version);
-    Log.info("%s [%d]: FW version %s\r\n", __FILE__, __LINE__, fw.c_str());
-    res = readBufferFromFile(buffer);
+    res = readBufferFromFile("/logo.bmp", buffer);
     if (res)
     {
       Log.info("%s [%d]: logo not exists. Use default\r\n", __FILE__, __LINE__);
@@ -347,9 +189,7 @@ void bl_init(void)
       }
     }
     wm.setClass("invert");
-    // wm.setConnectRetries(1);
     wm.setConnectTimeout(10);
-    // wm.setBreakAfterConfig(true);  // always exit configportal even if wifi save fails
 
     std::vector<const char *> menu = {"wifi"};
     wm.setMenu(menu);
@@ -362,15 +202,13 @@ void bl_init(void)
       wm.stopWebPortal();
 
       WiFi.disconnect();
-      // WiFi.mode(WIFI_OFF);
 
-      // wm.resetSettings();
-      //  show logo with string
-      res = readBufferFromFile(buffer);
+      res = readBufferFromFile("/logo.bmp", buffer);
       if (res)
         display_show_msg(buffer, WIFI_FAILED);
       else
         display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_FAILED);
+
       // Go to deep sleep
       display_sleep();
       goToSleep();
@@ -378,6 +216,7 @@ void bl_init(void)
     Log.info("%s [%d]: WiFi connected\r\n", __FILE__, __LINE__);
   }
 
+  // clock synchronization
   setClock();
 
   if (!preferences.isKey(PREFERENCES_API_KEY) || !preferences.isKey(PREFERENCES_FRIENDLY_ID))
@@ -391,26 +230,29 @@ void bl_init(void)
     Log.info("%s [%d]: API key and friendly ID saved\r\n", __FILE__, __LINE__);
   }
 
+  // ITA checking, image checking and drawing
   https_request_err_e request_result = HTTPS_NO_ERR;
   uint8_t retries = 0;
   while (request_result != HTTPS_SUCCES && retries < SERVER_MAX_RETRIES)
   {
     Log.info("%s [%d]: request retry %d...\r\n", __FILE__, __LINE__, retries);
-    request_result = downloadAndSaveToFile("https://usetrmnl.com");
+    request_result = downloadAndShow("https://usetrmnl.com");
     Log.info("%s [%d]: request result - %d\r\n", __FILE__, __LINE__, request_result);
     retries++;
   }
 
+  // OTA update checking
   if (update_firmware)
   {
     checkAndPerformFirmwareUpdate();
   }
 
+  // error handling
   switch (request_result)
   {
   case HTTPS_REQUEST_FAILED:
   {
-    bool res = readBufferFromFile(buffer);
+    bool res = readBufferFromFile("/logo.bmp", buffer);
     if (res)
       display_show_msg(buffer, API_ERROR);
     else
@@ -419,7 +261,7 @@ void bl_init(void)
   break;
   case HTTPS_RESPONSE_CODE_INVALID:
   {
-    bool res = readBufferFromFile(buffer);
+    bool res = readBufferFromFile("/logo.bmp", buffer);
     if (res)
       display_show_msg(buffer, WIFI_INTERNAL_ERROR);
     else
@@ -428,7 +270,7 @@ void bl_init(void)
   break;
   case HTTPS_UNABLE_TO_CONNECT:
   {
-    bool res = readBufferFromFile(buffer);
+    bool res = readBufferFromFile("/logo.bmp", buffer);
     if (res)
       display_show_msg(buffer, API_ERROR);
     else
@@ -437,7 +279,7 @@ void bl_init(void)
   break;
   case HTTPS_WRONG_IMAGE_FORMAT:
   {
-    bool rs = readBufferFromFile(buffer);
+    bool rs = readBufferFromFile("/logo.bmp", buffer);
     if (rs)
       display_show_msg(buffer, BMP_FORMAT_ERROR);
     else
@@ -446,7 +288,7 @@ void bl_init(void)
   break;
   case HTTPS_WRONG_IMAGE_SIZE:
   {
-    bool res = readBufferFromFile(buffer);
+    bool res = readBufferFromFile("/logo.bmp", buffer);
     if (res)
       display_show_msg(buffer, API_SIZE_ERROR);
     // display_show_msg(buffer, API_SIZE_ERROR);
@@ -456,7 +298,7 @@ void bl_init(void)
   break;
   case HTTPS_CLIENT_FAILED:
   {
-    bool res = readBufferFromFile(buffer);
+    bool res = readBufferFromFile("/logo.bmp", buffer);
     if (res)
       display_show_msg(buffer, WIFI_INTERNAL_ERROR);
     else
@@ -467,6 +309,7 @@ void bl_init(void)
     break;
   }
 
+  // display go to sleep
   display_sleep();
   if (!update_firmware)
     goToSleep();
@@ -483,85 +326,84 @@ void bl_process(void)
 {
 }
 
-static bool writeBufferToFile(const char *name, uint8_t *in_buffer, uint16_t size)
+/**
+ * @brief Function to parse .bmp file header
+ * @param data pointer to the buffer
+ * @param reserved variable address to store parsed color schematic
+ * @return bmp_err_e error code
+ */
+static bmp_err_e parseBMPHeader(uint8_t *data, bool &reversed)
 {
-  if (SPIFFS.exists(name))
+  // Check if the file is a BMP image
+  if (data[0] != 'B' || data[1] != 'M')
   {
-    Log.info("%s [%d]: file %s exists. Deleting...\r\n", __FILE__, __LINE__, name);
-    if (SPIFFS.remove(name))
-      Log.info("%s [%d]: file %s deleted\r\n", __FILE__, __LINE__, name);
-    else
-      Log.info("%s [%d]: file %s deleting failed\r\n", __FILE__, __LINE__, name);
+    Log.fatal("%s [%d]: It is not a BMP file\r\n", __FILE__, __LINE__);
+    return BMP_NOT_BMP;
   }
-  else
+
+  // Get width and height from the header
+  uint32_t width = *(uint32_t *)&data[18];
+  uint32_t height = *(uint32_t *)&data[22];
+  uint16_t bitsPerPixel = *(uint16_t *)&data[28];
+  uint32_t compressionMethod = *(uint32_t *)&data[30];
+  uint32_t imageDataSize = *(uint32_t *)&data[34];
+  uint32_t colorTableEntries = *(uint32_t *)&data[46];
+
+  if (width != 800 || height != 480 || bitsPerPixel != 1 || imageDataSize != 48000 || colorTableEntries != 2)
+    return BMP_BAD_SIZE;
+  // Get the offset of the pixel data
+  uint32_t dataOffset = *(uint32_t *)&data[10];
+
+  // Display BMP information
+  Log.info("%s [%d]: BMP Header Information:\r\nWidth: %d\r\nHeight: %d\r\nBits per Pixel: %d\r\nCompression Method: %d\r\nImage Data Size: %d\r\nColor Table Entries: %d\r\nData offset: %d\r\n", __FILE__, __LINE__, width, height, bitsPerPixel, compressionMethod, imageDataSize, colorTableEntries, dataOffset);
+
+  // Check if there's a color table
+  if (dataOffset > 54)
   {
-    Log.info("%s [%d]: file %s not exists.\r\n", __FILE__, __LINE__, name);
-  }
-  File file = SPIFFS.open(name, FILE_APPEND);
-  Serial.println(file);
-  if (file)
-  {
-    size_t res = file.write(in_buffer, size);
-    file.close();
-    if (res)
+    // Read color table entries
+    uint32_t colorTableSize = colorTableEntries * 4; // Each color entry is 4 bytes
+
+    // Display color table
+    Log.info("%s [%d]: Color table\r\n", __FILE__, __LINE__);
+    for (uint32_t i = 0; i < colorTableSize; i += 4)
     {
-      Log.info("%s [%d]: file %s writing success\r\n", __FILE__, __LINE__, name);
-      return true;
+      Log.info("%s [%d]: Color %d: B-%d, R-%d, G-%d\r\n", __FILE__, __LINE__, i / 4 + 1, data[54 + 4 * i], data[55 + 4 * i], data[56 + 4 * i], data[57 + 4 * i]);
+    }
+
+    if (data[54] == 0 && data[55] == 0 && data[56] == 0 && data[57] == 0 && data[58] == 255 && data[59] == 255 && data[60] == 255 && data[61] == 0)
+    {
+      Log.info("%s [%d]: Color scheme standart\r\n", __FILE__, __LINE__);
+      reversed = false;
+    }
+    else if (data[54] == 255 && data[55] == 255 && data[56] == 255 && data[57] == 0 && data[58] == 0 && data[59] == 0 && data[60] == 0 && data[61] == 0)
+    {
+      Log.info("%s [%d]: Color scheme reversed\r\n", __FILE__, __LINE__);
+      reversed = true;
     }
     else
     {
-      Log.error("%s [%d]: file %s writing error\r\n", __FILE__, __LINE__, name);
-      return false;
+      Log.info("%s [%d]: Color scheme demaged\r\n", __FILE__, __LINE__);
+      return BMP_COLOR_SCHEME_FAILED;
     }
+    return BMP_NO_ERR;
   }
   else
   {
-    Log.error("%s [%d]: File open ERROR\r\n", __FILE__, __LINE__);
-    return false;
+    return BMP_INVALID_OFFSET;
   }
 }
 
-static bool readBufferFromFile(uint8_t *out_buffer)
-{
-  if (SPIFFS.exists("/logo.bmp"))
-  {
-    Log.info("%s [%d]: icon exists\r\n", __FILE__, __LINE__);
-    File file = SPIFFS.open("/logo.bmp", FILE_READ);
-    if (file)
-    {
-      if (file.size() == DISPLAY_BMP_IMAGE_SIZE)
-      {
-        Log.info("%s [%d]: the size is the same\r\n", __FILE__, __LINE__);
-        file.readBytes((char *)out_buffer, DISPLAY_BMP_IMAGE_SIZE);
-      }
-      else
-      {
-        Log.error("%s [%d]: the size is NOT the same %d\r\n", __FILE__, __LINE__, file.size());
-        return false;
-      }
-      file.close();
-      return true;
-    }
-    else
-    {
-      Log.error("%s [%d]: File open ERROR\r\n", __FILE__, __LINE__);
-      return false;
-    }
-  }
-  else
-  {
-    Log.error("%s [%d]: icon DOESN\'T exists\r\n", __FILE__, __LINE__);
-    return false;
-  }
-}
-
-static https_request_err_e downloadAndSaveToFile(const char *url)
+/**
+ * @brief Function to ping server and download and show the image if all is OK
+ * @param url Server URL addrees
+ * @return https_request_err_e error code
+ */
+static https_request_err_e downloadAndShow(const char *url)
 {
   https_request_err_e result = HTTPS_NO_ERR;
   WiFiClientSecure *client = new WiFiClientSecure;
   if (client)
   {
-    // client->setCACert(rootCACertificate);
     client->setInsecure();
     {
       // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
@@ -635,8 +477,6 @@ static https_request_err_e downloadAndSaveToFile(const char *url)
           if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
           {
             String payload = https.getString();
-            Serial.print("Payload: ");
-            Serial.println(payload);
             size_t size = https.getSize();
             Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, size);
             Log.info("%s [%d]: Free heap size: %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
@@ -814,7 +654,7 @@ static https_request_err_e downloadAndSaveToFile(const char *url)
             else
             {
               Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
-              
+
               result = HTTPS_REQUEST_FAILED;
             }
           }
@@ -834,7 +674,7 @@ static https_request_err_e downloadAndSaveToFile(const char *url)
         else
         {
           Log.error("%s [%d]: unable to connect\r\n", __FILE__, __LINE__);
-          
+
           result = HTTPS_UNABLE_TO_CONNECT;
         }
       }
@@ -846,7 +686,7 @@ static https_request_err_e downloadAndSaveToFile(const char *url)
   else
   {
     Log.error("%s [%d]: Unable to create client\r\n", __FILE__, __LINE__);
-    
+
     result = HTTPS_UNABLE_TO_CONNECT;
   }
 
@@ -857,157 +697,16 @@ static https_request_err_e downloadAndSaveToFile(const char *url)
   return result;
 }
 
-static void checkAndPerformFirmwareUpdate(void)
-{
-  WiFiClientSecure *client = new WiFiClientSecure;
-  if (client)
-  {
-    client->setInsecure();
-    HTTPClient https;
-    if (https.begin(*client, binUrl))
-    {
-      int httpCode = https.GET();
-      if (httpCode == HTTP_CODE_OK)
-      {
-        Log.info("%s [%d]: Downloading .bin file...\r\n", __FILE__, __LINE__);
-
-        size_t contentLength = https.getSize();
-        // Perform firmware update
-        if (Update.begin(contentLength))
-        {
-          Log.info("%s [%d]: Firmware update start\r\n", __FILE__, __LINE__);
-          bool res = readBufferFromFile(buffer);
-          if (res)
-            display_show_msg(buffer, FW_UPDATE);
-          else
-            display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE);
-          if (Update.writeStream(https.getStream()))
-          {
-            if (Update.end(true))
-            {
-              Log.info("%s [%d]: Firmware update successful. Rebooting...\r\n", __FILE__, __LINE__);
-              bool res = readBufferFromFile(buffer);
-              if (res)
-                display_show_msg(buffer, FW_UPDATE_SUCCESS);
-              else
-                display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE_SUCCESS);
-            }
-            else
-            {
-              Log.fatal("%s [%d]: Firmware update failed!\r\n", __FILE__, __LINE__);
-              bool res = readBufferFromFile(buffer);
-              if (res)
-                display_show_msg(buffer, FW_UPDATE_FAILED);
-              else
-                display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE_FAILED);
-            }
-          }
-          else
-          {
-            Log.fatal("%s [%d]: Write to firmware update stream failed!\r\n", __FILE__, __LINE__);
-            bool res = readBufferFromFile(buffer);
-            if (res)
-              display_show_msg(buffer, FW_UPDATE_FAILED);
-            else
-              display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE_FAILED);
-          }
-        }
-        else
-        {
-          Log.fatal("%s [%d]: Begin firmware update failed!\r\n", __FILE__, __LINE__);
-          bool res = readBufferFromFile(buffer);
-          if (res)
-            display_show_msg(buffer, FW_UPDATE_FAILED);
-          else
-            display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE_FAILED);
-        }
-      }
-      else
-      {
-        Log.fatal("%s [%d]: HTTP GET failed!\r\n", __FILE__, __LINE__);
-        bool res = readBufferFromFile(buffer);
-        if (res)
-          display_show_msg(buffer, API_ERROR);
-        else
-          display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
-      }
-      https.end();
-    }
-  }
-  delete client;
-}
-
-static bmp_err_e parseBMPHeader(uint8_t *data, bool &reserved)
-{
-  // Check if the file is a BMP image
-  if (data[0] != 'B' || data[1] != 'M')
-  {
-    Serial.print("data[0]: ");
-    Serial.println(data[0]);
-    Serial.print("data[1]: ");
-    Serial.println(data[1]);
-    Log.fatal("%s [%d]: It is not a BMP file\r\n", __FILE__, __LINE__);
-    return BMP_NOT_BMP;
-  }
-
-  // Get width and height from the header
-  uint32_t width = *(uint32_t *)&data[18];
-  uint32_t height = *(uint32_t *)&data[22];
-  uint16_t bitsPerPixel = *(uint16_t *)&data[28];
-  uint32_t compressionMethod = *(uint32_t *)&data[30];
-  uint32_t imageDataSize = *(uint32_t *)&data[34];
-  uint32_t colorTableEntries = *(uint32_t *)&data[46];
-
-  if (width != 800 || height != 480 || bitsPerPixel != 1 || imageDataSize != 48000 || colorTableEntries != 2)
-    return BMP_BAD_SIZE;
-  // Get the offset of the pixel data
-  uint32_t dataOffset = *(uint32_t *)&data[10];
-
-  // Display BMP information
-  Log.info("%s [%d]: BMP Header Information:\r\nWidth: %d\r\nHeight: %d\r\nBits per Pixel: %d\r\nCompression Method: %d\r\nImage Data Size: %d\r\nColor Table Entries: %d\r\nData offset: %d\r\n", __FILE__, __LINE__, width, height, bitsPerPixel, compressionMethod, imageDataSize, colorTableEntries, dataOffset);
-
-  // Check if there's a color table
-  if (dataOffset > 54)
-  {
-    // Read color table entries
-    uint32_t colorTableSize = colorTableEntries * 4; // Each color entry is 4 bytes
-
-    // Display color table
-    Log.info("%s [%d]: Color table\r\n", __FILE__, __LINE__);
-    for (uint32_t i = 0; i < colorTableSize; i += 4)
-    {
-      Log.info("%s [%d]: Color %d: B-%d, R-%d, G-%d\r\n", __FILE__, __LINE__, i / 4 + 1, data[54 + 4 * i], data[55 + 4 * i], data[56 + 4 * i], data[57 + 4 * i]);
-    }
-
-    if (data[54] == 0 && data[55] == 0 && data[56] == 0 && data[57] == 0 && data[58] == 255 && data[59] == 255 && data[60] == 255 && data[61] == 0)
-    {
-      Log.info("%s [%d]: Color scheme standart\r\n", __FILE__, __LINE__);
-      reserved = false;
-    }
-    else if (data[54] == 255 && data[55] == 255 && data[56] == 255 && data[57] == 0 && data[58] == 0 && data[59] == 0 && data[60] == 0 && data[61] == 0)
-    {
-      Log.info("%s [%d]: Color scheme reversed\r\n", __FILE__, __LINE__);
-      reserved = true;
-    }
-    else
-    {
-      Log.info("%s [%d]: Color scheme demaged\r\n", __FILE__, __LINE__);
-      return BMP_COLOR_SCHEME_FAILED;
-    }
-    return BMP_NO_ERR;
-  }
-  else
-  {
-    return BMP_INVALID_OFFSET;
-  }
-}
-
+/**
+ * @brief Function to getting the friendly id and API key
+ * @param url Server URL addrees
+ * @return none
+ */
 static void getDeviceCredentials(const char *url)
 {
   WiFiClientSecure *client = new WiFiClientSecure;
   if (client)
   {
-    // client->setCACert(rootCACertificate);
     client->setInsecure();
     {
       // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
@@ -1076,23 +775,21 @@ static void getDeviceCredentials(const char *url)
           else
           {
             Log.info("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
-            bool res = readBufferFromFile(buffer);
+            bool res = readBufferFromFile("/logo.bmp", buffer);
             if (res)
               display_show_msg(buffer, API_ERROR);
             else
               display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
-            // display_sleep();
           }
         }
         else
         {
           Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
-          bool res = readBufferFromFile(buffer);
+          bool res = readBufferFromFile("/logo.bmp", buffer);
           if (res)
             display_show_msg(buffer, API_ERROR);
           else
             display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
-          // display_sleep();
         }
 
         https.end();
@@ -1100,20 +797,16 @@ static void getDeviceCredentials(const char *url)
       else
       {
         Log.error("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
-        bool res = readBufferFromFile(buffer);
+        bool res = readBufferFromFile("/logo.bmp", buffer);
         if (res)
           display_show_msg(buffer, WIFI_INTERNAL_ERROR);
         else
           display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_INTERNAL_ERROR);
-        // display_sleep();
       }
       Log.info("%s [%d]: status - %d\r\n", __FILE__, __LINE__, status);
       if (status)
       {
         status = false;
-        // memset(new_url, 0, sizeof(new_url));
-        // strcpy(new_url, url);
-        // strcat(new_url, filename);
         Log.info("%s [%d]: filename - %s\r\n", __FILE__, __LINE__, filename);
 
         Log.info("%s [%d]: [HTTPS] Request to %s\r\n", __FILE__, __LINE__, filename);
@@ -1145,8 +838,6 @@ static void getDeviceCredentials(const char *url)
               if (counter == sizeof(buffer))
               {
                 Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
-                // EPD_7IN5_V2_Clear();
-                // DEV_Delay_ms(500);
 
                 bool res = writeBufferToFile("/logo.bmp", buffer, sizeof(buffer));
                 if (res)
@@ -1160,7 +851,7 @@ static void getDeviceCredentials(const char *url)
               else
               {
                 Log.error("%s [%d]: Receiving failed. Readed: %d\r\n", __FILE__, __LINE__, counter);
-                bool res = readBufferFromFile(buffer);
+                bool res = readBufferFromFile("/logo.bmp", buffer);
                 if (res)
                   display_show_msg(buffer, API_SIZE_ERROR);
                 else
@@ -1171,7 +862,7 @@ static void getDeviceCredentials(const char *url)
             {
               Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
               https.end();
-              bool res = readBufferFromFile(buffer);
+              bool res = readBufferFromFile("/logo.bmp", buffer);
               if (res)
                 display_show_msg(buffer, API_ERROR);
               else
@@ -1181,7 +872,7 @@ static void getDeviceCredentials(const char *url)
           else
           {
             Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
-            bool res = readBufferFromFile(buffer);
+            bool res = readBufferFromFile("/logo.bmp", buffer);
             if (res)
               display_show_msg(buffer, API_ERROR);
             else
@@ -1191,7 +882,7 @@ static void getDeviceCredentials(const char *url)
         else
         {
           Log.error("%s [%d]: unable to connect\r\n", __FILE__, __LINE__);
-          bool res = readBufferFromFile(buffer);
+          bool res = readBufferFromFile("/logo.bmp", buffer);
           if (res)
             display_show_msg(buffer, API_ERROR);
           else
@@ -1206,7 +897,7 @@ static void getDeviceCredentials(const char *url)
   else
   {
     Log.error("%s [%d]: Unable to create client\r\n", __FILE__, __LINE__);
-    bool res = readBufferFromFile(buffer);
+    bool res = readBufferFromFile("/logo.bmp", buffer);
     if (res)
       display_show_msg(buffer, WIFI_INTERNAL_ERROR);
     else
@@ -1214,6 +905,178 @@ static void getDeviceCredentials(const char *url)
   }
 }
 
+/**
+ * @brief Function to reading image buffer from file
+ * @param out_buffer buffer pointer
+ * @return 1 - if success; 0 - if failed
+ */
+static bool readBufferFromFile(const char *name, uint8_t *out_buffer)
+{
+  if (SPIFFS.exists(name))
+  {
+    Log.info("%s [%d]: icon exists\r\n", __FILE__, __LINE__);
+    File file = SPIFFS.open("name", FILE_READ);
+    if (file)
+    {
+      if (file.size() == DISPLAY_BMP_IMAGE_SIZE)
+      {
+        Log.info("%s [%d]: the size is the same\r\n", __FILE__, __LINE__);
+        file.readBytes((char *)out_buffer, DISPLAY_BMP_IMAGE_SIZE);
+      }
+      else
+      {
+        Log.error("%s [%d]: the size is NOT the same %d\r\n", __FILE__, __LINE__, file.size());
+        return false;
+      }
+      file.close();
+      return true;
+    }
+    else
+    {
+      Log.error("%s [%d]: File open ERROR\r\n", __FILE__, __LINE__);
+      return false;
+    }
+  }
+  else
+  {
+    Log.error("%s [%d]: icon DOESN\'T exists\r\n", __FILE__, __LINE__);
+    return false;
+  }
+}
+
+/**
+ * @brief Function to reading image buffer from file
+ * @param name buffer pointer
+ * @return 1 - if success; 0 - if failed
+ */
+static bool writeBufferToFile(const char *name, uint8_t *in_buffer, uint16_t size)
+{
+  if (SPIFFS.exists(name))
+  {
+    Log.info("%s [%d]: file %s exists. Deleting...\r\n", __FILE__, __LINE__, name);
+    if (SPIFFS.remove(name))
+      Log.info("%s [%d]: file %s deleted\r\n", __FILE__, __LINE__, name);
+    else
+      Log.info("%s [%d]: file %s deleting failed\r\n", __FILE__, __LINE__, name);
+  }
+  else
+  {
+    Log.info("%s [%d]: file %s not exists.\r\n", __FILE__, __LINE__, name);
+  }
+  File file = SPIFFS.open(name, FILE_APPEND);
+  Serial.println(file);
+  if (file)
+  {
+    size_t res = file.write(in_buffer, size);
+    file.close();
+    if (res)
+    {
+      Log.info("%s [%d]: file %s writing success\r\n", __FILE__, __LINE__, name);
+      return true;
+    }
+    else
+    {
+      Log.error("%s [%d]: file %s writing error\r\n", __FILE__, __LINE__, name);
+      return false;
+    }
+  }
+  else
+  {
+    Log.error("%s [%d]: File open ERROR\r\n", __FILE__, __LINE__);
+    return false;
+  }
+}
+
+/**
+ * @brief Function to check and performing OTA update
+ * @param none
+ * @return none
+ */
+static void checkAndPerformFirmwareUpdate(void)
+{
+  WiFiClientSecure *client = new WiFiClientSecure;
+  if (client)
+  {
+    client->setInsecure();
+    HTTPClient https;
+    if (https.begin(*client, binUrl))
+    {
+      int httpCode = https.GET();
+      if (httpCode == HTTP_CODE_OK)
+      {
+        Log.info("%s [%d]: Downloading .bin file...\r\n", __FILE__, __LINE__);
+
+        size_t contentLength = https.getSize();
+        // Perform firmware update
+        if (Update.begin(contentLength))
+        {
+          Log.info("%s [%d]: Firmware update start\r\n", __FILE__, __LINE__);
+          bool res = readBufferFromFile("/logo.bmp", buffer);
+          if (res)
+            display_show_msg(buffer, FW_UPDATE);
+          else
+            display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE);
+          if (Update.writeStream(https.getStream()))
+          {
+            if (Update.end(true))
+            {
+              Log.info("%s [%d]: Firmware update successful. Rebooting...\r\n", __FILE__, __LINE__);
+              bool res = readBufferFromFile("/logo.bmp", buffer);
+              if (res)
+                display_show_msg(buffer, FW_UPDATE_SUCCESS);
+              else
+                display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE_SUCCESS);
+            }
+            else
+            {
+              Log.fatal("%s [%d]: Firmware update failed!\r\n", __FILE__, __LINE__);
+              bool res = readBufferFromFile("/logo.bmp", buffer);
+              if (res)
+                display_show_msg(buffer, FW_UPDATE_FAILED);
+              else
+                display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE_FAILED);
+            }
+          }
+          else
+          {
+            Log.fatal("%s [%d]: Write to firmware update stream failed!\r\n", __FILE__, __LINE__);
+            bool res = readBufferFromFile("/logo.bmp", buffer);
+            if (res)
+              display_show_msg(buffer, FW_UPDATE_FAILED);
+            else
+              display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE_FAILED);
+          }
+        }
+        else
+        {
+          Log.fatal("%s [%d]: Begin firmware update failed!\r\n", __FILE__, __LINE__);
+          bool res = readBufferFromFile("/logo.bmp", buffer);
+          if (res)
+            display_show_msg(buffer, FW_UPDATE_FAILED);
+          else
+            display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE_FAILED);
+        }
+      }
+      else
+      {
+        Log.fatal("%s [%d]: HTTP GET failed!\r\n", __FILE__, __LINE__);
+        bool res = readBufferFromFile("/logo.bmp", buffer);
+        if (res)
+          display_show_msg(buffer, API_ERROR);
+        else
+          display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+      }
+      https.end();
+    }
+  }
+  delete client;
+}
+
+/**
+ * @brief Function to sleep prepearing and go to sleep
+ * @param none
+ * @return none
+ */
 static void goToSleep(void)
 {
   uint32_t time_to_sleep = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
@@ -1223,4 +1086,122 @@ static void goToSleep(void)
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT,
                                     ESP_GPIO_WAKEUP_GPIO_LOW);
   esp_deep_sleep_start();
+}
+
+// Not sure if WiFiClientSecure checks the validity date of the certificate.
+// Setting clock just to be sure...
+/**
+ * @brief Function to clock synchronization 
+ * @param none
+ * @return none
+ */
+static void setClock()
+{
+  Log.info("%s [%d]: Time synchronization...\r\n", __FILE__, __LINE__);
+  configTime(0, 0, "pool.ntp.org");
+
+  time_t nowSecs = time(nullptr);
+  while (nowSecs < 8 * 3600 * 2)
+  {
+    delay(500);
+    yield();
+    nowSecs = time(nullptr);
+  }
+
+  struct tm timeinfo;
+  gmtime_r(&nowSecs, &timeinfo);
+  Log.info("%s [%d]: Current time - %s\r\n", __FILE__, __LINE__, asctime(&timeinfo));
+}
+
+/**
+ * @brief Function to read the battery voltage
+ * @param none
+ * @return float voltage in Volts
+ */
+static float readBatteryVoltage(void)
+{
+  Log.info("%s [%d]: Battery voltage reading...\r\n", __FILE__, __LINE__);
+  int32_t adc = 0;
+  for (uint8_t i = 0; i < 128; i++)
+  {
+    adc += analogReadMilliVolts(PIN_BATTERY);
+  }
+
+  int32_t sensorValue = (adc / 128) * 2;
+
+  float voltage = sensorValue / 1000.0;
+  return voltage;
+}
+
+/**
+ * @brief Function to send the log note
+ * @param log_buffer pointer to the buffer that contains log note
+ * @param size size of buffer
+ * @return none
+ */
+static void log_POST(char *log_buffer, size_t size)
+{
+  WiFiClientSecure *client = new WiFiClientSecure;
+  if (client)
+  {
+    client->setInsecure();
+
+    {
+      // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
+      HTTPClient https;
+      Log.info("%s [%d]: [HTTPS] begin...\r\n", __FILE__, __LINE__);
+      if (https.begin(*client, "https://usetrmnl.com/api/log"))
+      { // HTTPS
+        Log.info("%s [%d]: [HTTPS] POST...\r\n", __FILE__, __LINE__);
+
+        String api_key = "";
+        if (preferences.isKey(PREFERENCES_API_KEY))
+        {
+          api_key = preferences.getString(PREFERENCES_API_KEY, PREFERENCES_API_KEY_DEFAULT);
+          Log.info("%s [%d]: %s key exists. Value - %s\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY, api_key.c_str());
+        }
+        else
+        {
+          Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY);
+        }
+
+        https.addHeader("Accept", "application/json");
+        https.addHeader("Access-Token", api_key);
+        https.addHeader("Content-Type", "application/json");
+        Log.info("%s [%d]: Send log - %s\r\n", __FILE__, __LINE__, log_buffer);
+        // start connection and send HTTP header
+        int httpCode = https.POST(log_buffer);
+
+        // httpCode will be negative on error
+        if (httpCode > 0)
+        {
+          // HTTP header has been send and Server response header has been handled
+          Log.info("%s [%d]: [HTTPS] POST... code: %d\r\n", __FILE__, __LINE__, httpCode);
+          // file found at server
+          if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
+          {
+            String payload = https.getString();
+          }
+        }
+        else
+        {
+          Log.error("%s [%d]: [HTTPS] POST... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
+        }
+
+        https.end();
+      }
+      else
+      {
+        Log.error("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
+      }
+
+      // End extra scoping block
+    }
+
+    delete client;
+  }
+  else
+  {
+    Log.error("%s [%d]: [HTTPS] Unable to create client\r\n", __FILE__, __LINE__);
+  }
 }

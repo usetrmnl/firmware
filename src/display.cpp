@@ -74,9 +74,7 @@ void display_show_image(uint8_t *image_buffer, bool reverse)
     Paint_DrawBitMap(image_buffer + 62);
     EPD_7IN5_V2_Display(BlackImage);
     Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
-    // printf("Goto Sleep...\r\n");
-    // DEV_Delay_ms(2000);
-    // EPD_7IN5_V2_Sleep();
+
     free(BlackImage);
     BlackImage = NULL;
 }
