@@ -164,6 +164,9 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
 [v.1.2.5]
     - changed battery read function;
 
+[v.1.2.6]
+    - edited in final version;
+
 
     
 ## **Compilation guide**
