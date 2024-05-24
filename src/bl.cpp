@@ -18,16 +18,20 @@
 #include <cstdint>
 
 bool pref_clear = false;
+;
 WiFiManager wm;
 
-uint8_t buffer[48062]; // image buffer
-char filename[1024];   // image URL
-char binUrl[1024];     // update URL
-char log_array[512];   // log
+uint8_t buffer[48062];    // image buffer
+char filename[1024];      // image URL
+char binUrl[1024];        // update URL
+char log_array[512];      // log
+char message_buffer[128]; // message to show on the screen
 
-bool status = false;          // need to download a new image
-bool update_firmware = false; // need to download a new firmaware
-bool send_log = false;        // need to send logs
+bool status = false;                                                 // need to download a new image
+bool update_firmware = false;                                        // need to download a new firmaware
+bool reset_firmware = false;                                         // need to reset credentials
+bool send_log = false;                                               // need to send logs
+esp_sleep_wakeup_cause_t wakeup_reason = ESP_SLEEP_WAKEUP_UNDEFINED; // wake-up reason
 
 // timers
 uint32_t button_timer = 0;
@@ -37,6 +41,7 @@ Preferences preferences;
 static bmp_err_e parseBMPHeader(uint8_t *data, bool &reserved);                     // .bmp file validation
 static https_request_err_e downloadAndShow(const char *url);                        // download and show the image
 static void getDeviceCredentials(const char *url);                                  // receiveing API key and Friendly ID
+static void resetDeviceCredentials(void);                                           // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
 static bool readBufferFromFile(const char *name, uint8_t *out_buffer);              // file reading
 static bool writeBufferToFile(const char *name, uint8_t *in_buffer, uint16_t size); // filw writing
 static void checkAndPerformFirmwareUpdate(void);                                    // OTA update
@@ -44,6 +49,8 @@ static void goToSleep(void);                                                    
 static void setClock(void);                                                         // clock synchrinization
 static float readBatteryVoltage(void);                                              // battery voltage reading
 static void log_POST(char *log_buffer, size_t size);                                // log sending
+static void handleRoute(void);
+static void bindServerCallback(void);
 
 /**
  * @brief Function to init business logic module
@@ -59,12 +66,22 @@ void bl_init(void)
   pins_init();
   button_timer = millis();
 
+  wakeup_reason = esp_sleep_get_wakeup_cause();
+  Serial.printf("Wakeup was not caused by deep sleep: %d\n", wakeup_reason);
+
   Log.info("%s [%d]: preferences start\r\n", __FILE__, __LINE__);
   bool res = preferences.begin("data", false);
   if (res)
   {
     Log.info("%s [%d]: preferences init success\r\n", __FILE__, __LINE__);
-    // preferences.clear(); // if needed to clear the saved data
+    if (pref_clear)
+    {
+      res = preferences.clear(); // if needed to clear the saved data
+      if (res)
+        Log.info("%s [%d]: preferences cleared success\r\n", __FILE__, __LINE__);
+      else
+        Log.fatal("%s [%d]: preferences clearing error\r\n", __FILE__, __LINE__);
+    }
   }
   else
   {
@@ -96,8 +113,11 @@ void bl_init(void)
   Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
   display_init();
 
-  Log.info("%s [%d]: Display clear\r\n", __FILE__, __LINE__);
-  display_reset();
+  if (wakeup_reason != 4)
+  {
+    Log.info("%s [%d]: Display clear\r\n", __FILE__, __LINE__);
+    display_reset();
+  }
 
   // Mount SPIFFS
   if (!SPIFFS.begin(true))
@@ -161,39 +181,29 @@ void bl_init(void)
     if (res)
     {
       Log.info("%s [%d]: logo not exists. Use default\r\n", __FILE__, __LINE__);
-      if (preferences.isKey(PREFERENCES_FRIENDLY_ID))
-      {
-        Log.info("%s [%d]: friendly ID exists\r\n", __FILE__, __LINE__);
-        String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
-
-        display_show_msg(buffer, WIFI_CONNECT, friendly_id, true, fw.c_str());
-      }
-      else
-      {
-        display_show_msg(buffer, WIFI_CONNECT, "NOT SAVED", false, fw.c_str());
-      }
+      display_show_msg(buffer, WIFI_CONNECT, "", false, fw.c_str(), "");
     }
     else
     {
       Log.info("%s [%d]: logo not exists. Use default\r\n", __FILE__, __LINE__);
-      if (preferences.isKey(PREFERENCES_FRIENDLY_ID))
-      {
-        Log.info("%s [%d]: friendly ID exists\r\n", __FILE__, __LINE__);
-        String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
-        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_CONNECT, friendly_id, true, fw.c_str());
-      }
-      else
-      {
-        Log.error("%s [%d]: friendly ID NOT exists\r\n", __FILE__, __LINE__);
-        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_CONNECT, "NOT SAVED", false, fw.c_str());
-      }
+      display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_CONNECT, "", false, fw.c_str(), "");
     }
+
     wm.setClass("invert");
     wm.setConnectTimeout(10);
+    // Add a custom text label
 
-    std::vector<const char *> menu = {"wifi"};
+    // Optionally, add custom CSS to style the label
+    // wm.setCustomHeadElement("<style>h2 {color: blue;}</style>");
+
+    // wm.addParameter();
+    wm.setWebServerCallback(bindServerCallback);
+    const char *menuhtml = "<form action='/custom' method='get'><button>Reset</button></form><br/>\n";
+    wm.setCustomMenuHTML(menuhtml);
+
+    std::vector<const char *> menu = {"wifi", "custom"};
     wm.setMenu(menu);
-
+    wm.setCustomHeadElement("<div style='text-align:center; '><h2>Warning!\nIf the portal closes before you enter the Wi-Fi credentials, please open the portal again</h2></div>");
     res = wm.startConfigPortal("TRMNL"); // password protected ap
     if (!res)
     {
@@ -233,12 +243,21 @@ void bl_init(void)
   // ITA checking, image checking and drawing
   https_request_err_e request_result = HTTPS_NO_ERR;
   uint8_t retries = 0;
-  while (request_result != HTTPS_SUCCES && retries < SERVER_MAX_RETRIES)
+  while ((request_result != HTTPS_SUCCES && request_result != HTTPS_NO_REGISTER) && retries < SERVER_MAX_RETRIES)
   {
+
     Log.info("%s [%d]: request retry %d...\r\n", __FILE__, __LINE__, retries);
     request_result = downloadAndShow("https://usetrmnl.com");
     Log.info("%s [%d]: request result - %d\r\n", __FILE__, __LINE__, request_result);
+    bool logic = (request_result != HTTPS_SUCCES && request_result != HTTPS_NO_REGISTER);
+    Log.info("%s [%d]: logic %d...\r\n", __FILE__, __LINE__, logic);
     retries++;
+  }
+
+  // reset checking
+  if (request_result == HTTPS_RESET)
+  {
+    resetDeviceCredentials();
   }
 
   // OTA update checking
@@ -489,34 +508,62 @@ static https_request_err_e downloadAndShow(const char *url)
             }
             else
             {
-              String image_url = doc["image_url"];
-              update_firmware = doc["update_firmware"];
-              String firmware_url = doc["firmware_url"];
-              uint64_t rate = doc["refresh_rate"];
-
-              if (image_url.length() > 0)
+              uint64_t request_status = doc["status"];
+              Log.info("%s [%d]: status: %d\r\n", __FILE__, __LINE__, request_status);
+              if (request_status > 0)
               {
-                Log.info("%s [%d]: image_url: %s\r\n", __FILE__, __LINE__, image_url.c_str());
-                image_url.toCharArray(filename, image_url.length() + 1);
-              }
-              Log.info("%s [%d]: update_firmware: %d\r\n", __FILE__, __LINE__, update_firmware);
-              if (firmware_url.length() > 0)
-              {
-                Log.info("%s [%d]: firmware_url: %s\r\n", __FILE__, __LINE__, firmware_url.c_str());
-                firmware_url.toCharArray(binUrl, firmware_url.length() + 1);
-              }
-              Log.info("%s [%d]: refresh_rate: %d\r\n", __FILE__, __LINE__, rate);
-              if (rate != preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP))
-              {
-                Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, rate);
-                size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, rate);
+                result = HTTPS_NO_REGISTER;
+                Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
+                size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
                 Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+                // show the image
+                String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
+                bool res = readBufferFromFile("/logo.bmp", buffer);
+                if (res)
+                  display_show_msg(buffer, FRIENDLY_ID, friendly_id, true, "", "");
+                else
+                  display_show_msg(const_cast<uint8_t *>(default_icon), FRIENDLY_ID, friendly_id, true, "", "");
+
+                status = false;
               }
+              else
+              {
+                String image_url = doc["image_url"];
+                update_firmware = doc["update_firmware"];
+                String firmware_url = doc["firmware_url"];
+                uint64_t rate = doc["refresh_rate"];
+                reset_firmware = doc["reset_firmware"];
 
-              status = true;
+                if (image_url.length() > 0)
+                {
+                  Log.info("%s [%d]: image_url: %s\r\n", __FILE__, __LINE__, image_url.c_str());
+                  image_url.toCharArray(filename, image_url.length() + 1);
+                }
+                Log.info("%s [%d]: update_firmware: %d\r\n", __FILE__, __LINE__, update_firmware);
+                if (firmware_url.length() > 0)
+                {
+                  Log.info("%s [%d]: firmware_url: %s\r\n", __FILE__, __LINE__, firmware_url.c_str());
+                  firmware_url.toCharArray(binUrl, firmware_url.length() + 1);
+                }
+                Log.info("%s [%d]: refresh_rate: %d\r\n", __FILE__, __LINE__, rate);
+                if (rate != preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP))
+                {
+                  Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, rate);
+                  size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, rate);
+                  Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+                }
 
-              if (update_firmware)
-                result = HTTPS_SUCCES;
+                if (reset_firmware)
+                {
+                  Log.info("%s [%d]: Reset status is true\r\n", __FILE__, __LINE__);
+                }
+                status = true;
+
+                if (update_firmware)
+                  result = HTTPS_SUCCES;
+                if (reset_firmware)
+                  result = HTTPS_RESET;
+              }
             }
           }
           else
@@ -539,7 +586,7 @@ static https_request_err_e downloadAndShow(const char *url)
         result = HTTPS_UNABLE_TO_CONNECT;
       }
 
-      if (status && !update_firmware)
+      if (status && !update_firmware && !reset_firmware)
       {
         status = false;
 
@@ -694,6 +741,7 @@ static https_request_err_e downloadAndShow(const char *url)
   {
     send_log = false;
   }
+  Log.info("%s [%d]: Returned result - %d\r\n", __FILE__, __LINE__, result);
   return result;
 }
 
@@ -764,6 +812,11 @@ static void getDeviceCredentials(const char *url)
               String image_url = doc["image_url"];
               Log.info("%s [%d]: image_url - %s\r\n", __FILE__, __LINE__, image_url.c_str());
               image_url.toCharArray(filename, image_url.length() + 1);
+
+              String message_str = doc["message"];
+              Log.info("%s [%d]: message - %s\r\n", __FILE__, __LINE__, message_str.c_str());
+              message_str.toCharArray(message_buffer, message_str.length() + 1);
+
               Log.info("%s [%d]: status - %d\r\n", __FILE__, __LINE__, status);
             }
             else
@@ -846,7 +899,8 @@ static void getDeviceCredentials(const char *url)
                   Log.error("%s [%d]: File not written!\r\n", __FILE__, __LINE__);
 
                 // show the image
-                display_show_image(buffer, false);
+                String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
+                display_show_msg(buffer, FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
               }
               else
               {
@@ -903,6 +957,23 @@ static void getDeviceCredentials(const char *url)
     else
       display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_INTERNAL_ERROR);
   }
+}
+
+/**
+ * @brief Function to reset the friendly id, API key, WiFi SSID and password
+ * @param url Server URL addrees
+ * @return none
+ */
+static void resetDeviceCredentials(void)
+{
+  Log.info("%s [%d]: The device will be reset now...\r\n", __FILE__, __LINE__);
+  bool res = preferences.clear();
+  if (res)
+    Log.info("%s [%d]: The device reseted success. Restarting...\r\n", __FILE__, __LINE__);
+  else
+    Log.error("%s [%d]: The device reseting error. The device will be reset now...\r\n", __FILE__, __LINE__);
+  preferences.end();
+  ESP.restart();
 }
 
 /**
@@ -1079,7 +1150,9 @@ static void checkAndPerformFirmwareUpdate(void)
  */
 static void goToSleep(void)
 {
-  uint32_t time_to_sleep = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+  uint32_t time_to_sleep = SLEEP_TIME_TO_SLEEP;
+  if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))
+    time_to_sleep = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
   Log.info("%s [%d]: time to sleep - %d\r\n", __FILE__, __LINE__, time_to_sleep);
   preferences.end();
   esp_sleep_enable_timer_wakeup(time_to_sleep * SLEEP_uS_TO_S_FACTOR);
@@ -1091,7 +1164,7 @@ static void goToSleep(void)
 // Not sure if WiFiClientSecure checks the validity date of the certificate.
 // Setting clock just to be sure...
 /**
- * @brief Function to clock synchronization 
+ * @brief Function to clock synchronization
  * @param none
  * @return none
  */
@@ -1204,4 +1277,18 @@ static void log_POST(char *log_buffer, size_t size)
   {
     Log.error("%s [%d]: [HTTPS] Unable to create client\r\n", __FILE__, __LINE__);
   }
+}
+
+static void handleRoute(void)
+{
+  Log.info("%s [%d]: handle portal callback\r\n", __FILE__, __LINE__);
+
+  wm.stopConfigPortal();
+  resetDeviceCredentials();
+}
+
+static void bindServerCallback(void)
+{
+  wm.server->on("/custom", handleRoute); // this is now crashing esp32 for some reason
+  // wm.server->on("/info",handleRoute); // you can override wm!
 }

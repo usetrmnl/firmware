@@ -3,7 +3,7 @@
 
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 2
-#define FW_PATCH_VERSION 5
+#define FW_PATCH_VERSION 7
 
 #define PREFERENCES_API_KEY "api_key"
 #define PREFERENCES_API_KEY_DEFAULT ""
@@ -18,6 +18,7 @@
 
 #define SLEEP_uS_TO_S_FACTOR 1000000 /* Conversion factor for micro seconds to seconds */
 #define SLEEP_TIME_TO_SLEEP 900        /* Time ESP32 will go to sleep (in seconds) */
+#define SLEEP_TIME_WHILE_NOT_CONNECTED 30        /* Time ESP32 will go to sleep (in seconds) */
 
 #define PIN_RESET 9
 #define PIN_INTERRUPT 2

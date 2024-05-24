@@ -193,7 +193,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
  * @param image_buffer - pointer to the uint8_t image buffer
  * @return bool true - if success; false - if failed
  */
-void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char *fw_version)
+void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
 {
     UBYTE *BlackImage;
     /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
@@ -215,18 +215,30 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     Paint_DrawBitMap(image_buffer + 62);
     switch (message_type)
     {
-    case WIFI_CONNECT:
+    case FRIENDLY_ID:
     {
-        String string1 = "FW: ";
-        string1 += fw_version;
+        Log.info("%s [%d]: friendly id case\r\n", __FILE__, __LINE__);
+        char string1[] = "Please, sign up at usetrmnl.com/signup";
+        Paint_DrawString_EN((800 - sizeof(string1) * 17 > 9) ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 400, string1, &Font24, WHITE, BLACK);
+
+        String string2 = "with Friendly ID ";
         if (id)
         {
-            string1 += " Friendly ID: ";
-            string1 += friendly_id;
+            string2 += friendly_id;
         }
+        string2 += " to finish setup";
+        Paint_DrawString_EN((800 - string2.length() * 17 > 9) ? (800 - string2.length() * 17) / 2 + 9 : 0, 430, string2.c_str(), &Font24, WHITE, BLACK);
+    }
+    break;
+    case WIFI_CONNECT:
+    {
+        Log.info("%s [%d]: wifi connect case\r\n", __FILE__, __LINE__);
+        String string1 = "FW: ";
+        string1 += fw_version;
+        string1 += ". WiFi is not saved.";
         Log.info("%s [%d]: size of string1 - %d\r\n", __FILE__, __LINE__, string1.length());
         Paint_DrawString_EN((800 - string1.length() * 17 > 9) ? (800 - string1.length() * 17) / 2 + 9 : 0, 400, string1.c_str(), &Font24, WHITE, BLACK);
-        char string2[] = "Connect to TRMNL WiFi";
+        char string2[] = "Please, connect to TRMNL WiFi";
         Paint_DrawString_EN((800 - sizeof(string2) * 17 > 9) ? (800 - sizeof(string2) * 17) / 2 + 9 : 0, 430, string2, &Font24, WHITE, BLACK);
     }
     break;

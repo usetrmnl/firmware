@@ -5,6 +5,7 @@
 
 enum MSG {
   NONE,
+  FRIENDLY_ID,
   WIFI_CONNECT,
   WIFI_FAILED,
   WIFI_INTERNAL_ERROR,
@@ -50,7 +51,7 @@ void display_show_msg(uint8_t * image_buffer, MSG message_type);
  * @param image_buffer - pointer to the uint8_t image buffer
  * @return none
  */
-void display_show_msg(uint8_t * image_buffer, MSG message_type, String friendly_id, bool id, const char * fw_version);
+void display_show_msg(uint8_t * image_buffer, MSG message_type, String friendly_id, bool id, const char * fw_version, String message);
 
 /**
  * @brief Function to got the display to the sleep

@@ -97,75 +97,82 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
 ## **Version Log**
 
 [v.1.0.0]
-    - initial work version;
+   - initial work version;
 
 [v.1.0.1]
-    - added version control;\n
-    - added reading the default logo from flash, not from SPIFFS; 
+   - added version control;\n
+   - added reading the default logo from flash, not from SPIFFS; 
 
 [v.1.0.2]
-    - added setup request and response handling;\n
-    - added battery reading;\n
-    - added new errors messages;\n
-    - added key to requests;\n
-    - added dynamic refresh rate;
+   - added setup request and response handling;\n
+   - added battery reading;\n
+   - added new errors messages;\n
+   - added key to requests;\n
+   - added dynamic refresh rate;
 
 [v.1.0.3]
-    - added default logo storing and showing;
-    - added OTA
+   - added default logo storing and showing;
+   - added OTA
 
 [v.1.0.4]
-    - fixeD version that sending to the server;\n
-    - changed default refresh rate to 15 minutes;
+   - fixeD version that sending to the server;\n
+   - changed default refresh rate to 15 minutes;
 
 [v.1.0.5]
-    - fixed WiFi connection with wrong credentials;\n
-    - changed default AP name;\n
-    - fixed starting config portal in backend if connection is wrong;
+   - fixed WiFi connection with wrong credentials;\n
+   - changed default AP name;\n
+   - fixed starting config portal in backend if connection is wrong;
 
 [v.1.0.6]
-    - changed picture file path to absolute path;
+   - changed picture file path to absolute path;
 
 [v.1.0.7]
-    - fixed an uknown bag with OTA update;
+   - fixed an uknown bag with OTA update;
 
 [v.1.0.8]
-    - changeed BMP header length;
+   - changeed BMP header length;
 
 [v.1.0.9]
-    - fixed loop error on receiving image from the new server(added timeout loop that waiting for stream available);\n
-    - localization problem with inversion of the color with new server(relative with difference headers);
+   - fixed loop error on receiving image from the new server(added timeout loop that waiting for stream available);\n
+   - localization problem with inversion of the color with new server(relative with difference headers);
 
 [v.1.1.0]
-    - added bmp header parser;\n
-    - added new error relative with incorrect bmp format - bad width, height, bpp, color table size, color; 
+   - added bmp header parser;\n
+   - added new error relative with incorrect bmp format - bad width, height, bpp, color table size, color; 
 
 [v.1.2.0]
-    - added new initial sequence for e-paper display(from RPi code. Now in the code are 3 initialization sequences: - default function from ESP32 code; default function from RPi code (2.2 s for Chinese displays, 10 s for waveshare displays); fast function from RPi code(3.4 s for Chinese displays, 1.8 s for waveshare displays));
+   - added new initial sequence for e-paper display(from RPi code. Now in the code are 3 initialization sequences: - default function from ESP32 code; default function from RPi code (2.2 s for Chinese displays, 10 s for waveshare displays); fast function from RPi code(3.4 s for Chinese displays, 1.8 s for waveshare displays));
 
 [v.1.2.1]
-    - added log POST request for failed GET requests;\n
+   - added log POST request for failed GET requests;\n
 
 [v.1.2.2]
-    - changed the sequence of actions when sending logs;\n
-    - removed menu items from WiFI manager;\n
-    - removed Friendly ID from boot image;\n
-    - done small copywriting edits for prompt messages;\n
-    - improved battery voltage reading(added information about basic voltage to README);\n
+   - changed the sequence of actions when sending logs;\n
+   - removed menu items from WiFI manager;\n
+   - removed Friendly ID from boot image;\n
+   - done small copywriting edits for prompt messages;\n
+   - improved battery voltage reading(added information about basic voltage to README);\n
 
 [v.1.2.3]
-    - added retries for https queries;
+   - added retries for https queries;
 
 [v.1.2.4]
-    - fixed delay after power ON from PC USB;
-    - debug hidden;
-    - fixed refresh rate;
+   - fixed delay after power ON from PC USB;
+   - debug hidden;
+   - fixed refresh rate;
 
 [v.1.2.5]
-    - changed battery read function;
+   - changed battery read function;
 
 [v.1.2.6]
-    - edited in final version;
+   - code refactored;
+   - changed friendly ID showing(now it will showing untill the device willn't registered at usertrmnl.com);
+   - snow effect shows only when power reset or wake up by button;
+
+[v.1.2.7]
+   - added warning message that if captive portal closed without credential saved - user must re-open it;
+   - added reset button to the main screen of the captive portal that clear preferences(wifi_credentials, friendly id and API key);
+   - added reset_firmaware flag handling - if it will true then the device will reset all credentials(wifi_credentials, friendly id and API key);
 
 
     

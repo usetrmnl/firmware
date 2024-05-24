@@ -28,6 +28,8 @@ enum bmp_err_e
 enum https_request_err_e
 {
     HTTPS_NO_ERR,
+    HTTPS_RESET,
+    HTTPS_NO_REGISTER,
     HTTPS_SUCCES,
     HTTPS_CLIENT_FAILED,
     HTTPS_REQUEST_FAILED,

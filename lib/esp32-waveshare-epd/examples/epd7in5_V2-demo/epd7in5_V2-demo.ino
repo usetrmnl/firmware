@@ -1,3 +1,9 @@
+#include <WiFiManager.h>
+#include <strings_en.h>
+#include <wm_consts_en.h>
+#include <wm_strings_en.h>
+#include <wm_strings_es.h>
+
 /* Includes ------------------------------------------------------------------*/
 #include "DEV_Config.h"
 #include "EPD.h"
