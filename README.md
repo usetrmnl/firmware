@@ -2,6 +2,10 @@
 
 [insert something helpful]
 
+## **Algorithm block scheme**
+
+![Image Alt text](/pics/algorithm.png "Algorithm block scheme")
+
 ## **Web Server Endpoints**
 
 following Wifi connection, swap Mac Address for API Key and Friendly ID (which get saved on device).
