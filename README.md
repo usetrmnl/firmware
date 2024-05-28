@@ -41,7 +41,17 @@ response example (success, device found with this access token):
   "image_url"=>"https://trmnl.s3.us-east-2.amazonaws.com/path-to-img.bmp",
   "update_firmware"=>false,
   "firmware_url"=>nil,
-  "refresh_rate"=>"1800"
+  "refresh_rate"=>"1800",
+  "reset_firmware"=>false
+}
+
+response example (success, device found AND needs soft reset):
+{
+ "image_url"=>"https://trmnl.s3.us-east-2.amazonaws.com/path-to-img.bmp",
+ "update_firmware"=>false,
+ "firmware_url"=>nil,
+ "refresh_rate"=>"1800",
+ "reset_firmware"=>true
 }
 
 response example (success, device found AND needs firmware update):
@@ -49,7 +59,8 @@ response example (success, device found AND needs firmware update):
  "image_url"=>"https://trmnl.s3.us-east-2.amazonaws.com/path-to-img.bmp",
  "update_firmware"=>true,
  "firmware_url"=>"https://trmnl.s3.us-east-2.amazonaws.com/path-to-firmware.bin",
- "refresh_rate"=>"1800"
+ "refresh_rate"=>"1800",
+ "reset_firmware"=>false
 }
 
 response example (fail, device not found for this access token):
