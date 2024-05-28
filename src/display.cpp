@@ -218,7 +218,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     case FRIENDLY_ID:
     {
         Log.info("%s [%d]: friendly id case\r\n", __FILE__, __LINE__);
-        char string1[] = "Please, sign up at usetrmnl.com/signup";
+        char string1[] = "Please sign up at usetrmnl.com/signup";
         Paint_DrawString_EN((800 - sizeof(string1) * 17 > 9) ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 400, string1, &Font24, WHITE, BLACK);
 
         String string2 = "with Friendly ID ";
@@ -238,7 +238,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         string1 += ". WiFi is not saved.";
         Log.info("%s [%d]: size of string1 - %d\r\n", __FILE__, __LINE__, string1.length());
         Paint_DrawString_EN((800 - string1.length() * 17 > 9) ? (800 - string1.length() * 17) / 2 + 9 : 0, 400, string1.c_str(), &Font24, WHITE, BLACK);
-        char string2[] = "Please, connect to TRMNL WiFi";
+        char string2[] = "Please connect to TRMNL WiFi";
         Paint_DrawString_EN((800 - sizeof(string2) * 17 > 9) ? (800 - sizeof(string2) * 17) / 2 + 9 : 0, 430, string2, &Font24, WHITE, BLACK);
     }
     break;
