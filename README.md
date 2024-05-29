@@ -189,6 +189,8 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
    - added reset button to the main screen of the captive portal that clear preferences(wifi_credentials, friendly id and API key);
    - added reset_firmaware flag handling - if it will true then the device will reset all credentials(wifi_credentials, friendly id and API key);
 
+[v.1.2.8]
+   - fixed error decoding;
 
     
 ## **Compilation guide**

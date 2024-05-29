@@ -710,7 +710,7 @@ static https_request_err_e downloadAndShow(const char *url)
             Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
 
             memset(log_array, 0, sizeof(log_array));
-            sprintf(log_array, "{\"log\":{\"dump\":{\"error\":\"\"returned_code\":%d,\"code_to_string\":%s\"}}}", httpCode, https.errorToString(httpCode));
+            sprintf(log_array, "{\"log\":{\"dump\":{\"error\":\"\"returned_code\":%d,\"code_to_string\":%s\"}}}", httpCode, https.errorToString(httpCode).c_str());
             log_POST(log_array, strlen(log_array));
 
             result = HTTPS_REQUEST_FAILED;
