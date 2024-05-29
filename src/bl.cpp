@@ -243,7 +243,7 @@ void bl_init(void)
   // ITA checking, image checking and drawing
   https_request_err_e request_result = HTTPS_NO_ERR;
   uint8_t retries = 0;
-  while ((request_result != HTTPS_SUCCES && request_result != HTTPS_NO_REGISTER) && retries < SERVER_MAX_RETRIES)
+  while ((request_result != HTTPS_SUCCES && request_result != HTTPS_NO_REGISTER && request_result != HTTPS_RESET) && retries < SERVER_MAX_RETRIES)
   {
 
     Log.info("%s [%d]: request retry %d...\r\n", __FILE__, __LINE__, retries);

@@ -192,7 +192,9 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
 [v.1.2.8]
    - fixed error decoding;
 
-    
+[v.1.2.9]
+   - fixed small bug on soft reset;
+
 ## **Compilation guide**
 1. Install the VScode https://code.visualstudio.com
 2. Install PlatformIO https://platformio.org/install/ide?install=vscode
