@@ -195,6 +195,12 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
 [v.1.2.9]
    - fixed small bug on soft reset;
 
+[v.1.2.10]
+   - WiFi deleted after device reset from Captive Portal or from API response;
+   - Rename "Reset" to "Soft Reset" on Config Portal;
+   - added reset handling after status=500 received;
+   - fixed display udating when no needed;
+
 ## **Compilation guide**
 1. Install the VScode https://code.visualstudio.com
 2. Install PlatformIO https://platformio.org/install/ide?install=vscode

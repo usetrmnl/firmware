@@ -32,6 +32,7 @@ bool update_firmware = false;                                        // need to 
 bool reset_firmware = false;                                         // need to reset credentials
 bool send_log = false;                                               // need to send logs
 esp_sleep_wakeup_cause_t wakeup_reason = ESP_SLEEP_WAKEUP_UNDEFINED; // wake-up reason
+MSG current_msg = NONE;
 
 // timers
 uint32_t button_timer = 0;
@@ -155,11 +156,15 @@ void bl_init(void)
     {
       Log.fatal("%s [%d]: Connection failed!\r\n", __FILE__, __LINE__);
 
-      res = readBufferFromFile("/logo.bmp", buffer);
-      if (res)
-        display_show_msg(buffer, WIFI_FAILED);
-      else
-        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_FAILED);
+      if (current_msg != WIFI_FAILED)
+      {
+        res = readBufferFromFile("/logo.bmp", buffer);
+        if (res)
+          display_show_msg(buffer, WIFI_FAILED);
+        else
+          display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_FAILED);
+        current_msg = WIFI_FAILED;
+      }
       // Go to deep sleep
       display_sleep();
       goToSleep();
@@ -198,7 +203,7 @@ void bl_init(void)
 
     // wm.addParameter();
     wm.setWebServerCallback(bindServerCallback);
-    const char *menuhtml = "<form action='/custom' method='get'><button>Reset</button></form><br/>\n";
+    const char *menuhtml = "<form action='/custom' method='get'><button>Soft Reset</button></form><br/>\n";
     wm.setCustomMenuHTML(menuhtml);
 
     std::vector<const char *> menu = {"wifi", "custom"};
@@ -512,18 +517,13 @@ static https_request_err_e downloadAndShow(const char *url)
               Log.info("%s [%d]: status: %d\r\n", __FILE__, __LINE__, request_status);
               if (request_status > 0)
               {
-                result = HTTPS_NO_REGISTER;
-                Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
-                size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
-                Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
-                // show the image
-                String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
-                bool res = readBufferFromFile("/logo.bmp", buffer);
-                if (res)
-                  display_show_msg(buffer, FRIENDLY_ID, friendly_id, true, "", "");
-                else
-                  display_show_msg(const_cast<uint8_t *>(default_icon), FRIENDLY_ID, friendly_id, true, "", "");
-
+                if (request_status == 500)
+                {
+                  result = HTTPS_RESET;
+                  Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
+                  size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
+                  Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+                }
                 status = false;
               }
               else
@@ -967,6 +967,8 @@ static void getDeviceCredentials(const char *url)
 static void resetDeviceCredentials(void)
 {
   Log.info("%s [%d]: The device will be reset now...\r\n", __FILE__, __LINE__);
+  Log.info("%s [%d]: WiFi reseting...\r\n", __FILE__, __LINE__);
+  wm.resetSettings();
   bool res = preferences.clear();
   if (res)
     Log.info("%s [%d]: The device reseted success. Restarting...\r\n", __FILE__, __LINE__);
