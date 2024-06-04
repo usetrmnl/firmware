@@ -33,7 +33,7 @@ bool reset_firmware = false;                                         // need to 
 bool send_log = false;                                               // need to send logs
 esp_sleep_wakeup_cause_t wakeup_reason = ESP_SLEEP_WAKEUP_UNDEFINED; // wake-up reason
 MSG current_msg = NONE;
-
+RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
 // timers
 uint32_t button_timer = 0;
 
@@ -257,6 +257,18 @@ void bl_init(void)
     bool logic = (request_result != HTTPS_SUCCES && request_result != HTTPS_NO_REGISTER);
     Log.info("%s [%d]: logic %d...\r\n", __FILE__, __LINE__, logic);
     retries++;
+  }
+
+  if (request_result == HTTPS_NO_REGISTER && need_to_refresh_display == 1)
+  {
+    // show the image
+    String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
+    bool res = readBufferFromFile("/logo.bmp", buffer);
+    if (res)
+      display_show_msg(buffer, FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
+    else
+      display_show_msg(const_cast<uint8_t *>(default_icon), FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
+    need_to_refresh_display = 0;
   }
 
   // reset checking
@@ -523,46 +535,57 @@ static https_request_err_e downloadAndShow(const char *url)
                   Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
                   size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
                   Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+                  status = false;
                 }
-                status = false;
+                else if (request_status == 202)
+                {
+                  result = HTTPS_NO_REGISTER;
+                  Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
+                  size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
+                  Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+                  status = false;
+                }
+                else if (request_status == 200)
+                {
+                  String image_url = doc["image_url"];
+                  update_firmware = doc["update_firmware"];
+                  String firmware_url = doc["firmware_url"];
+                  uint64_t rate = doc["refresh_rate"];
+                  reset_firmware = doc["reset_firmware"];
+
+                  if (image_url.length() > 0)
+                  {
+                    Log.info("%s [%d]: image_url: %s\r\n", __FILE__, __LINE__, image_url.c_str());
+                    image_url.toCharArray(filename, image_url.length() + 1);
+                  }
+                  Log.info("%s [%d]: update_firmware: %d\r\n", __FILE__, __LINE__, update_firmware);
+                  if (firmware_url.length() > 0)
+                  {
+                    Log.info("%s [%d]: firmware_url: %s\r\n", __FILE__, __LINE__, firmware_url.c_str());
+                    firmware_url.toCharArray(binUrl, firmware_url.length() + 1);
+                  }
+                  Log.info("%s [%d]: refresh_rate: %d\r\n", __FILE__, __LINE__, rate);
+                  if (rate != preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP))
+                  {
+                    Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, rate);
+                    size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, rate);
+                    Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+                  }
+
+                  if (reset_firmware)
+                  {
+                    Log.info("%s [%d]: Reset status is true\r\n", __FILE__, __LINE__);
+                  }
+                  status = true;
+
+                  if (update_firmware)
+                    result = HTTPS_SUCCES;
+                  if (reset_firmware)
+                    result = HTTPS_RESET;
+                }
               }
               else
               {
-                String image_url = doc["image_url"];
-                update_firmware = doc["update_firmware"];
-                String firmware_url = doc["firmware_url"];
-                uint64_t rate = doc["refresh_rate"];
-                reset_firmware = doc["reset_firmware"];
-
-                if (image_url.length() > 0)
-                {
-                  Log.info("%s [%d]: image_url: %s\r\n", __FILE__, __LINE__, image_url.c_str());
-                  image_url.toCharArray(filename, image_url.length() + 1);
-                }
-                Log.info("%s [%d]: update_firmware: %d\r\n", __FILE__, __LINE__, update_firmware);
-                if (firmware_url.length() > 0)
-                {
-                  Log.info("%s [%d]: firmware_url: %s\r\n", __FILE__, __LINE__, firmware_url.c_str());
-                  firmware_url.toCharArray(binUrl, firmware_url.length() + 1);
-                }
-                Log.info("%s [%d]: refresh_rate: %d\r\n", __FILE__, __LINE__, rate);
-                if (rate != preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP))
-                {
-                  Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, rate);
-                  size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, rate);
-                  Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
-                }
-
-                if (reset_firmware)
-                {
-                  Log.info("%s [%d]: Reset status is true\r\n", __FILE__, __LINE__);
-                }
-                status = true;
-
-                if (update_firmware)
-                  result = HTTPS_SUCCES;
-                if (reset_firmware)
-                  result = HTTPS_RESET;
               }
             }
           }
@@ -901,6 +924,7 @@ static void getDeviceCredentials(const char *url)
                 // show the image
                 String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
                 display_show_msg(buffer, FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
+                need_to_refresh_display = 0;
               }
               else
               {
@@ -969,6 +993,7 @@ static void resetDeviceCredentials(void)
   Log.info("%s [%d]: The device will be reset now...\r\n", __FILE__, __LINE__);
   Log.info("%s [%d]: WiFi reseting...\r\n", __FILE__, __LINE__);
   wm.resetSettings();
+  need_to_refresh_display = 1;
   bool res = preferences.clear();
   if (res)
     Log.info("%s [%d]: The device reseted success. Restarting...\r\n", __FILE__, __LINE__);

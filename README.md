@@ -201,6 +201,10 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
    - added reset handling after status=500 received;
    - fixed display udating when no needed;
 
+[v.1.2.11]
+   - fixed issue with the friendly id showing;
+   - added status 202 for /api/display endpoint;
+
 ## **Compilation guide**
 1. Install the VScode https://code.visualstudio.com
 2. Install PlatformIO https://platformio.org/install/ide?install=vscode
