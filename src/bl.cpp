@@ -527,27 +527,11 @@ static https_request_err_e downloadAndShow(const char *url)
             {
               uint64_t request_status = doc["status"];
               Log.info("%s [%d]: status: %d\r\n", __FILE__, __LINE__, request_status);
-              if (request_status > 0)
+              switch (request_status)
               {
-                if (request_status == 500)
-                {
-                  result = HTTPS_RESET;
-                  Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
-                  size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
-                  Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
-                  status = false;
-                }
-                else if (request_status == 202)
-                {
-                  result = HTTPS_NO_REGISTER;
-                  Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
-                  size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
-                  Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
-                  status = false;
-                }
-                else if (request_status == 200)
-                {
-                  String image_url = doc["image_url"];
+              case 0:
+              {
+                String image_url = doc["image_url"];
                   update_firmware = doc["update_firmware"];
                   String firmware_url = doc["firmware_url"];
                   uint64_t rate = doc["refresh_rate"];
@@ -582,10 +566,29 @@ static https_request_err_e downloadAndShow(const char *url)
                     result = HTTPS_SUCCES;
                   if (reset_firmware)
                     result = HTTPS_RESET;
-                }
               }
-              else
+              break;
+              case 202:
               {
+                result = HTTPS_NO_REGISTER;
+                  Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
+                  size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
+                  Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+                  status = false;
+              }
+              break;
+              case 500:
+              {
+                result = HTTPS_RESET;
+                  Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
+                  size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
+                  Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+                  status = false;
+              }
+              break;
+
+              default:
+                break;
               }
             }
           }
