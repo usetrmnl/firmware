@@ -3,7 +3,7 @@
 
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 2
-#define FW_PATCH_VERSION 12
+#define FW_PATCH_VERSION 13
 
 #define PREFERENCES_API_KEY "api_key"
 #define PREFERENCES_API_KEY_DEFAULT ""
@@ -13,6 +13,7 @@
 
 #define WIFI_CONNECTION_ATTEMPTS 5
 #define WIFI_PORTAL_TIMEOUT 120
+#define WIFI_CONNECTION_RSSI -100
 
 #define DISPLAY_BMP_IMAGE_SIZE 48062 // in bytes - 62 bytes - header; 48000 bytes - bitmap (480*800 1bpp) / 8
 

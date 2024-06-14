@@ -208,6 +208,9 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
 [v.1.2.12]
    - fixed status codes handling;
 
+[v.1.2.13]
+   - added bad Wi-Fi signal handler while internet connection or HTTPS requesting;
+
 ## **Compilation guide**
 1. Install the VScode https://code.visualstudio.com
 2. Install PlatformIO https://platformio.org/install/ide?install=vscode

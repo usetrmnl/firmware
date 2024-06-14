@@ -289,10 +289,20 @@ void bl_init(void)
   case HTTPS_REQUEST_FAILED:
   {
     bool res = readBufferFromFile("/logo.bmp", buffer);
-    if (res)
-      display_show_msg(buffer, API_ERROR);
+    if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+    {
+      if (res)
+        display_show_msg(buffer, API_ERROR);
+      else
+        display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+    }
     else
-      display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+    {
+      if (res)
+        display_show_msg(buffer, WIFI_WEAK);
+      else
+        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+    }
   }
   break;
   case HTTPS_RESPONSE_CODE_INVALID:
@@ -307,10 +317,20 @@ void bl_init(void)
   case HTTPS_UNABLE_TO_CONNECT:
   {
     bool res = readBufferFromFile("/logo.bmp", buffer);
-    if (res)
-      display_show_msg(buffer, API_ERROR);
+    if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+    {
+      if (res)
+        display_show_msg(buffer, API_ERROR);
+      else
+        display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+    }
     else
-      display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+    {
+      if (res)
+        display_show_msg(buffer, WIFI_WEAK);
+      else
+        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+    }
   }
   break;
   case HTTPS_WRONG_IMAGE_FORMAT:
@@ -325,11 +345,20 @@ void bl_init(void)
   case HTTPS_WRONG_IMAGE_SIZE:
   {
     bool res = readBufferFromFile("/logo.bmp", buffer);
-    if (res)
-      display_show_msg(buffer, API_SIZE_ERROR);
-    // display_show_msg(buffer, API_SIZE_ERROR);
+    if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+    {
+      if (res)
+        display_show_msg(buffer, API_SIZE_ERROR);
+      else
+        display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
+    }
     else
-      display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
+    {
+      if (res)
+        display_show_msg(buffer, WIFI_WEAK);
+      else
+        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+    }
   }
   break;
   case HTTPS_CLIENT_FAILED:
@@ -444,7 +473,7 @@ static https_request_err_e downloadAndShow(const char *url)
     {
       // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
       HTTPClient https;
-
+      Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
       Log.info("%s [%d]: [HTTPS] begin...\r\n", __FILE__, __LINE__);
       char new_url[200];
       strcpy(new_url, url);
@@ -492,6 +521,7 @@ static https_request_err_e downloadAndShow(const char *url)
       // if (https.begin(*client, new_url))
       if (https.begin(*client, "https://usetrmnl.com/api/display"))
       { // HTTPS
+        Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
         Log.info("%s [%d]: [HTTPS] GET...\r\n", __FILE__, __LINE__);
         // start connection and send HTTP header
         https.addHeader("ID", WiFi.macAddress());
@@ -531,58 +561,58 @@ static https_request_err_e downloadAndShow(const char *url)
               case 0:
               {
                 String image_url = doc["image_url"];
-                  update_firmware = doc["update_firmware"];
-                  String firmware_url = doc["firmware_url"];
-                  uint64_t rate = doc["refresh_rate"];
-                  reset_firmware = doc["reset_firmware"];
+                update_firmware = doc["update_firmware"];
+                String firmware_url = doc["firmware_url"];
+                uint64_t rate = doc["refresh_rate"];
+                reset_firmware = doc["reset_firmware"];
 
-                  if (image_url.length() > 0)
-                  {
-                    Log.info("%s [%d]: image_url: %s\r\n", __FILE__, __LINE__, image_url.c_str());
-                    image_url.toCharArray(filename, image_url.length() + 1);
-                  }
-                  Log.info("%s [%d]: update_firmware: %d\r\n", __FILE__, __LINE__, update_firmware);
-                  if (firmware_url.length() > 0)
-                  {
-                    Log.info("%s [%d]: firmware_url: %s\r\n", __FILE__, __LINE__, firmware_url.c_str());
-                    firmware_url.toCharArray(binUrl, firmware_url.length() + 1);
-                  }
-                  Log.info("%s [%d]: refresh_rate: %d\r\n", __FILE__, __LINE__, rate);
-                  if (rate != preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP))
-                  {
-                    Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, rate);
-                    size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, rate);
-                    Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
-                  }
+                if (image_url.length() > 0)
+                {
+                  Log.info("%s [%d]: image_url: %s\r\n", __FILE__, __LINE__, image_url.c_str());
+                  image_url.toCharArray(filename, image_url.length() + 1);
+                }
+                Log.info("%s [%d]: update_firmware: %d\r\n", __FILE__, __LINE__, update_firmware);
+                if (firmware_url.length() > 0)
+                {
+                  Log.info("%s [%d]: firmware_url: %s\r\n", __FILE__, __LINE__, firmware_url.c_str());
+                  firmware_url.toCharArray(binUrl, firmware_url.length() + 1);
+                }
+                Log.info("%s [%d]: refresh_rate: %d\r\n", __FILE__, __LINE__, rate);
+                if (rate != preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP))
+                {
+                  Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, rate);
+                  size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, rate);
+                  Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+                }
 
-                  if (reset_firmware)
-                  {
-                    Log.info("%s [%d]: Reset status is true\r\n", __FILE__, __LINE__);
-                  }
-                  status = true;
+                if (reset_firmware)
+                {
+                  Log.info("%s [%d]: Reset status is true\r\n", __FILE__, __LINE__);
+                }
+                status = true;
 
-                  if (update_firmware)
-                    result = HTTPS_SUCCES;
-                  if (reset_firmware)
-                    result = HTTPS_RESET;
+                if (update_firmware)
+                  result = HTTPS_SUCCES;
+                if (reset_firmware)
+                  result = HTTPS_RESET;
               }
               break;
               case 202:
               {
                 result = HTTPS_NO_REGISTER;
-                  Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
-                  size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
-                  Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
-                  status = false;
+                Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
+                size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
+                Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+                status = false;
               }
               break;
               case 500:
               {
                 result = HTTPS_RESET;
-                  Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
-                  size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
-                  Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
-                  status = false;
+                Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
+                size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
+                Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+                status = false;
               }
               break;
 
@@ -619,6 +649,7 @@ static https_request_err_e downloadAndShow(const char *url)
         if (https.begin(*client, filename))
         { // HTTPS
           Log.info("%s [%d]: [HTTPS] GET..\r\n", __FILE__, __LINE__);
+          Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
           // start connection and send HTTP header
           int httpCode = https.GET();
 
@@ -627,6 +658,7 @@ static https_request_err_e downloadAndShow(const char *url)
           {
             // HTTP header has been send and Server response header has been handled
             Log.error("%s [%d]: [HTTPS] GET... code: %d\r\n", __FILE__, __LINE__, httpCode);
+            Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
             // file found at server
             if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
             {
@@ -635,6 +667,7 @@ static https_request_err_e downloadAndShow(const char *url)
               if (https.getSize() == DISPLAY_BMP_IMAGE_SIZE)
               {
                 WiFiClient *stream = https.getStreamPtr();
+                Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
                 Log.info("%s [%d]: Stream timeout: %d\r\n", __FILE__, __LINE__, stream->getTimeout());
 
                 Log.info("%s [%d]: Stream available: %d\r\n", __FILE__, __LINE__, stream->available());
@@ -792,6 +825,7 @@ static void getDeviceCredentials(const char *url)
       https.addHeader("ID", WiFi.macAddress());
       if (https.begin(*client, new_url))
       { // HTTPS
+        Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
         Log.info("%s [%d]: [HTTPS] GET...\r\n", __FILE__, __LINE__);
         // start connection and send HTTP header
 
@@ -804,6 +838,7 @@ static void getDeviceCredentials(const char *url)
           // HTTP header has been send and Server response header has been handled
           Log.info("%s [%d]: GET... code: %d\r\n", __FILE__, __LINE__, httpCode);
           // file found at server
+          Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
           if (httpCode == HTTP_CODE_OK)
           {
             Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
@@ -854,20 +889,40 @@ static void getDeviceCredentials(const char *url)
           {
             Log.info("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
             bool res = readBufferFromFile("/logo.bmp", buffer);
-            if (res)
-              display_show_msg(buffer, API_ERROR);
+            if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+            {
+              if (res)
+                display_show_msg(buffer, API_ERROR);
+              else
+                display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+            }
             else
-              display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+            {
+              if (res)
+                display_show_msg(buffer, WIFI_WEAK);
+              else
+                display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+            }
           }
         }
         else
         {
           Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
           bool res = readBufferFromFile("/logo.bmp", buffer);
-          if (res)
-            display_show_msg(buffer, API_ERROR);
+          if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+          {
+            if (res)
+              display_show_msg(buffer, API_ERROR);
+            else
+              display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+          }
           else
-            display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+          {
+            if (res)
+              display_show_msg(buffer, WIFI_WEAK);
+            else
+              display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+          }
         }
 
         https.end();
@@ -932,10 +987,20 @@ static void getDeviceCredentials(const char *url)
               {
                 Log.error("%s [%d]: Receiving failed. Readed: %d\r\n", __FILE__, __LINE__, counter);
                 bool res = readBufferFromFile("/logo.bmp", buffer);
-                if (res)
-                  display_show_msg(buffer, API_SIZE_ERROR);
+                if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+                {
+                  if (res)
+                    display_show_msg(buffer, API_SIZE_ERROR);
+                  else
+                    display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
+                }
                 else
-                  display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
+                {
+                  if (res)
+                    display_show_msg(buffer, WIFI_WEAK);
+                  else
+                    display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+                }
               }
             }
             else
@@ -943,30 +1008,60 @@ static void getDeviceCredentials(const char *url)
               Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
               https.end();
               bool res = readBufferFromFile("/logo.bmp", buffer);
-              if (res)
-                display_show_msg(buffer, API_ERROR);
+              if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+              {
+                if (res)
+                  display_show_msg(buffer, API_ERROR);
+                else
+                  display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+              }
               else
-                display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+              {
+                if (res)
+                  display_show_msg(buffer, WIFI_WEAK);
+                else
+                  display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+              }
             }
           }
           else
           {
             Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
             bool res = readBufferFromFile("/logo.bmp", buffer);
-            if (res)
-              display_show_msg(buffer, API_ERROR);
+            if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+            {
+              if (res)
+                display_show_msg(buffer, API_ERROR);
+              else
+                display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+            }
             else
-              display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+            {
+              if (res)
+                display_show_msg(buffer, WIFI_WEAK);
+              else
+                display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+            }
           }
         }
         else
         {
           Log.error("%s [%d]: unable to connect\r\n", __FILE__, __LINE__);
           bool res = readBufferFromFile("/logo.bmp", buffer);
-          if (res)
-            display_show_msg(buffer, API_ERROR);
+          if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+          {
+            if (res)
+              display_show_msg(buffer, API_ERROR);
+            else
+              display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+          }
           else
-            display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+          {
+            if (res)
+              display_show_msg(buffer, WIFI_WEAK);
+            else
+              display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+          }
         }
       }
       // End extra scoping block
@@ -1161,10 +1256,20 @@ static void checkAndPerformFirmwareUpdate(void)
       {
         Log.fatal("%s [%d]: HTTP GET failed!\r\n", __FILE__, __LINE__);
         bool res = readBufferFromFile("/logo.bmp", buffer);
-        if (res)
-          display_show_msg(buffer, API_ERROR);
+        if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+        {
+          if (res)
+            display_show_msg(buffer, API_ERROR);
+          else
+            display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+        }
         else
-          display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+        {
+          if (res)
+            display_show_msg(buffer, WIFI_WEAK);
+          else
+            display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+        }
       }
       https.end();
     }
