@@ -503,7 +503,6 @@ static https_request_err_e downloadAndShow(const char *url)
         delay(5);
 
         int httpCode = https.GET();
-
         // httpCode will be negative on error
         if (httpCode > 0)
         {
