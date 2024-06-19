@@ -1,6 +1,6 @@
 # TRMNL Firmware
 
-[insert something helpful]
+created for the [TRMNL](https://usetrmnl.com) e-ink display.
 
 ## **Algorithm block scheme**
 
@@ -31,9 +31,10 @@ GET `/api/display`
 headers = {
   'ID' => 'XX:XX:XX:XX',
   'Access-Token' => '2r--SahjsAKCFksVcped2Q',
-  'Refresh-Rate' => '1800' 
-  'Battery-Voltage' => '4.1'
-  'FW-Version' => '2.1.3'
+  'Refresh-Rate' => '1800' ,
+  'Battery-Voltage' => '4.1',
+  'FW-Version' => '2.1.3',
+  'RSSI' => '-69'
 }
 
 response example (success, device found with this access token):
