@@ -516,7 +516,7 @@ static https_request_err_e downloadAndShow(const char *url)
 
       float battery_voltage = readBatteryVoltage();
 
-      Log.info("%s [%d]: Added headers:\n\rID: %s\n\rAccess-Token: %s\n\rRefresh_Rate: %s\n\rBattery-Voltage: %s\n\rFW-Version: %s\r\n", __FILE__, __LINE__, WiFi.macAddress().c_str(), api_key.c_str(), String(refresh_rate).c_str(), String(battery_voltage).c_str(), fw_version.c_str());
+      Log.info("%s [%d]: Added headers:\n\rID: %s\n\rAccess-Token: %s\n\rRefresh_Rate: %s\n\rBattery-Voltage: %s\n\rFW-Version: %s\r\nRSSI: %s\r\n", __FILE__, __LINE__, WiFi.macAddress().c_str(), api_key.c_str(), String(refresh_rate).c_str(), String(battery_voltage).c_str(), fw_version.c_str(), String(WiFi.RSSI()));
 
       // if (https.begin(*client, new_url))
       if (https.begin(*client, "https://usetrmnl.com/api/display"))
@@ -529,6 +529,7 @@ static https_request_err_e downloadAndShow(const char *url)
         https.addHeader("Refresh-Rate", String(refresh_rate));
         https.addHeader("Battery-Voltage", String(battery_voltage));
         https.addHeader("FW-Version", fw_version);
+        https.addHeader("RSSI", String(WiFi.RSSI()));
 
         delay(5);
 
