@@ -215,6 +215,10 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
 [v.1.2.14]
    - added RSSI field into /api/display request;
 
+[v.1.2.15]
+   - added NTP servers mirrors;
+   - added loging in offline mode;
+
 ## **Compilation guide**
 1. Install the VScode https://code.visualstudio.com
 2. Install PlatformIO https://platformio.org/install/ide?install=vscode
