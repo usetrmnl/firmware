@@ -52,6 +52,8 @@ static float readBatteryVoltage(void);                                          
 static void log_POST(char *log_buffer, size_t size);                                // log sending
 static void handleRoute(void);
 static void bindServerCallback(void);
+static void checkLogNotes(void);
+static uint32_t getTime(void);
 
 /**
  * @brief Function to init business logic module
@@ -165,6 +167,11 @@ void bl_init(void)
           display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_FAILED);
         current_msg = WIFI_FAILED;
       }
+
+      memset(log_array, 0, sizeof(log_array));
+      sprintf(log_array, "%d [%d]: wifi connection failed", getTime(), __LINE__);
+      log_POST(log_array, strlen(log_array));
+
       // Go to deep sleep
       display_sleep();
       goToSleep();
@@ -224,6 +231,10 @@ void bl_init(void)
       else
         display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_FAILED);
 
+      memset(log_array, 0, sizeof(log_array));
+      sprintf(log_array, "%d [%d]: connection to the new WiFi failed", getTime(), __LINE__);
+      log_POST(log_array, strlen(log_array));
+
       // Go to deep sleep
       display_sleep();
       goToSleep();
@@ -245,7 +256,7 @@ void bl_init(void)
     Log.info("%s [%d]: API key and friendly ID saved\r\n", __FILE__, __LINE__);
   }
 
-  // ITA checking, image checking and drawing
+  // OTA checking, image checking and drawing
   https_request_err_e request_result = HTTPS_NO_ERR;
   uint8_t retries = 0;
   while ((request_result != HTTPS_SUCCES && request_result != HTTPS_NO_REGISTER && request_result != HTTPS_RESET) && retries < SERVER_MAX_RETRIES)
@@ -372,6 +383,11 @@ void bl_init(void)
   break;
   default:
     break;
+  }
+
+  if (request_result != HTTPS_NO_ERR)
+  {
+    checkLogNotes();
   }
 
   // display go to sleep
@@ -626,12 +642,19 @@ static https_request_err_e downloadAndShow(const char *url)
           {
             Log.info("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
             result = HTTPS_REQUEST_FAILED;
+            memset(log_array, 0, sizeof(log_array));
+            sprintf(log_array, "%d [%d]: returned code is mot OK", getTime(), __LINE__);
+            log_POST(log_array, strlen(log_array));
           }
         }
         else
         {
           Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
           result = HTTPS_RESPONSE_CODE_INVALID;
+
+          memset(log_array, 0, sizeof(log_array));
+          sprintf(log_array, "%d [%d]: HTTPS returned code is less then 0", getTime(), __LINE__);
+          log_POST(log_array, strlen(log_array));
         }
 
         https.end();
@@ -640,6 +663,9 @@ static https_request_err_e downloadAndShow(const char *url)
       {
         Log.error("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
         result = HTTPS_UNABLE_TO_CONNECT;
+        memset(log_array, 0, sizeof(log_array));
+        sprintf(log_array, "%d [%d]: unable to connect to the API endpoint", getTime(), __LINE__);
+        log_POST(log_array, strlen(log_array));
       }
 
       if (status && !update_firmware && !reset_firmware)
@@ -727,7 +753,7 @@ static https_request_err_e downloadAndShow(const char *url)
                   if (res != BMP_NO_ERR)
                   {
                     memset(log_array, 0, sizeof(log_array));
-                    sprintf(log_array, "{\"log\":{\"dump\":{\"error\":\"\"bmp_header_error\":\"%s\"\"}}}", error.c_str());
+                    sprintf(log_array, "%d [%d]: error parsing bmp file - %d", getTime(), __LINE__, error.c_str());
                     log_POST(log_array, strlen(log_array));
 
                     result = HTTPS_WRONG_IMAGE_FORMAT;
@@ -740,7 +766,7 @@ static https_request_err_e downloadAndShow(const char *url)
 
                   // display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
                   memset(log_array, 0, sizeof(log_array));
-                  sprintf(log_array, "{\"log\":{\"dump\":{\"error\":\"\"returned_code\":%d,\"content_size\":%d,\"readed\":%d\"}}}", httpCode, https.getSize(), counter);
+                  sprintf(log_array, "%d [%d]: HTTPS request error. Returned code - %d, available bytes - %d, received bytes - %d", getTime(), __LINE__, httpCode, https.getSize(), counter);
                   log_POST(log_array, strlen(log_array));
 
                   result = HTTPS_WRONG_IMAGE_SIZE;
@@ -751,7 +777,7 @@ static https_request_err_e downloadAndShow(const char *url)
                 Log.error("%s [%d]: Receiving failed. Bad file size\r\n", __FILE__, __LINE__);
 
                 memset(log_array, 0, sizeof(log_array));
-                sprintf(log_array, "{\"log\":{\"dump\":{\"error\":\"\"returned_code\":%d,\"content_size\":%d,\"readed\":%d\"}}}", httpCode, https.getSize(), counter);
+                sprintf(log_array, "%d [%d]: HTTPS request error. Returned code - %d, available bytes - %d, received bytes - %d", getTime(), __LINE__, httpCode, https.getSize(), counter);
                 log_POST(log_array, strlen(log_array));
 
                 result = HTTPS_REQUEST_FAILED;
@@ -762,6 +788,9 @@ static https_request_err_e downloadAndShow(const char *url)
               Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
 
               result = HTTPS_REQUEST_FAILED;
+              memset(log_array, 0, sizeof(log_array));
+              sprintf(log_array, "%d [%d]: HTTPS returned code is not OK", getTime(), __LINE__);
+              log_POST(log_array, strlen(log_array));
             }
           }
           else
@@ -769,7 +798,7 @@ static https_request_err_e downloadAndShow(const char *url)
             Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
 
             memset(log_array, 0, sizeof(log_array));
-            sprintf(log_array, "{\"log\":{\"dump\":{\"error\":\"\"returned_code\":%d,\"code_to_string\":%s\"}}}", httpCode, https.errorToString(httpCode).c_str());
+            sprintf(log_array, "%d [%d]: HTTPS request failed with error - %d, %s", getTime(), __LINE__, httpCode, https.errorToString(httpCode).c_str());
             log_POST(log_array, strlen(log_array));
 
             result = HTTPS_REQUEST_FAILED;
@@ -780,6 +809,10 @@ static https_request_err_e downloadAndShow(const char *url)
         else
         {
           Log.error("%s [%d]: unable to connect\r\n", __FILE__, __LINE__);
+
+          memset(log_array, 0, sizeof(log_array));
+          sprintf(log_array, "%d [%d]: unable to connect to the API", getTime(), __LINE__);
+          log_POST(log_array, strlen(log_array));
 
           result = HTTPS_UNABLE_TO_CONNECT;
         }
@@ -889,6 +922,7 @@ static void getDeviceCredentials(const char *url)
           else
           {
             Log.info("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
+
             bool res = readBufferFromFile("/logo.bmp", buffer);
             if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
             {
@@ -904,6 +938,9 @@ static void getDeviceCredentials(const char *url)
               else
                 display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
             }
+            memset(log_array, 0, sizeof(log_array));
+            sprintf(log_array, "%d [%d]: returned code is not OK", getTime(), __LINE__);
+            log_POST(log_array, strlen(log_array));
           }
         }
         else
@@ -924,6 +961,9 @@ static void getDeviceCredentials(const char *url)
             else
               display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
           }
+          memset(log_array, 0, sizeof(log_array));
+          sprintf(log_array, "%d [%d]: HTTPS returned code is less then 0", getTime(), __LINE__);
+          log_POST(log_array, strlen(log_array));
         }
 
         https.end();
@@ -936,6 +976,9 @@ static void getDeviceCredentials(const char *url)
           display_show_msg(buffer, WIFI_INTERNAL_ERROR);
         else
           display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_INTERNAL_ERROR);
+        memset(log_array, 0, sizeof(log_array));
+        sprintf(log_array, "%d [%d]: unable to connect to the API", getTime(), __LINE__);
+        log_POST(log_array, strlen(log_array));
       }
       Log.info("%s [%d]: status - %d\r\n", __FILE__, __LINE__, status);
       if (status)
@@ -1002,6 +1045,9 @@ static void getDeviceCredentials(const char *url)
                   else
                     display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
                 }
+                memset(log_array, 0, sizeof(log_array));
+                sprintf(log_array, "%d [%d]:Receiving failed. Readed: %d", getTime(), __LINE__, counter);
+                log_POST(log_array, strlen(log_array));
               }
             }
             else
@@ -1023,6 +1069,9 @@ static void getDeviceCredentials(const char *url)
                 else
                   display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
               }
+              memset(log_array, 0, sizeof(log_array));
+              sprintf(log_array, "%d [%d]: HTTPS received code is not OK", getTime(), __LINE__);
+              log_POST(log_array, strlen(log_array));
             }
           }
           else
@@ -1043,6 +1092,9 @@ static void getDeviceCredentials(const char *url)
               else
                 display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
             }
+            memset(log_array, 0, sizeof(log_array));
+            sprintf(log_array, "%d [%d]: HTTPS returned code is less then 0", getTime(), __LINE__);
+            log_POST(log_array, strlen(log_array));
           }
         }
         else
@@ -1063,6 +1115,9 @@ static void getDeviceCredentials(const char *url)
             else
               display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
           }
+          memset(log_array, 0, sizeof(log_array));
+          sprintf(log_array, "%d [%d]: unable to connect to the APU", getTime(), __LINE__);
+          log_POST(log_array, strlen(log_array));
         }
       }
       // End extra scoping block
@@ -1078,6 +1133,9 @@ static void getDeviceCredentials(const char *url)
       display_show_msg(buffer, WIFI_INTERNAL_ERROR);
     else
       display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_INTERNAL_ERROR);
+    memset(log_array, 0, sizeof(log_array));
+    sprintf(log_array, "%d [%d]: unable to create the client", getTime(), __LINE__);
+    log_POST(log_array, strlen(log_array));
   }
 }
 
@@ -1305,19 +1363,40 @@ static void goToSleep(void)
  */
 static void setClock()
 {
-  Log.info("%s [%d]: Time synchronization...\r\n", __FILE__, __LINE__);
+  Log.info("%s [%d]: Time synchronization... Attempt 1...\r\n", __FILE__, __LINE__);
   configTime(0, 0, "pool.ntp.org");
+  delay(500);
+  // time_t nowSecs = time(nullptr);
+  // while (nowSecs < 8 * 3600 * 2)
+  // {
+  //   delay(500);
+  //   yield();
+  //   nowSecs = time(nullptr);
+  // }
 
-  time_t nowSecs = time(nullptr);
-  while (nowSecs < 8 * 3600 * 2)
+  // struct tm timeinfo;
+  // gmtime_r(&nowSecs, &timeinfo);
+
+  // Wait for time to be set
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo))
   {
+    Log.info("%s [%d]: Time synchronization failed... Attempt 2...\r\n", __FILE__, __LINE__);
+    configTime(0, 0, "time.windows.com");
     delay(500);
-    yield();
-    nowSecs = time(nullptr);
+    if (!getLocalTime(&timeinfo))
+    {
+      Log.info("%s [%d]: Time synchronization failed... Attempt 3...\r\n", __FILE__, __LINE__);
+      configTime(0, 0, "time.google.com");
+      delay(500);
+      if (!getLocalTime(&timeinfo))
+      {
+        Log.info("%s [%d]: Time synchronization failed after 3 attempts...\r\n", __FILE__, __LINE__);
+        return;
+      }
+    }
   }
 
-  struct tm timeinfo;
-  gmtime_r(&nowSecs, &timeinfo);
   Log.info("%s [%d]: Current time - %s\r\n", __FILE__, __LINE__, asctime(&timeinfo));
 }
 
@@ -1350,6 +1429,7 @@ static float readBatteryVoltage(void)
 static void log_POST(char *log_buffer, size_t size)
 {
   WiFiClientSecure *client = new WiFiClientSecure;
+  bool result = false;
   if (client)
   {
     client->setInsecure();
@@ -1376,9 +1456,11 @@ static void log_POST(char *log_buffer, size_t size)
         https.addHeader("Accept", "application/json");
         https.addHeader("Access-Token", api_key);
         https.addHeader("Content-Type", "application/json");
-        Log.info("%s [%d]: Send log - %s\r\n", __FILE__, __LINE__, log_buffer);
+        char buffer[512] = {0};
+        sprintf(buffer, "{\"log\":{\"dump\":{\"error\":\"%s\"}}}", log_buffer);
+        Log.info("%s [%d]: Send log - %s\r\n", __FILE__, __LINE__, buffer);
         // start connection and send HTTP header
-        int httpCode = https.POST(log_buffer);
+        int httpCode = https.POST(buffer);
 
         // httpCode will be negative on error
         if (httpCode > 0)
@@ -1386,14 +1468,16 @@ static void log_POST(char *log_buffer, size_t size)
           // HTTP header has been send and Server response header has been handled
           Log.info("%s [%d]: [HTTPS] POST... code: %d\r\n", __FILE__, __LINE__, httpCode);
           // file found at server
-          if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
+          if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY || httpCode == HTTP_CODE_NO_CONTENT)
           {
+            result = true;
             String payload = https.getString();
           }
         }
         else
         {
           Log.error("%s [%d]: [HTTPS] POST... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
+          result = false;
         }
 
         https.end();
@@ -1401,6 +1485,7 @@ static void log_POST(char *log_buffer, size_t size)
       else
       {
         Log.error("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
+        result = false;
       }
 
       // End extra scoping block
@@ -1411,6 +1496,72 @@ static void log_POST(char *log_buffer, size_t size)
   else
   {
     Log.error("%s [%d]: [HTTPS] Unable to create client\r\n", __FILE__, __LINE__);
+    result = false;
+  }
+  if (!result)
+  {
+    // log not send
+    for (uint8_t i = 0; i < LOG_MAX_NOTES_NUMBER; i++)
+    {
+      String key = PREFERENCES_LOG_KEY + String(i);
+      if (preferences.isKey(key.c_str()))
+      {
+        Log.info("%s [%d]: key %s exists\r\n", __FILE__, __LINE__, key);
+        result = false;
+      }
+      else
+      {
+        Log.info("%s [%d]: key %s not exists\r\n", __FILE__, __LINE__, key);
+        size_t res = preferences.putString(key.c_str(), log_buffer);
+        Log.info("%s [%d]: Initial size %d. Received size - %d\r\n", __FILE__, __LINE__, size, res);
+        if (res == size)
+        {
+          Log.info("%s [%d]: log note written success\r\n", __FILE__, __LINE__);
+        }
+        else
+        {
+          Log.info("%s [%d]: log note writing failed\r\n", __FILE__, __LINE__);
+        }
+        result = true;
+        break;
+      }
+    }
+    if (!result)
+    {
+      uint8_t head = 0;
+      if (preferences.isKey(PREFERENCES_LOG_BUFFER_HEAD_KEY))
+      {
+        Log.info("%s [%d]: head exists\r\n", __FILE__, __LINE__);
+        head = preferences.getUChar(PREFERENCES_LOG_BUFFER_HEAD_KEY, 0);
+      }
+      else
+      {
+        Log.info("%s [%d]: head NOT exists\r\n", __FILE__, __LINE__);
+      }
+
+      String key = PREFERENCES_LOG_KEY + String(head);
+      size_t res = preferences.putString(key.c_str(), log_buffer);
+      if (res == size)
+      {
+        Log.info("%s [%d]: log note written success\r\n", __FILE__, __LINE__);
+      }
+      else
+      {
+        Log.info("%s [%d]: log note writing failed\r\n", __FILE__, __LINE__);
+      }
+
+      head += 1;
+      if (head == LOG_MAX_NOTES_NUMBER)
+      {
+        head = 0;
+      }
+
+      uint8_t result_write = preferences.putUChar(PREFERENCES_LOG_BUFFER_HEAD_KEY, head);
+      if (result_write)
+        Log.info("%s [%d]: head written success\r\n", __FILE__, __LINE__);
+      else
+        Log.info("%s [%d]: head note writing failed\r\n", __FILE__, __LINE__);
+    }
   }
 }
 
@@ -1426,4 +1577,136 @@ static void bindServerCallback(void)
 {
   wm.server->on("/custom", handleRoute); // this is now crashing esp32 for some reason
   // wm.server->on("/info",handleRoute); // you can override wm!
+}
+
+static uint32_t getTime(void)
+{
+  time_t now;
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo))
+  {
+    // Serial.println("Failed to obtain time");
+    return (0);
+  }
+  time(&now);
+  return now;
+}
+
+static void checkLogNotes(void)
+{
+  String log;
+  for (uint8_t i = 0; i < LOG_MAX_NOTES_NUMBER; i++)
+  {
+    String key = PREFERENCES_LOG_KEY + String(i);
+    if (preferences.isKey(key.c_str()))
+    {
+      Log.info("%s [%d]: log note exists\r\n", __FILE__, __LINE__);
+      String note = preferences.getString(key.c_str(), "");
+      if (note.length() > 0)
+      {
+        log += note;
+        log += ",";
+      }
+    }
+  }
+
+  bool result = false;
+  if (log.length() > 0)
+  {
+    Log.info("%s [%d]: log string - %s\r\n", __FILE__, __LINE__, log.c_str());
+    Log.info("%s [%d]: need to send the log\r\n", __FILE__, __LINE__);
+    WiFiClientSecure *client = new WiFiClientSecure;
+
+    if (client)
+    {
+      client->setInsecure();
+
+      {
+        // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
+        HTTPClient https;
+        Log.info("%s [%d]: [HTTPS] begin...\r\n", __FILE__, __LINE__);
+        if (https.begin(*client, "https://usetrmnl.com/api/log"))
+        { // HTTPS
+          Log.info("%s [%d]: [HTTPS] POST...\r\n", __FILE__, __LINE__);
+
+          String api_key = "";
+          if (preferences.isKey(PREFERENCES_API_KEY))
+          {
+            api_key = preferences.getString(PREFERENCES_API_KEY, PREFERENCES_API_KEY_DEFAULT);
+            Log.info("%s [%d]: %s key exists. Value - %s\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY, api_key.c_str());
+          }
+          else
+          {
+            Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY);
+          }
+
+          https.addHeader("Accept", "application/json");
+          https.addHeader("Access-Token", api_key);
+          https.addHeader("Content-Type", "application/json");
+          // char buffer[512 * LOG_MAX_NOTES_NUMBER] = {0};
+          String buffer = "{\"log\":{\"dump\":{\"error\":\"" + log;
+          buffer = buffer + "\"}}}";
+          // sprintf(buffer, %s, log);
+          Log.info("%s [%d]: Send log - %s\r\n", __FILE__, __LINE__, buffer.c_str());
+          // start connection and send HTTP header
+          int httpCode = https.POST(buffer);
+
+          // httpCode will be negative on error
+          if (httpCode > 0)
+          {
+            // HTTP header has been send and Server response header has been handled
+            Log.info("%s [%d]: [HTTPS] POST... code: %d\r\n", __FILE__, __LINE__, httpCode);
+            // file found at server
+            if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY || httpCode == HTTP_CODE_NO_CONTENT)
+            {
+              result = true;
+              Log.info("%s [%d]: [HTTPS] POST OK\r\n", __FILE__, __LINE__);
+              // String payload = https.getString();
+            }
+          }
+          else
+          {
+            Log.error("%s [%d]: [HTTPS] POST... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
+            result = false;
+          }
+
+          https.end();
+        }
+        else
+        {
+          Log.error("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
+          result = false;
+        }
+
+        // End extra scoping block
+      }
+
+      delete client;
+    }
+    else
+    {
+      Log.error("%s [%d]: [HTTPS] Unable to create client\r\n", __FILE__, __LINE__);
+      result = false;
+    }
+  }
+  else
+  {
+    Log.info("%s [%d]: no needed to send the log\r\n", __FILE__, __LINE__);
+  }
+  if (result == true)
+  {
+    for (uint8_t i = 0; i < LOG_MAX_NOTES_NUMBER; i++)
+    {
+      String key = PREFERENCES_LOG_KEY + String(i);
+      if (preferences.isKey(key.c_str()))
+      {
+        Log.info("%s [%d]: log note exists\r\n", __FILE__, __LINE__);
+        bool note_del = preferences.remove(key.c_str());
+        if (note_del)
+          Log.info("%s [%d]: log note deleted\r\n", __FILE__, __LINE__);
+        else
+          Log.info("%s [%d]: log note not deleted\r\n", __FILE__, __LINE__);
+      }
+    }
+  }
 }

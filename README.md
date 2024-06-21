@@ -213,7 +213,7 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
    - added bad Wi-Fi signal handler while internet connection or HTTPS requesting;
 
 [v.1.2.14]
-   - added RSSI field into /api/disolay request;
+   - added RSSI field into /api/display request;
 
 ## **Compilation guide**
 1. Install the VScode https://code.visualstudio.com
