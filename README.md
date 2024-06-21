@@ -39,6 +39,7 @@ headers = {
 
 response example (success, device found with this access token):
 {
+  "status"=>0, # will be 202 if no user_id is attached to device
   "image_url"=>"https://trmnl.s3.us-east-2.amazonaws.com/path-to-img.bmp",
   "update_firmware"=>false,
   "firmware_url"=>nil,
@@ -48,6 +49,7 @@ response example (success, device found with this access token):
 
 response example (success, device found AND needs soft reset):
 {
+ "status"=>0,
  "image_url"=>"https://trmnl.s3.us-east-2.amazonaws.com/path-to-img.bmp",
  "update_firmware"=>false,
  "firmware_url"=>nil,
@@ -57,6 +59,7 @@ response example (success, device found AND needs soft reset):
 
 response example (success, device found AND needs firmware update):
 {
+ "status"=>0,
  "image_url"=>"https://trmnl.s3.us-east-2.amazonaws.com/path-to-img.bmp",
  "update_firmware"=>true,
  "firmware_url"=>"https://trmnl.s3.us-east-2.amazonaws.com/path-to-firmware.bin",
