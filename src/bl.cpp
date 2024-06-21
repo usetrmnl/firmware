@@ -643,7 +643,7 @@ static https_request_err_e downloadAndShow(const char *url)
             Log.info("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
             result = HTTPS_REQUEST_FAILED;
             memset(log_array, 0, sizeof(log_array));
-            sprintf(log_array, "%d [%d]: returned code is mot OK", getTime(), __LINE__);
+            sprintf(log_array, "%d [%d]: returned code is not OK - %d", getTime(), __LINE__, httpCode);
             log_POST(log_array, strlen(log_array));
           }
         }
@@ -653,7 +653,7 @@ static https_request_err_e downloadAndShow(const char *url)
           result = HTTPS_RESPONSE_CODE_INVALID;
 
           memset(log_array, 0, sizeof(log_array));
-          sprintf(log_array, "%d [%d]: HTTPS returned code is less then 0", getTime(), __LINE__);
+          sprintf(log_array, "%d [%d]: HTTPS returned code is less then 0. Code - %d", getTime(), __LINE__, httpCode);
           log_POST(log_array, strlen(log_array));
         }
 
@@ -789,7 +789,7 @@ static https_request_err_e downloadAndShow(const char *url)
 
               result = HTTPS_REQUEST_FAILED;
               memset(log_array, 0, sizeof(log_array));
-              sprintf(log_array, "%d [%d]: HTTPS returned code is not OK", getTime(), __LINE__);
+              sprintf(log_array, "%d [%d]: HTTPS returned code is not OK. Code - %d", getTime(), __LINE__, httpCode);
               log_POST(log_array, strlen(log_array));
             }
           }
@@ -939,7 +939,7 @@ static void getDeviceCredentials(const char *url)
                 display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
             }
             memset(log_array, 0, sizeof(log_array));
-            sprintf(log_array, "%d [%d]: returned code is not OK", getTime(), __LINE__);
+            sprintf(log_array, "%d [%d]: returned code is not OK. Code - %d", getTime(), __LINE__, httpCode);
             log_POST(log_array, strlen(log_array));
           }
         }
@@ -962,7 +962,7 @@ static void getDeviceCredentials(const char *url)
               display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
           }
           memset(log_array, 0, sizeof(log_array));
-          sprintf(log_array, "%d [%d]: HTTPS returned code is less then 0", getTime(), __LINE__);
+          sprintf(log_array, "%d [%d]: HTTPS returned code is less then 0. Code - %d", getTime(), __LINE__, httpCode);
           log_POST(log_array, strlen(log_array));
         }
 
@@ -1070,7 +1070,7 @@ static void getDeviceCredentials(const char *url)
                   display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
               }
               memset(log_array, 0, sizeof(log_array));
-              sprintf(log_array, "%d [%d]: HTTPS received code is not OK", getTime(), __LINE__);
+              sprintf(log_array, "%d [%d]: HTTPS received code is not OK. Code - %d", getTime(), __LINE__, httpCode);
               log_POST(log_array, strlen(log_array));
             }
           }
@@ -1093,7 +1093,7 @@ static void getDeviceCredentials(const char *url)
                 display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
             }
             memset(log_array, 0, sizeof(log_array));
-            sprintf(log_array, "%d [%d]: HTTPS returned code is less then 0", getTime(), __LINE__);
+            sprintf(log_array, "%d [%d]: HTTPS returned code is less then 0. Code - %d", getTime(), __LINE__, httpCode);
             log_POST(log_array, strlen(log_array));
           }
         }

@@ -219,6 +219,9 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
    - added NTP servers mirrors;
    - added loging in offline mode;
 
+[v.1.2.16]
+   - added HTTPS error code to log note;
+
 ## **Compilation guide**
 1. Install the VScode https://code.visualstudio.com
 2. Install PlatformIO https://platformio.org/install/ide?install=vscode
