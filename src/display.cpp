@@ -11,7 +11,7 @@
 /**
  * @brief Function to init the display
  * @param none
- * @return bool true - if success; false - if failed
+ * @return none
  */
 void display_init(void)
 {
@@ -27,7 +27,7 @@ void display_init(void)
 /**
  * @brief Function to reset the display
  * @param none
- * @return bool true - if success; false - if failed
+ * @return none
  */
 void display_reset(void)
 {
@@ -39,8 +39,9 @@ void display_reset(void)
 
 /**
  * @brief Function to show the image on the display
- * @param image_buffer - pointer to the uint8_t bmp image buffer with header
- * @return bool true - if success; false - if failed
+ * @param image_buffer pointer to the uint8_t image buffer
+ * @param reverse shows if the color scheme is reverse 
+ * @return none
  */
 void display_show_image(uint8_t *image_buffer, bool reverse)
 {
@@ -81,8 +82,9 @@ void display_show_image(uint8_t *image_buffer, bool reverse)
 
 /**
  * @brief Function to show the image with message on the display
- * @param image_buffer - pointer to the uint8_t image buffer
- * @return bool true - if success; false - if failed
+ * @param image_buffer pointer to the uint8_t image buffer
+ * @param message_type type of message that will show on the screen
+ * @return none
  */
 void display_show_msg(uint8_t *image_buffer, MSG message_type)
 {
@@ -196,8 +198,13 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
 
 /**
  * @brief Function to show the image with message on the display
- * @param image_buffer - pointer to the uint8_t image buffer
- * @return bool true - if success; false - if failed
+ * @param image_buffer pointer to the uint8_t image buffer
+ * @param message_type type of message that will show on the screen
+ * @param friendly_id device friendly ID
+ * @param id shows if ID exists
+ * @param fw_version version of the firmaware
+ * @param message additional message
+ * @return none
  */
 void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
 {

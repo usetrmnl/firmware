@@ -18,7 +18,6 @@
 #include <cstdint>
 
 bool pref_clear = false;
-;
 WiFiManager wm;
 
 uint8_t buffer[48062];    // image buffer
@@ -34,6 +33,7 @@ bool send_log = false;                                               // need to 
 esp_sleep_wakeup_cause_t wakeup_reason = ESP_SLEEP_WAKEUP_UNDEFINED; // wake-up reason
 MSG current_msg = NONE;
 RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
+
 // timers
 uint32_t button_timer = 0;
 
@@ -203,12 +203,7 @@ void bl_init(void)
 
     wm.setClass("invert");
     wm.setConnectTimeout(10);
-    // Add a custom text label
 
-    // Optionally, add custom CSS to style the label
-    // wm.setCustomHeadElement("<style>h2 {color: blue;}</style>");
-
-    // wm.addParameter();
     wm.setWebServerCallback(bindServerCallback);
     const char *menuhtml = "<form action='/custom' method='get'><button>Soft Reset</button></form><br/>\n";
     wm.setCustomMenuHTML(menuhtml);
@@ -1366,16 +1361,6 @@ static void setClock()
   Log.info("%s [%d]: Time synchronization... Attempt 1...\r\n", __FILE__, __LINE__);
   configTime(0, 0, "pool.ntp.org");
   delay(500);
-  // time_t nowSecs = time(nullptr);
-  // while (nowSecs < 8 * 3600 * 2)
-  // {
-  //   delay(500);
-  //   yield();
-  //   nowSecs = time(nullptr);
-  // }
-
-  // struct tm timeinfo;
-  // gmtime_r(&nowSecs, &timeinfo);
 
   // Wait for time to be set
   struct tm timeinfo;
@@ -1643,10 +1628,10 @@ static void checkLogNotes(void)
           https.addHeader("Accept", "application/json");
           https.addHeader("Access-Token", api_key);
           https.addHeader("Content-Type", "application/json");
-          // char buffer[512 * LOG_MAX_NOTES_NUMBER] = {0};
+
           String buffer = "{\"log\":{\"dump\":{\"error\":\"" + log;
           buffer = buffer + "\"}}}";
-          // sprintf(buffer, %s, log);
+
           Log.info("%s [%d]: Send log - %s\r\n", __FILE__, __LINE__, buffer.c_str());
           // start connection and send HTTP header
           int httpCode = https.POST(buffer);
@@ -1677,8 +1662,6 @@ static void checkLogNotes(void)
           Log.error("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
           result = false;
         }
-
-        // End extra scoping block
       }
 
       delete client;

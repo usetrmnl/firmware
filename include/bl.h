@@ -15,6 +15,4 @@ void bl_init(void);
  */
 void bl_process(void);
 
-void test_init(void);
-
 #endif
