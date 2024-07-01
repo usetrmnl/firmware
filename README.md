@@ -8,13 +8,13 @@ created for the [TRMNL](https://usetrmnl.com) e-ink display.
 
 ## **Web Server Endpoints**
 
-following Wifi connection, swap Mac Address for API Key and Friendly ID (which get saved on device).
+following Wifi connection via the captive portal, device swaps its Mac Address for an API Key and Friendly ID from the server (which get saved on device).
 
 ```curl
-GET `/api/setup`
+GET /api/setup
 
 headers = {
-  'ID' => 'XX:XX:XX:XX'
+  'ID' => 'XX:XX:XX:XX:XX' # mac adddress
 }
 
 response example (success):
@@ -23,15 +23,16 @@ response example (success):
 response example (fail, device with this Mac Address not found)
 { "status" => 404, "api_key" => nil, "friendly_id" => nil, "image_url" => nil }
 ```
-request for image / display content
+
+assuming the Setup endpoint responded successfully, future requests are made solely for image / display content:
 
 ```curl
-GET `/api/display`
+GET /api/display
 
 headers = {
   'ID' => 'XX:XX:XX:XX',
   'Access-Token' => '2r--SahjsAKCFksVcped2Q',
-  'Refresh-Rate' => '1800' ,
+  'Refresh-Rate' => '1800',
   'Battery-Voltage' => '4.1',
   'FW-Version' => '2.1.3',
   'RSSI' => '-69'
@@ -73,157 +74,160 @@ response example (fail, device not found for this access token):
 if 'FW-Version' header != web server `Setting.firmware_download_url`, server will include absolute URL from which to download firmware.
 ```
 
+if device detects an issue with response data from the `api/display` endpoint, logs are sent to server.
+
+```curl
+POST /api/logs
+
+# example request tbd
+```
+
 ## **Power consumption**
 
-The image displays the amount of power consumed during a work cycle that involves downloading and displaying images.
+Ths image displays the amount of power consumed during a work cycle that involves downloading and displaying images.
 
 ![Image Alt text](/pics/Simple_cycle.jpg "Simple cycle")
 
-The image displays the amount of power consumed while in sleep mode
+This image displays the amount of power consumed while in sleep mode.
 
 ![Image Alt text](/pics/Sleep_cycle.jpg "Sleep cycle")
 
-The image displays the amount of power consumed during a work cycle that involves link pinging, new firmware downloading and OTA.
+This image displays the amount of power consumed during a work cycle that involves link pinging, new firmware downloading and OTA.
 
 ![Image Alt text](/pics/OTA.jpg "OTA")
-
-In this repo readme you can see actual power consumption test results
-https://github.com/usetrmnl/firmware/tree/main
 
 Full Power Cycle
 
 - Sleep 0.1mA
 - Image refresh cycle 32.8mA during 24s
 
-In case it will do a continuous refresh it will refresh 8231 times on full charge or 54 hours of continuous refreshing
-In case it will sleep all the time it can sleep 18000 hours which is 750 days
+If refreshed continuously, device will refresh 8,231 times (54 hours) on a full charge.
+If device is set to sleep continuously, it can sleep for 18,000 hours (750 days).
 
 15 min refresh = 78 days
 5 min refresh = 29 days
 
 ## **Low Battery Level**
 
-
-The image shows that the battery disconnects when the voltage reaches 2.75 V
+This image shows that the battery disconnects when the voltage reaches 2.75 V:
 
 ![Image Alt text](/pics/battery_3v3.jpg "Voltage battery&3.3V")
 
-
-The pulse on the graph shows the voltage on the divider in sleep mode, further on the graph it can be seen that at the moment of disconnection of the battery on the divider under load the voltage is equal to 1V, i.e. a voltage of 1.2V under load on the divider can be considered extremely critical, which corresponds to a voltage of 1.5V in the state sleep on the divider and 3V on the battery
+The pulse on the graph shows the voltage on the divider in sleep mode, further on the graph it can be seen that at the moment of disconnection of the battery on the divider under load the voltage is equal to 1V, i.e. a voltage of 1.2V under load on the divider can be considered extremely critical, which corresponds to a voltage of 1.5V in the state sleep on the divider and 3V on the battery:
 
 ![Image Alt text](/pics/battery_divider.jpg "Voltage battery&divider")
 
 ## **Version Log**
 
 [v.1.0.0]
-   - initial work version;
+   - initial work version
 
 [v.1.0.1]
-   - added version control;\n
-   - added reading the default logo from flash, not from SPIFFS; 
+   - added version control
+   - added reading the default logo from flash, not from SPIFFS
 
 [v.1.0.2]
-   - added setup request and response handling;\n
-   - added battery reading;\n
-   - added new errors messages;\n
-   - added key to requests;\n
-   - added dynamic refresh rate;
+   - added setup request and response handling
+   - added battery reading
+   - added new errors messages
+   - added key to requests
+   - added dynamic refresh rate
 
 [v.1.0.3]
-   - added default logo storing and showing;
+   - added default logo storing and showing
    - added OTA
 
 [v.1.0.4]
-   - fixeD version that sending to the server;\n
-   - changed default refresh rate to 15 minutes;
+   - fixeD version that sending to the server
+   - changed default refresh rate to 15 minutes
 
 [v.1.0.5]
-   - fixed WiFi connection with wrong credentials;\n
-   - changed default AP name;\n
-   - fixed starting config portal in backend if connection is wrong;
+   - fixed WiFi connection with wrong credentials
+   - changed default AP name
+   - fixed starting config portal in backend if connection is wrong
 
 [v.1.0.6]
-   - changed picture file path to absolute path;
+   - changed picture file path to absolute path
 
 [v.1.0.7]
-   - fixed an uknown bag with OTA update;
+   - fixed an uknown bag with OTA update
 
 [v.1.0.8]
-   - changeed BMP header length;
+   - changeed BMP header length
 
 [v.1.0.9]
-   - fixed loop error on receiving image from the new server(added timeout loop that waiting for stream available);\n
-   - localization problem with inversion of the color with new server(relative with difference headers);
+   - fixed loop error on receiving image from the new server(added timeout loop that waiting for stream available)
+   - localization problem with inversion of the color with new server(relative with difference headers)
 
 [v.1.1.0]
-   - added bmp header parser;\n
-   - added new error relative with incorrect bmp format - bad width, height, bpp, color table size, color; 
+   - added bmp header parser
+   - added new error relative with incorrect bmp format - bad width, height, bpp, color table size, color
 
 [v.1.2.0]
-   - added new initial sequence for e-paper display(from RPi code. Now in the code are 3 initialization sequences: - default function from ESP32 code; default function from RPi code (2.2 s for Chinese displays, 10 s for waveshare displays); fast function from RPi code(3.4 s for Chinese displays, 1.8 s for waveshare displays));
+   - added new initial sequence for e-paper display (from RPi prototype). Now in the code are 3 initialization sequences: - default function from ESP32 code; default function from RPi code (2.2 s for Chinese displays, 10 s for waveshare displays); fast function from RPi code (3.4 s for Chinese displays, 1.8 s for waveshare displays).
 
 [v.1.2.1]
-   - added log POST request for failed GET requests;\n
+   - added log POST request for failed GET requests
 
 [v.1.2.2]
-   - changed the sequence of actions when sending logs;\n
-   - removed menu items from WiFI manager;\n
-   - removed Friendly ID from boot image;\n
-   - done small copywriting edits for prompt messages;\n
-   - improved battery voltage reading(added information about basic voltage to README);\n
+   - changed the sequence of actions when sending logs
+   - removed menu items from WiFI manager
+   - removed Friendly ID from boot image
+   - done small copywriting edits for prompt messages
+   - improved battery voltage reading(added information about basic voltage to README)
 
 [v.1.2.3]
-   - added retries for https queries;
+   - added retries for https queries
 
 [v.1.2.4]
-   - fixed delay after power ON from PC USB;
-   - debug hidden;
-   - fixed refresh rate;
+   - fixed delay after power ON from PC USB
+   - debug hidden
+   - fixed refresh rate
 
 [v.1.2.5]
-   - changed battery read function;
+   - changed battery read function
 
 [v.1.2.6]
-   - code refactored;
-   - changed friendly ID showing(now it will showing untill the device willn't registered at usertrmnl.com);
-   - snow effect shows only when power reset or wake up by button;
+   - code refactored
+   - changed friendly ID display logic (now it will show until the device is linked to User at usertrmnl.com)
+   - snow effect shows only when power reset or wake up by button
 
 [v.1.2.7]
-   - added warning message that if captive portal closed without credential saved - user must re-open it;
-   - added reset button to the main screen of the captive portal that clear preferences(wifi_credentials, friendly id and API key);
-   - added reset_firmaware flag handling - if it will true then the device will reset all credentials(wifi_credentials, friendly id and API key);
+   - added warning message that if captive portal closed without credential saved - user must re-open it
+   - added reset button to the main screen of the captive portal that clear preferences(wifi_credentials, friendly id and API key)
+   - added reset_firmaware flag handling - if it will true then the device will reset all credentials(wifi_credentials, friendly id and API key)
 
 [v.1.2.8]
-   - fixed error decoding;
+   - fixed error decoding
 
 [v.1.2.9]
-   - fixed small bug on soft reset;
+   - fixed small bug on soft reset
 
 [v.1.2.10]
-   - WiFi deleted after device reset from Captive Portal or from API response;
-   - Rename "Reset" to "Soft Reset" on Config Portal;
-   - added reset handling after status=500 received;
-   - fixed display udating when no needed;
+   - WiFi deleted after device reset from Captive Portal or from API response
+   - Rename "Reset" to "Soft Reset" on Config Portal
+   - added reset handling after status=500 received
+   - fixed display udating when no needed
 
 [v.1.2.11]
-   - fixed issue with the friendly id showing;
-   - added status 202 for /api/display endpoint;
+   - fixed issue with the friendly id showing
+   - added status 202 for /api/display endpoint
 
 [v.1.2.12]
-   - fixed status codes handling;
+   - fixed status codes handling
 
 [v.1.2.13]
-   - added bad Wi-Fi signal handler while internet connection or HTTPS requesting;
+   - added bad Wi-Fi signal handler while internet connection or HTTPS requesting
 
 [v.1.2.14]
-   - added RSSI field into /api/display request;
+   - added RSSI field into /api/display request
 
 [v.1.2.15]
-   - added NTP servers mirrors;
-   - added loging in offline mode;
+   - added NTP servers mirrors
+   - added loging in offline mode
 
 [v.1.2.16]
-   - added HTTPS error code to log note;
+   - added HTTPS error code to log note
 
 ## **Compilation guide**
 1. Install the VScode https://code.visualstudio.com
