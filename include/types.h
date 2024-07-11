@@ -16,15 +16,6 @@ typedef enum
   MODE_BLE,
 } MODE;
 
-enum bmp_err_e
-{
-    BMP_NO_ERR,
-    BMP_NOT_BMP,
-    BMP_BAD_SIZE,
-    BMP_COLOR_SCHEME_FAILED,
-    BMP_INVALID_OFFSET,
-};
-
 enum https_request_err_e
 {
     HTTPS_NO_ERR,
