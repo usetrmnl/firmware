@@ -1,5 +1,5 @@
 #include <bmp.h>
-#include <ArduinoLog.h>
+#include <trmnl_log.h>
 
 /**
  * @brief Function to parse .bmp file header
