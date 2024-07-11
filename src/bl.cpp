@@ -254,14 +254,12 @@ void bl_init(void)
   // OTA checking, image checking and drawing
   https_request_err_e request_result = HTTPS_NO_ERR;
   uint8_t retries = 0;
-  while ((request_result != HTTPS_SUCCES && request_result != HTTPS_NO_REGISTER && request_result != HTTPS_RESET) && retries < SERVER_MAX_RETRIES)
+  while ((request_result != HTTPS_SUCCES && request_result != HTTPS_NO_REGISTER && request_result != HTTPS_RESET && request_result != HTTPS_PLUGIN_NOT_ATTACHED) && retries < SERVER_MAX_RETRIES)
   {
 
     Log.info("%s [%d]: request retry %d...\r\n", __FILE__, __LINE__, retries);
     request_result = downloadAndShow("https://usetrmnl.com");
     Log.info("%s [%d]: request result - %d\r\n", __FILE__, __LINE__, request_result);
-    bool logic = (request_result != HTTPS_SUCCES && request_result != HTTPS_NO_REGISTER);
-    Log.info("%s [%d]: logic %d...\r\n", __FILE__, __LINE__, logic);
     retries++;
   }
 
@@ -280,6 +278,7 @@ void bl_init(void)
   // reset checking
   if (request_result == HTTPS_RESET)
   {
+    Log.info("%s [%d]: Device reseting...\r\n", __FILE__, __LINE__);
     resetDeviceCredentials();
   }
 
@@ -376,11 +375,21 @@ void bl_init(void)
       display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_INTERNAL_ERROR);
   }
   break;
+  case HTTPS_PLUGIN_NOT_ATTACHED:
+  {
+    if (preferences.getInt(PREFERENCES_SLEEP_TIME_KEY, 0) != SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED)
+    {
+      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED);
+      size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED);
+      Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED);
+    }
+  }
+  break;
   default:
     break;
   }
 
-  if (request_result != HTTPS_NO_ERR)
+  if (request_result != HTTPS_NO_ERR && request_result != HTTPS_PLUGIN_NOT_ATTACHED)
   {
     checkLogNotes();
   }
@@ -577,11 +586,68 @@ static https_request_err_e downloadAndShow(const char *url)
                 String firmware_url = doc["firmware_url"];
                 uint64_t rate = doc["refresh_rate"];
                 reset_firmware = doc["reset_firmware"];
+                bool sleep_5_seconds = false;
 
+                if (update_firmware)
+                {
+                  Log.info("%s [%d]: update firfware. Check URL\r\n", __FILE__, __LINE__);
+                  if (firmware_url.length() == 0)
+                  {
+                    Log.error("%s [%d]: Empty URL\r\n", __FILE__, __LINE__);
+                    update_firmware = false;
+                  }
+                }
                 if (image_url.length() > 0)
                 {
                   Log.info("%s [%d]: image_url: %s\r\n", __FILE__, __LINE__, image_url.c_str());
+                  Log.info("%s [%d]: image url end with: %d\r\n", __FILE__, __LINE__, image_url.endsWith("/setup-logo.bmp"));
+
                   image_url.toCharArray(filename, image_url.length() + 1);
+                  // check if plugin is applied
+                  bool flag = preferences.getBool(PREFERENCES_DEVICE_REGISTRED_KEY, false);
+                  Log.info("%s [%d]: flag: %d\r\n", __FILE__, __LINE__, flag);
+
+                  if (image_url.endsWith("/setup-logo.bmp"))
+                  {
+                    Log.info("%s [%d]: End with logo.bmp\r\n", __FILE__, __LINE__);
+                    if (!flag)
+                    {
+                      // draw received logo
+                      status = true;
+                      // set flag to true
+                      if (preferences.getBool(PREFERENCES_DEVICE_REGISTRED_KEY, false) != true) // check the flag to avoid the re-writing
+                      {
+                        bool res = preferences.putBool(PREFERENCES_DEVICE_REGISTRED_KEY, true);
+                        if (res)
+                          Log.info("%s [%d]: Flag written true successfully\r\n", __FILE__, __LINE__);
+                        else
+                          Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                      }
+                    }
+                    else
+                    {
+                      // don't draw received logo
+                      status = false;
+                    }
+                    // sleep 5 seconds
+                    sleep_5_seconds = true;
+                  }
+                  else
+                  {
+                    Log.info("%s [%d]: End with NO logo.bmp\r\n", __FILE__, __LINE__);
+                    if (flag)
+                    {
+                      if (preferences.getBool(PREFERENCES_DEVICE_REGISTRED_KEY, false) != false) // check the flag to avoid the re-writing
+                      {
+                        bool res = preferences.putBool(PREFERENCES_DEVICE_REGISTRED_KEY, false);
+                        if (res)
+                          Log.info("%s [%d]: Flag written false successfully\r\n", __FILE__, __LINE__);
+                        else
+                          Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                      }
+                    }
+                    status = true;
+                  }
                 }
                 Log.info("%s [%d]: update_firmware: %d\r\n", __FILE__, __LINE__, update_firmware);
                 if (firmware_url.length() > 0)
@@ -601,12 +667,14 @@ static https_request_err_e downloadAndShow(const char *url)
                 {
                   Log.info("%s [%d]: Reset status is true\r\n", __FILE__, __LINE__);
                 }
-                status = true;
 
                 if (update_firmware)
                   result = HTTPS_SUCCES;
                 if (reset_firmware)
                   result = HTTPS_RESET;
+                if (sleep_5_seconds)
+                  result = HTTPS_PLUGIN_NOT_ATTACHED;
+                Log.info("%s [%d]: result - %d\r\n", __FILE__, __LINE__, result);
               }
               break;
               case 202:
@@ -718,7 +786,8 @@ static https_request_err_e downloadAndShow(const char *url)
                   {
                     // show the image
                     display_show_image(buffer, image_reverse);
-                    result = HTTPS_SUCCES;
+                    if (result != HTTPS_PLUGIN_NOT_ATTACHED)
+                      result = HTTPS_SUCCES;
                   }
                   break;
                   case BMP_NOT_BMP:
@@ -1455,8 +1524,8 @@ static void log_POST(char *log_buffer, size_t size)
           // file found at server
           if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY || httpCode == HTTP_CODE_NO_CONTENT)
           {
+            Log.info("%s [%d]: RESULT TRUE\r\n", __FILE__, __LINE__);
             result = true;
-            String payload = https.getString();
           }
         }
         else
