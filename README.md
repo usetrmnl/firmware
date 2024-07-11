@@ -231,6 +231,8 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
 
 [v.1.2.17]
    - incresed time of button pressing for reset from 300 ms to 5000 ms
+   - decreased ping time after first powering-on and after plugins was deleted from device
+   - add empty string parsing while URL parsing
 
 ## **Compilation guide**
 1. Install the VScode https://code.visualstudio.com

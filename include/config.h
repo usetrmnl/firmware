@@ -3,7 +3,7 @@
 
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 2
-#define FW_PATCH_VERSION 16
+#define FW_PATCH_VERSION 17
 
 #define LOG_MAX_NOTES_NUMBER 5
 
