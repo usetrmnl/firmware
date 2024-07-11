@@ -29,6 +29,7 @@ enum https_request_err_e
     HTTPS_JSON_PARSING_ERR,
     HTTPS_WRONG_IMAGE_SIZE,
     HTTPS_WRONG_IMAGE_FORMAT,
+    HTTPS_PLUGIN_NOT_ATTACHED,
 };
 
 #endif

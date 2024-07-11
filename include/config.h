@@ -3,7 +3,7 @@
 
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 2
-#define FW_PATCH_VERSION 16
+#define FW_PATCH_VERSION 17
 
 #define LOG_MAX_NOTES_NUMBER 5
 
@@ -14,6 +14,7 @@
 #define PREFERENCES_SLEEP_TIME_KEY "refresh_rate"
 #define PREFERENCES_LOG_KEY "log_"
 #define PREFERENCES_LOG_BUFFER_HEAD_KEY "log_head"
+#define PREFERENCES_DEVICE_REGISTRED_KEY "plugin"
 
 #define WIFI_CONNECTION_ATTEMPTS 5
 #define WIFI_PORTAL_TIMEOUT 120
@@ -23,13 +24,14 @@
 
 #define SLEEP_uS_TO_S_FACTOR 1000000 /* Conversion factor for micro seconds to seconds */
 #define SLEEP_TIME_TO_SLEEP 900        /* Time ESP32 will go to sleep (in seconds) */
-#define SLEEP_TIME_WHILE_NOT_CONNECTED 30        /* Time ESP32 will go to sleep (in seconds) */
+#define SLEEP_TIME_WHILE_NOT_CONNECTED 5        /* Time ESP32 will go to sleep (in seconds) */
+#define SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED 5        /* Time ESP32 will go to sleep (in seconds) */
 
 #define PIN_RESET 9
 #define PIN_INTERRUPT 2
 #define PIN_BATTERY 3
 
-#define BUTTON_HOLD_TIME 300
+#define BUTTON_HOLD_TIME 5000
 
 #define SERVER_MAX_RETRIES 3
 
