@@ -52,6 +52,8 @@ static void handleRoute(void);
 static void bindServerCallback(void);
 static void checkLogNotes(void);
 static uint32_t getTime(void);
+static void showMessageWithLogo(MSG message_type);
+static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message);
 
 /**
  * @brief Function to init business logic module
@@ -158,11 +160,7 @@ void bl_init(void)
 
       if (current_msg != WIFI_FAILED)
       {
-        res = readBufferFromFile("/logo.bmp", buffer);
-        if (res)
-          display_show_msg(buffer, WIFI_FAILED);
-        else
-          display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_FAILED);
+        showMessageWithLogo(WIFI_FAILED);
         current_msg = WIFI_FAILED;
       }
 
@@ -187,17 +185,9 @@ void bl_init(void)
     String fw = fw_version;
 
     Log.info("%s [%d]: FW version %s\r\n", __FILE__, __LINE__, fw_version);
-    res = readBufferFromFile("/logo.bmp", buffer);
-    if (res)
-    {
-      Log.info("%s [%d]: logo not exists. Use default\r\n", __FILE__, __LINE__);
-      display_show_msg(buffer, WIFI_CONNECT, "", false, fw.c_str(), "");
-    }
-    else
-    {
-      Log.info("%s [%d]: logo not exists. Use default\r\n", __FILE__, __LINE__);
-      display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_CONNECT, "", false, fw.c_str(), "");
-    }
+
+    Log.info("%s [%d]: logo not exists. Use default\r\n", __FILE__, __LINE__);
+    showMessageWithLogo(WIFI_CONNECT, "", false, fw.c_str(), "");
 
     wm.setClass("invert");
     wm.setConnectTimeout(10);
@@ -218,11 +208,7 @@ void bl_init(void)
 
       WiFi.disconnect();
 
-      res = readBufferFromFile("/logo.bmp", buffer);
-      if (res)
-        display_show_msg(buffer, WIFI_FAILED);
-      else
-        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_FAILED);
+      showMessageWithLogo(WIFI_FAILED);
 
       memset(log_array, 0, sizeof(log_array));
       sprintf(log_array, "%d [%d]: connection to the new WiFi failed", getTime(), __LINE__);
@@ -265,11 +251,7 @@ void bl_init(void)
   {
     // show the image
     String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
-    bool res = readBufferFromFile("/logo.bmp", buffer);
-    if (res)
-      display_show_msg(buffer, FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
-    else
-      display_show_msg(const_cast<uint8_t *>(default_icon), FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
+    showMessageWithLogo(FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
     need_to_refresh_display = 0;
   }
 
@@ -291,86 +273,53 @@ void bl_init(void)
   {
   case HTTPS_REQUEST_FAILED:
   {
-    bool res = readBufferFromFile("/logo.bmp", buffer);
     if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
     {
-      if (res)
-        display_show_msg(buffer, API_ERROR);
-      else
-        display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+      showMessageWithLogo(API_ERROR);
     }
     else
     {
-      if (res)
-        display_show_msg(buffer, WIFI_WEAK);
-      else
-        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+      showMessageWithLogo(WIFI_WEAK);
     }
   }
   break;
   case HTTPS_RESPONSE_CODE_INVALID:
   {
-    bool res = readBufferFromFile("/logo.bmp", buffer);
-    if (res)
-      display_show_msg(buffer, WIFI_INTERNAL_ERROR);
-    else
-      display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_INTERNAL_ERROR);
+    showMessageWithLogo(WIFI_INTERNAL_ERROR);
   }
   break;
   case HTTPS_UNABLE_TO_CONNECT:
   {
-    bool res = readBufferFromFile("/logo.bmp", buffer);
     if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
     {
-      if (res)
-        display_show_msg(buffer, API_ERROR);
-      else
-        display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+      showMessageWithLogo(API_ERROR);
     }
     else
     {
-      if (res)
-        display_show_msg(buffer, WIFI_WEAK);
-      else
-        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+      showMessageWithLogo(WIFI_WEAK);
     }
   }
   break;
   case HTTPS_WRONG_IMAGE_FORMAT:
   {
-    bool rs = readBufferFromFile("/logo.bmp", buffer);
-    if (rs)
-      display_show_msg(buffer, BMP_FORMAT_ERROR);
-    else
-      display_show_msg(const_cast<uint8_t *>(default_icon), BMP_FORMAT_ERROR);
+    showMessageWithLogo(BMP_FORMAT_ERROR);
   }
   break;
   case HTTPS_WRONG_IMAGE_SIZE:
   {
-    bool res = readBufferFromFile("/logo.bmp", buffer);
     if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
     {
-      if (res)
-        display_show_msg(buffer, API_SIZE_ERROR);
-      else
-        display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
+      showMessageWithLogo(API_SIZE_ERROR);
     }
     else
     {
-      if (res)
-        display_show_msg(buffer, WIFI_WEAK);
-      else
-        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+      showMessageWithLogo(WIFI_WEAK);
     }
   }
   break;
   case HTTPS_CLIENT_FAILED:
   {
-    bool res = readBufferFromFile("/logo.bmp", buffer);
-    if (res)
-      display_show_msg(buffer, WIFI_INTERNAL_ERROR);
-    else
-      display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_INTERNAL_ERROR);
+    showMessageWithLogo(WIFI_INTERNAL_ERROR);
   }
   break;
   case HTTPS_PLUGIN_NOT_ATTACHED:
@@ -1610,4 +1559,23 @@ static void checkLogNotes(void)
       }
     }
   }
+}
+
+uint8_t *storedLogoOrDefault()
+{
+  if (readBufferFromFile("/logo.bmp", buffer))
+  {
+    return buffer;
+  }
+  return const_cast<uint8_t *>(default_icon);
+}
+
+static void showMessageWithLogo(MSG message_type)
+{
+  display_show_msg(storedLogoOrDefault(), message_type);
+}
+
+static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
+{
+  display_show_msg(storedLogoOrDefault(), message_type, friendly_id, id, fw_version, message);
 }
