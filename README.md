@@ -234,6 +234,10 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
    - decreased ping time after first powering-on and after plugins was deleted from device
    - add empty string parsing while URL parsing
 
+[v.1.2.18]
+   - replaced 3 attempts of getting UTC to 1 with multiple NTP servers
+   - added double click handler
+
 ## **Compilation guide**
 1. Install the VScode https://code.visualstudio.com
 2. Install PlatformIO https://platformio.org/install/ide?install=vscode
