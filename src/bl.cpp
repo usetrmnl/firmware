@@ -12,11 +12,11 @@
 #include <stdlib.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncTCP.h>
-#include <SPIFFS.h>
 #include <ImageData.h>
 #include <Preferences.h>
 #include <cstdint>
 #include <bmp.h>
+#include <filesystem.h>
 
 bool pref_clear = false;
 WiFiManager wm;
@@ -43,8 +43,6 @@ Preferences preferences;
 static https_request_err_e downloadAndShow(const char *url);                        // download and show the image
 static void getDeviceCredentials(const char *url);                                  // receiveing API key and Friendly ID
 static void resetDeviceCredentials(void);                                           // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
-static bool readBufferFromFile(const char *name, uint8_t *out_buffer);              // file reading
-static bool writeBufferToFile(const char *name, uint8_t *in_buffer, uint16_t size); // filw writing
 static void checkAndPerformFirmwareUpdate(void);                                    // OTA update
 static void goToSleep(void);                                                        // sleep prepearing
 static void setClock(void);                                                         // clock synchrinization
@@ -123,7 +121,7 @@ void bl_init(void)
   }
 
   // Mount SPIFFS
-  if (!SPIFFS.begin(true))
+  if (!openFilesystem(true))
   {
     Log.fatal("%s [%d]: Failed to mount SPIFFS\r\n", __FILE__, __LINE__);
     ESP.restart();
@@ -1154,88 +1152,6 @@ static void resetDeviceCredentials(void)
     Log.error("%s [%d]: The device reseting error. The device will be reset now...\r\n", __FILE__, __LINE__);
   preferences.end();
   ESP.restart();
-}
-
-/**
- * @brief Function to reading image buffer from file
- * @param out_buffer buffer pointer
- * @return 1 - if success; 0 - if failed
- */
-static bool readBufferFromFile(const char *name, uint8_t *out_buffer)
-{
-  if (SPIFFS.exists(name))
-  {
-    Log.info("%s [%d]: icon exists\r\n", __FILE__, __LINE__);
-    File file = SPIFFS.open("name", FILE_READ);
-    if (file)
-    {
-      if (file.size() == DISPLAY_BMP_IMAGE_SIZE)
-      {
-        Log.info("%s [%d]: the size is the same\r\n", __FILE__, __LINE__);
-        file.readBytes((char *)out_buffer, DISPLAY_BMP_IMAGE_SIZE);
-      }
-      else
-      {
-        Log.error("%s [%d]: the size is NOT the same %d\r\n", __FILE__, __LINE__, file.size());
-        return false;
-      }
-      file.close();
-      return true;
-    }
-    else
-    {
-      Log.error("%s [%d]: File open ERROR\r\n", __FILE__, __LINE__);
-      return false;
-    }
-  }
-  else
-  {
-    Log.error("%s [%d]: icon DOESN\'T exists\r\n", __FILE__, __LINE__);
-    return false;
-  }
-}
-
-/**
- * @brief Function to reading image buffer from file
- * @param name buffer pointer
- * @return 1 - if success; 0 - if failed
- */
-static bool writeBufferToFile(const char *name, uint8_t *in_buffer, uint16_t size)
-{
-  if (SPIFFS.exists(name))
-  {
-    Log.info("%s [%d]: file %s exists. Deleting...\r\n", __FILE__, __LINE__, name);
-    if (SPIFFS.remove(name))
-      Log.info("%s [%d]: file %s deleted\r\n", __FILE__, __LINE__, name);
-    else
-      Log.info("%s [%d]: file %s deleting failed\r\n", __FILE__, __LINE__, name);
-  }
-  else
-  {
-    Log.info("%s [%d]: file %s not exists.\r\n", __FILE__, __LINE__, name);
-  }
-  File file = SPIFFS.open(name, FILE_APPEND);
-  Serial.println(file);
-  if (file)
-  {
-    size_t res = file.write(in_buffer, size);
-    file.close();
-    if (res)
-    {
-      Log.info("%s [%d]: file %s writing success\r\n", __FILE__, __LINE__, name);
-      return true;
-    }
-    else
-    {
-      Log.error("%s [%d]: file %s writing error\r\n", __FILE__, __LINE__, name);
-      return false;
-    }
-  }
-  else
-  {
-    Log.error("%s [%d]: File open ERROR\r\n", __FILE__, __LINE__);
-    return false;
-  }
 }
 
 /**
