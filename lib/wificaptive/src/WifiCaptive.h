@@ -53,6 +53,7 @@ class WifiCaptive {
         bool startPortal();
         String getSSID();
         String getPassword();
+        bool isSaved();
         void resetSettings();
         void setResetSettingsCallback(std::function<void()> func);
 };

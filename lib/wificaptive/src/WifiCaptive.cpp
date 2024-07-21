@@ -54,6 +54,9 @@ void WifiCaptive::setUpWebserver(AsyncWebServer &server, const IPAddress &localI
 
 	server.on("/soft-reset", HTTP_ANY, [&](AsyncWebServerRequest *request) {
 		resetSettings();
+		if (_resetcallback != NULL) {
+			_resetcallback(); // @CALLBACK
+		}
 		request->send(200);
 	});
 
@@ -201,10 +204,6 @@ void WifiCaptive::resetSettings() {
     preferences.end();
 
     WiFi.disconnect(true, true);
-
-	if (_resetcallback != NULL) {
-		_resetcallback(); // @CALLBACK
-	}
 }
 
 bool WifiCaptive::WifiEnableSTA(bool enable, bool persistent){
@@ -339,6 +338,11 @@ String WifiCaptive::getPassword(){
     preferences.end();
 
   	return password;
+}
+
+bool WifiCaptive::isSaved() {
+	String ssid = getSSID();
+	return ssid != "";
 }
 
 WifiCaptive WifiCaptivePortal;
