@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TRMNL Wi-Fi Configuration</title>
+  <style>
+    table {
+      border-spacing: 1;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 4px;
+      overflow: hidden;
+      width: 100%;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    table td,
+    table th {
+      padding-left: 8px;
+      text-align: left;
+    }
+
+    table tbody tr {
+      height: 30px;
+      border-bottom: 1px solid #BBBB;
+      font-size: 16px;
+    }
+
+    table tbody tr:hover {
+      background: #f2f2f2;
+    }
+
+    .selected {
+      background-color: #BBBB;
+    }
+
+    body {
+      font: 400 14px 'Calibri', 'Arial';
+    }
+
+    blockquote {
+      color: white;
+      text-align: center;
+    }
+
+    #loader-wrapper {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 9999;
+    }
+
+    #loader {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 60px;
+      height: 60px;
+    }
+
+    #loader:before {
+      content: "";
+      display: block;
+      position: absolute;
+      border-style: solid;
+      border-color: #fff;
+      border-top-color: transparent;
+      border-width: 6px;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      top: 10px;
+      left: 10px;
+      animation: loader-spin 1s linear infinite;
+    }
+
+    @keyframes loader-spin {
+      0% {
+        transform: rotate(0);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    #loader-wrapper {
+      display: none;
+    }
+
+    .div-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 30px 30px 30px 30px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      margin-bottom: 20px;
+      width: 100%;
+    }
+
+    label {
+      font-size: 18px;
+      margin-bottom: 5px;
+    }
+
+    input {
+      border-width: 1px;
+      border-radius: .75rem;
+      font-size: 16px;
+      padding: 5px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    input:focus {
+      outline: none;
+      border: 2px solid #F86527;
+      border-radius: .75rem;
+    }
+
+    input::placeholder {
+      opacity: 70%;
+    }
+
+    .button {
+      color: #fff;
+      border: none;
+      padding: 8px 18px;
+      font-size: 18px;
+      border-radius: 5px;
+    }
+    
+    .button:disabled {
+      opacity: .65;
+    }
+
+    .button-success {
+      background-color: #F86527;
+    }
+
+    .button-primary {
+      background-color: #e4eaf0;
+      color: #212529;
+    }
+
+    .button-primary:hover:not([disabled]) {
+      background-color: #d7dfe8;
+    }
+
+    .button-secondary {
+      background-color: #343a40;
+    }
+
+    .button-secondary:hover:not([disabled]) {
+      background-color: #3e444a;
+    }
+
+    .button:hover:not([disabled]) {
+      filter: saturate(0.8);
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    .alert-primary {
+      color: #383d41;
+      background-color: #e2e3e5;
+      border-color: #d6d8db;
+    }
+
+    .alert-warning {
+      color: #856404;
+      background-color: #fff3cd;
+      border-color: #ffeeba;
+    }
+
+    .alert {
+      position: relative;
+      padding: .75rem 1.25rem;
+      margin-bottom: 1rem;
+      border: 1px solid transparent;
+      border-radius: .25rem;
+      margin-left: auto;
+      margin-right: auto;
+    }
+  </style>
+  <script>
+    const lockIcon = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgZmlsbD0iY3VycmVudENvbG9yIiBjbGFzcz0iYmkgYmktbG9jayIgdmlld0JveD0iMCAwIDE2IDE2Ij4KICA8cGF0aCBkPSJNOCAxYTIgMiAwIDAgMSAyIDJ2NEg2VjNhMiAyIDAgMCAxIDItMm0zIDZWM2EzIDMgMCAwIDAtNiAwdjRhMiAyIDAgMCAwLTIgMnY1YTIgMiAwIDAgMCAyIDJoNmEyIDIgMCAwIDAgMi0yVjlhMiAyIDAgMCAwLTItMk01IDhoNmExIDEgMCAwIDEgMSAxdjVhMSAxIDAgMCAxLTEgMUg1YTEgMSAwIDAgMS0xLTFWOWExIDEgMCAwIDEgMS0xIi8+Cjwvc3ZnPg==";
+    
+    function refresh() {
+      location.reload();
+    }
+
+    function connect() {
+      hideAlert();
+      var ssid = document.getElementById('ssid').value;
+      var pswd = document.getElementById('password').value;
+      if (!ssid) {
+        displayAlert('Please enter your Wi-Fi name', "warning");
+        return;
+      }
+
+      var body = { ssid: ssid, pswd: pswd };
+      showLoader();
+      fetch('/connect', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      })
+        .then(response => response.json())
+        .then(response => {
+          displayWifiInfo(response);
+          hideLoader();
+        })
+        .catch(_ => {
+          hideLoader();
+        });
+    }
+
+    function softReset() {
+      showLoader();
+      fetch('/soft-reset', {
+        method: 'GET',
+      })
+        .then(_ => {
+          hideLoader();
+          displayAlert('Soft reset completed succesfully. Your settings have been restored to their default values.', "primary");
+        })
+        .catch(_ => {
+          hideLoader();
+          displayAlert('An error occured during the soft reset. Please try again or contact support if the issue persists.', "warning");
+        });
+    }
+
+    async function getInfo() {
+      let response = await fetch('/scan', {
+        method: 'GET',
+      })
+      .catch(_ => {
+        document.getElementById('scanning-text').textContent =
+            'There was an error while scanning networks. Please refresh the page or enter your wifi name manually';
+      });
+
+      if (response && esponse.status == 200) {
+        var json = responsse.json();
+        var text = document.getElementById('scanning-text');
+        text.style.display = 'none';
+        json.forEach((item, row) => {
+          appendWifiToTable(item.name, item.open);
+        });
+      } else if (response && response.status == 202) {
+        setTimeout(getInfo, 2000); // repeat in 2s
+      }
+    }
+
+    function appendWifiToTable(name, open) {
+      var newRow = document.createElement('tr');
+      newRow.onclick = function () {
+        onClickItemTable(this);
+      };
+      var th = document.createElement('th');
+      var td = document.createElement('td');
+      th.textContent = name;
+      newRow.appendChild(th);
+      if (!open) {
+        var lock = document.createElement('img');
+        lock.setAttribute('src', lockIcon);
+        td.appendChild(lock);
+      }
+      newRow.appendChild(td);
+      document.getElementById('table-body').appendChild(newRow);
+    }
+
+    function onClickItemTable(x) {
+      x.classList.add('selected');
+      var siblings = Array.from(x.parentNode.children);
+      siblings.forEach((sibling) => {
+        if (sibling !== x) {
+          sibling.classList.remove('selected');
+        }
+      });
+      var value = x.querySelector('th').textContent;
+      if (value) {
+        document.getElementById('ssid').value = value;
+        var passwordTag = document.getElementById('password');
+        passwordTag.value = '';
+        passwordTag.focus();
+      }
+    }
+
+    function displayWifiInfo(response) {
+      var ssid = response.ssid;
+      var mac = response.mac;
+
+      let message = "";
+      if (ssid.length > 0) {
+        message = `Connecting to SSID: ${ssid}. MAC address: ${mac}`;
+      } else {
+        message = `No AP set. MAC address: ${mac}`;
+      }
+      displayInfo(message);
+    }
+
+    function displayInfo(message) {
+      var infoMessageBox = document.getElementById("info-message");
+      infoMessageBox.textContent = message;
+      infoMessageBox.style.display = "block";
+    }
+
+    function displayAlert(message, type) {
+      var messageBox = document.getElementById("message");
+      messageBox.style.display = "block";
+      messageBox.textContent = message;
+      messageBox.classList.remove("alert-primary");
+      messageBox.classList.remove("alert-warning");
+
+      messageBox.classList.add(`alert-${type}`);
+    }
+
+    function hideAlert() {
+      var messageBox = document.getElementById("message");
+      messageBox.style.display = "none";
+    }
+
+    function showLoader() {
+      var loader = document.getElementById("loader-wrapper");
+      loader.style.display = "block";
+    }
+
+    function hideLoader() {
+      var loader = document.getElementById("loader-wrapper");
+      loader.style.display = "none";
+    }
+
+    setTimeout(getInfo, 500);
+  </script>
+</head>
+
+<body>
+  <img src="/logo.svg" style="margin-left: auto; margin-right: auto; width: 50%; display: block;" />
+  <h1>Wi-Fi Configuration</h1>
+  <div class="div-container">
+    <table>
+      <tbody id="table-body">
+      </tbody>
+    </table>
+    <p id="scanning-text">Scanning networks, please wait...</p>
+  </div>
+  <div class="div-container">
+    <div class="form-group">
+      <label for="ssid">SSID</label>
+      <input type="text" id="ssid" name="ssid" placeholder="Enter your wifi name">
+    </div>
+    <div class="form-group">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" pattern=".{8,}" placeholder="Enter your password">
+    </div>
+    <div class="form-group">
+      <div class="alert alert-primary" id="message" role="alert" style="display: none;"></div>
+    </div>
+    <span>
+      <button id="btnConnect" class="button button-success" onclick="connect()">Connect</button>
+      <button id="btnRefresh" class="button button-primary" onclick="refresh()">Refresh</button>
+
+    </span>
+    <span style="margin-top: 20px;">
+      <button id="btnRefresh" class="button button-secondary" onclick="softReset()">Soft Reset</button>
+    </span>
+    <div class="form-group" style="margin-top: 10px;">
+      <div class="alert alert-primary" id="info-message" role="alert" style="display: none;"></div>
+    </div>
+  </div>
+  <div id="loader-wrapper">
+    <div id="loader"></div>
+  </div>
+</body>
+
+</html>
