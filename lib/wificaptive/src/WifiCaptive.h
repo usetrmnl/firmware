@@ -12,7 +12,7 @@
 #include <ArduinoJson.h>
 
 
-#define WIFI_SSID "TRMNL_1"
+#define WIFI_SSID "TRMNL"
 #define WIFI_PASSWORD NULL
 
 // Define the DNS interval in milliseconds between processing DNS requests

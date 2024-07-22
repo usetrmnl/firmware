@@ -45,13 +45,6 @@ void WifiCaptive::setUpWebserver(AsyncWebServer &server, const IPAddress &localI
     	request->send(response);
 	});
 
-	
-	// server.on("/wifi-info", HTTP_ANY, [&](AsyncWebServerRequest *request) {
-	// 	String mac = WiFi.macAddress();
-	// 	String message =  "{\"ssid\":\"" + _ssid +"\",\"mac\":\"" + mac +"\"}";
-	// 	request->send(200, "application/json", message);
-	// });
-
 	server.on("/soft-reset", HTTP_ANY, [&](AsyncWebServerRequest *request) {
 		resetSettings();
 		if (_resetcallback != NULL) {
@@ -174,9 +167,6 @@ bool WifiCaptive::startPortal()
 
 	delay(1000);
 
-	// if (result && WiFi.status() == WL_IDLE_STATUS) {
-	// 	WiFi.reconnect(); // restart wifi since we disconnected it in startconfigportal
-	// }
 	if(result) {
 		WiFi.mode(WIFI_STA);
 		WiFi.begin(_ssid.c_str(), _password.c_str());
@@ -245,19 +235,6 @@ uint8_t WifiCaptive::connectWifi(String ssid, String pass, bool connect)
   uint8_t retry = 1;
   uint8_t connRes = (uint8_t)WL_NO_SSID_AVAIL;
   uint8_t _connectRetries = 5;
-
-  //setSTAConfig();
-  //@todo catch failures in set_config
-
-  // make sure sta is on before `begin` so it does not call enablesta->mode while persistent is ON ( which would save WM AP state to eeprom !)
-  // WiFi.setAutoReconnect(false);
-  //if (_cleanConnect)
-  //  WiFi_Disconnect(); // disconnect before begin, in case anything is hung, this causes a 2 seconds delay for connect
-  // @todo find out what status is when this is needed, can we detect it and handle it, say in between states or idle_status to avoid these
-
-  // if retry without delay (via begin()), the IDF is still busy even after returning status
-  // E (5130) wifi:sta is connecting, return error
-  // [E][WiFiSTA.cpp:221] begin(): connect failed!
 
   while (retry <= _connectRetries && (connRes != WL_CONNECTED))
   {

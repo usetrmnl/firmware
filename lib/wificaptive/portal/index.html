@@ -248,18 +248,18 @@
     }
 
     async function getInfo() {
+      let scanningInfoBox = document.getElementById('scanning-info');
       let response = await fetch('/scan', {
         method: 'GET',
       })
       .catch(_ => {
-        document.getElementById('scanning-text').textContent =
+        scanningInfoBox.textContent =
             'There was an error while scanning networks. Please refresh the page or enter your wifi name manually';
       });
 
-      if (response && esponse.status == 200) {
-        var json = responsse.json();
-        var text = document.getElementById('scanning-text');
-        text.style.display = 'none';
+      if (response && response.status == 200) {
+        var json = await response.json();
+        scanningInfoBox.style.display = 'none';
         json.forEach((item, row) => {
           appendWifiToTable(item.name, item.open);
         });
@@ -359,7 +359,7 @@
       <tbody id="table-body">
       </tbody>
     </table>
-    <p id="scanning-text">Scanning networks, please wait...</p>
+    <p id="scanning-info">Scanning networks, please wait...</p>
   </div>
   <div class="div-container">
     <div class="form-group">
