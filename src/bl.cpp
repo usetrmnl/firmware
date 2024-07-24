@@ -12,11 +12,12 @@
 #include <stdlib.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncTCP.h>
-#include <SPIFFS.h>
 #include <ImageData.h>
 #include <Preferences.h>
 #include <cstdint>
 #include <bmp.h>
+#include <math.h>
+#include <filesystem.h>
 
 bool pref_clear = false;
 WiFiManager wm;
@@ -27,33 +28,40 @@ char binUrl[1024];        // update URL
 char log_array[512];      // log
 char message_buffer[128]; // message to show on the screen
 
-bool status = false;                                                 // need to download a new image
-bool update_firmware = false;                                        // need to download a new firmaware
-bool reset_firmware = false;                                         // need to reset credentials
-bool send_log = false;                                               // need to send logs
+bool status = false;          // need to download a new image
+bool update_firmware = false; // need to download a new firmaware
+bool reset_firmware = false;  // need to reset credentials
+bool send_log = false;        // need to send logs
+bool not_reset = false;
+bool double_click = false;
 esp_sleep_wakeup_cause_t wakeup_reason = ESP_SLEEP_WAKEUP_UNDEFINED; // wake-up reason
 MSG current_msg = NONE;
+SPECIAL_FUNCTION special_function = SF_NONE;
 RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
 
 // timers
 uint32_t button_timer = 0;
+bool twice = false;
 
 Preferences preferences;
 
-static https_request_err_e downloadAndShow(const char *url);                        // download and show the image
-static void getDeviceCredentials(const char *url);                                  // receiveing API key and Friendly ID
-static void resetDeviceCredentials(void);                                           // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
-static bool readBufferFromFile(const char *name, uint8_t *out_buffer);              // file reading
-static bool writeBufferToFile(const char *name, uint8_t *in_buffer, uint16_t size); // filw writing
-static void checkAndPerformFirmwareUpdate(void);                                    // OTA update
-static void goToSleep(void);                                                        // sleep prepearing
-static void setClock(void);                                                         // clock synchrinization
-static float readBatteryVoltage(void);                                              // battery voltage reading
-static void log_POST(char *log_buffer, size_t size);                                // log sending
+static https_request_err_e downloadAndShow(const char *url); // download and show the image
+static void getDeviceCredentials(const char *url);           // receiveing API key and Friendly ID
+static void resetDeviceCredentials(void);                    // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
+static void checkAndPerformFirmwareUpdate(void);             // OTA update
+static void goToSleep(void);                                 // sleep prepearing
+static void setClock(void);                                  // clock synchrinization
+static float readBatteryVoltage(void);                       // battery voltage reading
+static void log_POST(char *log_buffer, size_t size);         // log sending
 static void handleRoute(void);
 static void bindServerCallback(void);
 static void checkLogNotes(void);
+static void writeSpecialFunction(SPECIAL_FUNCTION function);
+static void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size);
 static uint32_t getTime(void);
+static void showMessageWithLogo(MSG message_type);
+static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message);
+static uint8_t *storedLogoOrDefault(void);
 
 /**
  * @brief Function to init business logic module
@@ -62,6 +70,7 @@ static uint32_t getTime(void);
  */
 void bl_init(void)
 {
+
   Serial.begin(115200);
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
   Log.info("%s [%d]: BL init success\r\n", __FILE__, __LINE__);
@@ -94,23 +103,91 @@ void bl_init(void)
   Log.info("%s [%d]: preferences end\r\n", __FILE__, __LINE__);
 
   Log.info("%s [%d]: button handling start\r\n", __FILE__, __LINE__);
-  // handling reset
-  while (1)
+
+  special_function = SF_NONE;
+
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO)
   {
-    if (digitalRead(PIN_INTERRUPT) == LOW && millis() - button_timer > BUTTON_HOLD_TIME)
+    while (1)
     {
-      Log.info("%s [%d]: WiFi reset\r\n", __FILE__, __LINE__);
-      wm.resetSettings();
-      break;
+      if (digitalRead(PIN_INTERRUPT) == LOW && millis() - button_timer > BUTTON_HOLD_TIME)
+      {
+        Log.info("%s [%d]: WiFi reset\r\n", __FILE__, __LINE__);
+        wm.resetSettings();
+        special_function = SF_NONE;
+        break;
+      }
+      else if (digitalRead(PIN_INTERRUPT) == HIGH && !not_reset)
+      {
+        Log.info("%s [%d]: WiFi NOT reset\r\n", __FILE__, __LINE__);
+        not_reset = true;
+      }
+      else if (digitalRead(PIN_INTERRUPT) == LOW && not_reset)
+      {
+        Log.info("%s [%d]: double click\r\n", __FILE__, __LINE__);
+        double_click = true;
+        break;
+      }
+      else if (digitalRead(PIN_INTERRUPT) == HIGH && millis() - button_timer > 2000)
+      {
+        Log.info("%s [%d]: NOT reset. Out\r\n", __FILE__, __LINE__);
+        special_function = SF_NONE;
+        break;
+      }
     }
-    else if (digitalRead(PIN_INTERRUPT) == HIGH)
+    Log.info("%s [%d]: button handling end\r\n", __FILE__, __LINE__);
+  }
+
+  if (double_click)
+  { // special function reading
+    if (preferences.isKey(PREFERENCES_SF_KEY))
     {
-      Log.info("%s [%d]: WiFi NOT reset\r\n", __FILE__, __LINE__);
+      Log.info("%s [%d]: SF saved. Reading...\r\n", __FILE__, __LINE__);
+      special_function = (SPECIAL_FUNCTION)preferences.getUInt(PREFERENCES_SF_KEY, 0);
+      Log.info("%s [%d]: Readed special function - %d\r\n", __FILE__, __LINE__, special_function);
+      switch (special_function)
+      {
+      case SF_IDENTIFY:
+      {
+        Log.info("%s [%d]: Identify special function...It will be handled while API ping...\r\n", __FILE__, __LINE__);
+      }
       break;
+      case SF_SLEEP:
+      {
+        Log.info("%s [%d]: Sleep special function...\r\n", __FILE__, __LINE__);
+        // still in progress
+      }
+      break;
+      case SF_ADD_WIFI:
+      {
+        Log.info("%s [%d]: Add WiFi function...\r\n", __FILE__, __LINE__);
+        // still in progress
+      }
+      break;
+      case SF_RESTART_PLAYLIST:
+      {
+        Log.info("%s [%d]: Identify special function...It will be handled while API ping...\r\n", __FILE__, __LINE__);
+      }
+      break;
+      case SF_REWIND:
+      {
+        Log.info("%s [%d]: Rewind special function...\r\n", __FILE__, __LINE__);
+      }
+      break;
+      case SF_SEND_TO_ME:
+      {
+        Log.info("%s [%d]: Send to me special function...It will be handled while API ping...\r\n", __FILE__, __LINE__);
+      }
+      break;
+      default:
+        break;
+      }
+    }
+    else
+    {
+      Log.error("%s [%d]: SF not saved\r\n", __FILE__, __LINE__);
     }
   }
-  Log.info("%s [%d]: button handling end\r\n", __FILE__, __LINE__);
-
   // EPD init
   // EPD clear
   Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
@@ -123,15 +200,7 @@ void bl_init(void)
   }
 
   // Mount SPIFFS
-  if (!SPIFFS.begin(true))
-  {
-    Log.fatal("%s [%d]: Failed to mount SPIFFS\r\n", __FILE__, __LINE__);
-    ESP.restart();
-  }
-  else
-  {
-    Log.info("%s [%d]: SPIFFS mounted\r\n", __FILE__, __LINE__);
-  }
+  filesystem_init();
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
   if (wm.getWiFiIsSaved())
@@ -160,11 +229,7 @@ void bl_init(void)
 
       if (current_msg != WIFI_FAILED)
       {
-        res = readBufferFromFile("/logo.bmp", buffer);
-        if (res)
-          display_show_msg(buffer, WIFI_FAILED);
-        else
-          display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_FAILED);
+        showMessageWithLogo(WIFI_FAILED);
         current_msg = WIFI_FAILED;
       }
 
@@ -189,17 +254,8 @@ void bl_init(void)
     String fw = fw_version;
 
     Log.info("%s [%d]: FW version %s\r\n", __FILE__, __LINE__, fw_version);
-    res = readBufferFromFile("/logo.bmp", buffer);
-    if (res)
-    {
-      Log.info("%s [%d]: logo not exists. Use default\r\n", __FILE__, __LINE__);
-      display_show_msg(buffer, WIFI_CONNECT, "", false, fw.c_str(), "");
-    }
-    else
-    {
-      Log.info("%s [%d]: logo not exists. Use default\r\n", __FILE__, __LINE__);
-      display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_CONNECT, "", false, fw.c_str(), "");
-    }
+
+    showMessageWithLogo(WIFI_CONNECT, "", false, fw.c_str(), "");
 
     wm.setClass("invert");
     wm.setConnectTimeout(10);
@@ -220,11 +276,7 @@ void bl_init(void)
 
       WiFi.disconnect();
 
-      res = readBufferFromFile("/logo.bmp", buffer);
-      if (res)
-        display_show_msg(buffer, WIFI_FAILED);
-      else
-        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_FAILED);
+      showMessageWithLogo(WIFI_FAILED);
 
       memset(log_array, 0, sizeof(log_array));
       sprintf(log_array, "%d [%d]: connection to the new WiFi failed", getTime(), __LINE__);
@@ -267,11 +319,7 @@ void bl_init(void)
   {
     // show the image
     String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
-    bool res = readBufferFromFile("/logo.bmp", buffer);
-    if (res)
-      display_show_msg(buffer, FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
-    else
-      display_show_msg(const_cast<uint8_t *>(default_icon), FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
+    showMessageWithLogo(FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
     need_to_refresh_display = 0;
   }
 
@@ -293,86 +341,53 @@ void bl_init(void)
   {
   case HTTPS_REQUEST_FAILED:
   {
-    bool res = readBufferFromFile("/logo.bmp", buffer);
     if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
     {
-      if (res)
-        display_show_msg(buffer, API_ERROR);
-      else
-        display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+      showMessageWithLogo(API_ERROR);
     }
     else
     {
-      if (res)
-        display_show_msg(buffer, WIFI_WEAK);
-      else
-        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+      showMessageWithLogo(WIFI_WEAK);
     }
   }
   break;
   case HTTPS_RESPONSE_CODE_INVALID:
   {
-    bool res = readBufferFromFile("/logo.bmp", buffer);
-    if (res)
-      display_show_msg(buffer, WIFI_INTERNAL_ERROR);
-    else
-      display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_INTERNAL_ERROR);
+    showMessageWithLogo(WIFI_INTERNAL_ERROR);
   }
   break;
   case HTTPS_UNABLE_TO_CONNECT:
   {
-    bool res = readBufferFromFile("/logo.bmp", buffer);
     if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
     {
-      if (res)
-        display_show_msg(buffer, API_ERROR);
-      else
-        display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+      showMessageWithLogo(API_ERROR);
     }
     else
     {
-      if (res)
-        display_show_msg(buffer, WIFI_WEAK);
-      else
-        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+      showMessageWithLogo(WIFI_WEAK);
     }
   }
   break;
   case HTTPS_WRONG_IMAGE_FORMAT:
   {
-    bool rs = readBufferFromFile("/logo.bmp", buffer);
-    if (rs)
-      display_show_msg(buffer, BMP_FORMAT_ERROR);
-    else
-      display_show_msg(const_cast<uint8_t *>(default_icon), BMP_FORMAT_ERROR);
+    showMessageWithLogo(BMP_FORMAT_ERROR);
   }
   break;
   case HTTPS_WRONG_IMAGE_SIZE:
   {
-    bool res = readBufferFromFile("/logo.bmp", buffer);
     if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
     {
-      if (res)
-        display_show_msg(buffer, API_SIZE_ERROR);
-      else
-        display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
+      showMessageWithLogo(API_SIZE_ERROR);
     }
     else
     {
-      if (res)
-        display_show_msg(buffer, WIFI_WEAK);
-      else
-        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+      showMessageWithLogo(WIFI_WEAK);
     }
   }
   break;
   case HTTPS_CLIENT_FAILED:
   {
-    bool res = readBufferFromFile("/logo.bmp", buffer);
-    if (res)
-      display_show_msg(buffer, WIFI_INTERNAL_ERROR);
-    else
-      display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_INTERNAL_ERROR);
+    showMessageWithLogo(WIFI_INTERNAL_ERROR);
   }
   break;
   case HTTPS_PLUGIN_NOT_ATTACHED:
@@ -469,12 +484,11 @@ static https_request_err_e downloadAndShow(const char *url)
 
       float battery_voltage = readBatteryVoltage();
 
-      Log.info("%s [%d]: Added headers:\n\rID: %s\n\rAccess-Token: %s\n\rRefresh_Rate: %s\n\rBattery-Voltage: %s\n\rFW-Version: %s\r\nRSSI: %s\r\n", __FILE__, __LINE__, WiFi.macAddress().c_str(), api_key.c_str(), String(refresh_rate).c_str(), String(battery_voltage).c_str(), fw_version.c_str(), String(WiFi.RSSI()));
+      Log.info("%s [%d]: Added headers:\n\rID: %s\n\rSpecial function: %d\n\rAccess-Token: %s\n\rRefresh_Rate: %s\n\rBattery-Voltage: %s\n\rFW-Version: %s\r\nRSSI: %s\r\n", __FILE__, __LINE__, WiFi.macAddress().c_str(), special_function, api_key.c_str(), String(refresh_rate).c_str(), String(battery_voltage).c_str(), fw_version.c_str(), String(WiFi.RSSI()));
 
       // if (https.begin(*client, new_url))
       if (https.begin(*client, "https://usetrmnl.com/api/display"))
       { // HTTPS
-        Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
         Log.info("%s [%d]: [HTTPS] GET...\r\n", __FILE__, __LINE__);
         // start connection and send HTTP header
         https.addHeader("ID", WiFi.macAddress());
@@ -483,6 +497,13 @@ static https_request_err_e downloadAndShow(const char *url)
         https.addHeader("Battery-Voltage", String(battery_voltage));
         https.addHeader("FW-Version", fw_version);
         https.addHeader("RSSI", String(WiFi.RSSI()));
+
+        Log.info("%s [%d]: Special function - %d\r\n", __FILE__, __LINE__, special_function);
+        if (special_function != SF_NONE)
+        {
+          Log.info("%s [%d]: Add special function - true\r\n", __FILE__, __LINE__);
+          https.addHeader("special_function", "true");
+        }
 
         delay(5);
 
@@ -499,14 +520,14 @@ static https_request_err_e downloadAndShow(const char *url)
             size_t size = https.getSize();
             Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, size);
             Log.info("%s [%d]: Free heap size: %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
-
+            Log.info("%s [%d]: Payload - %s\r\n", __FILE__, __LINE__, payload.c_str());
             JsonDocument doc;
             DeserializationError error = deserializeJson(doc, payload);
             if (error)
             {
               result = HTTPS_JSON_PARSING_ERR;
             }
-            else
+            else if (!error && special_function == SF_NONE)
             {
               uint64_t request_status = doc["status"];
               Log.info("%s [%d]: status: %d\r\n", __FILE__, __LINE__, request_status);
@@ -520,6 +541,45 @@ static https_request_err_e downloadAndShow(const char *url)
                 uint64_t rate = doc["refresh_rate"];
                 reset_firmware = doc["reset_firmware"];
                 bool sleep_5_seconds = false;
+                String special_function_str = doc["special_function"];
+
+                if (special_function_str.equals("identify"))
+                {
+                  Log.info("%s [%d]: New special function - identify\r\n", __FILE__, __LINE__);
+                  special_function = SF_IDENTIFY;
+                }
+                else if (special_function_str.equals("sleep"))
+                {
+                  Log.info("%s [%d]: New special function - sleep\r\n", __FILE__, __LINE__);
+                  special_function = SF_SLEEP;
+                }
+                else if (special_function_str.equals("add_wifi"))
+                {
+                  Log.info("%s [%d]: New special function - add_wifi\r\n", __FILE__, __LINE__);
+                  special_function = SF_ADD_WIFI;
+                }
+                else if (special_function_str.equals("restart_playlist"))
+                {
+                  Log.info("%s [%d]: New special function - restart_playlist\r\n", __FILE__, __LINE__);
+                  special_function = SF_RESTART_PLAYLIST;
+                }
+                else if (special_function_str.equals("rewind"))
+                {
+                  Log.info("%s [%d]: New special function - rewind\r\n", __FILE__, __LINE__);
+                  special_function = SF_REWIND;
+                }
+                else if (special_function_str.equals("send_to_me"))
+                {
+                  Log.info("%s [%d]: New special function - send_to_me\r\n", __FILE__, __LINE__);
+                  special_function = SF_SEND_TO_ME;
+                }
+                else
+                {
+                  Log.info("%s [%d]: No new special function\r\n", __FILE__, __LINE__);
+                  special_function = SF_NONE;
+                }
+                writeSpecialFunction(special_function);
+                special_function = SF_NONE;
 
                 if (update_firmware)
                 {
@@ -633,6 +693,262 @@ static https_request_err_e downloadAndShow(const char *url)
                 break;
               }
             }
+            else if (!error && special_function != SF_NONE)
+            {
+              uint64_t request_status = doc["status"];
+              Log.info("%s [%d]: status: %d\r\n", __FILE__, __LINE__, request_status);
+              switch (request_status)
+              {
+              case 0:
+              {
+                switch (special_function)
+                {
+                case SF_IDENTIFY:
+                {
+                  String action = doc["action"];
+                  if (action.equals("identify"))
+                  {
+                    Log.info("%s [%d]:Identify success\r\n", __FILE__, __LINE__);
+                    String image_url = doc["image_url"];
+                    if (image_url.length() > 0)
+                    {
+                      Log.info("%s [%d]: image_url: %s\r\n", __FILE__, __LINE__, image_url.c_str());
+                      Log.info("%s [%d]: image url end with: %d\r\n", __FILE__, __LINE__, image_url.endsWith("/setup-logo.bmp"));
+
+                      image_url.toCharArray(filename, image_url.length() + 1);
+                      // check if plugin is applied
+                      bool flag = preferences.getBool(PREFERENCES_DEVICE_REGISTRED_KEY, false);
+                      Log.info("%s [%d]: flag: %d\r\n", __FILE__, __LINE__, flag);
+
+                      if (image_url.endsWith("/setup-logo.bmp"))
+                      {
+                        Log.info("%s [%d]: End with logo.bmp\r\n", __FILE__, __LINE__);
+                        if (!flag)
+                        {
+                          // draw received logo
+                          status = true;
+                          // set flag to true
+                          if (preferences.getBool(PREFERENCES_DEVICE_REGISTRED_KEY, false) != true) // check the flag to avoid the re-writing
+                          {
+                            bool res = preferences.putBool(PREFERENCES_DEVICE_REGISTRED_KEY, true);
+                            if (res)
+                              Log.info("%s [%d]: Flag written true successfully\r\n", __FILE__, __LINE__);
+                            else
+                              Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                          }
+                        }
+                        else
+                        {
+                          // don't draw received logo
+                          status = false;
+                        }
+                      }
+                      else
+                      {
+                        Log.info("%s [%d]: End with NO logo.bmp\r\n", __FILE__, __LINE__);
+                        if (flag)
+                        {
+                          if (preferences.getBool(PREFERENCES_DEVICE_REGISTRED_KEY, false) != false) // check the flag to avoid the re-writing
+                          {
+                            bool res = preferences.putBool(PREFERENCES_DEVICE_REGISTRED_KEY, false);
+                            if (res)
+                              Log.info("%s [%d]: Flag written false successfully\r\n", __FILE__, __LINE__);
+                            else
+                              Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                          }
+                        }
+                        status = true;
+                      }
+                    }
+                  }
+                  else
+                  {
+                    Log.error("%s [%d]: identify failed\r\n", __FILE__, __LINE__);
+                  }
+                }
+                break;
+                case SF_SLEEP:
+                {
+                  String action = doc["action"];
+                  if (action.equals("sleep"))
+                  {
+                    uint64_t rate = doc["refresh_rate"];
+                    Log.info("%s [%d]: refresh_rate: %d\r\n", __FILE__, __LINE__, rate);
+                    if (rate != preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP))
+                    {
+                      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, rate);
+                      size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, rate);
+                      Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+                    }
+                    status = false;
+                    result = HTTPS_SUCCES;
+                    Log.info("%s [%d]: sleep success\r\n", __FILE__, __LINE__);
+                  }
+                  else
+                  {
+                    Log.error("%s [%d]: sleep failed\r\n", __FILE__, __LINE__);
+                    // need to add error
+                  }
+                }
+                break;
+                case SF_ADD_WIFI:
+                {
+                  String action = doc["action"];
+                  if (action.equals("add_wifi"))
+                  {
+                    status = false;
+                    result = HTTPS_SUCCES;
+                    Log.info("%s [%d]: Add wifi success\r\n", __FILE__, __LINE__);
+                  }
+                  else
+                  {
+                    Log.error("%s [%d]: Add wifi failed\r\n", __FILE__, __LINE__);
+                  }
+                }
+                break;
+                case SF_RESTART_PLAYLIST:
+                {
+                  String action = doc["action"];
+                  if (action.equals("restart_playlist"))
+                  {
+                    Log.info("%s [%d]:Restart playlist success\r\n", __FILE__, __LINE__);
+                    String image_url = doc["image_url"];
+                    if (image_url.length() > 0)
+                    {
+                      Log.info("%s [%d]: image_url: %s\r\n", __FILE__, __LINE__, image_url.c_str());
+                      Log.info("%s [%d]: image url end with: %d\r\n", __FILE__, __LINE__, image_url.endsWith("/setup-logo.bmp"));
+
+                      image_url.toCharArray(filename, image_url.length() + 1);
+                      // check if plugin is applied
+                      bool flag = preferences.getBool(PREFERENCES_DEVICE_REGISTRED_KEY, false);
+                      Log.info("%s [%d]: flag: %d\r\n", __FILE__, __LINE__, flag);
+
+                      if (image_url.endsWith("/setup-logo.bmp"))
+                      {
+                        Log.info("%s [%d]: End with logo.bmp\r\n", __FILE__, __LINE__);
+                        if (!flag)
+                        {
+                          // draw received logo
+                          status = true;
+                          // set flag to true
+                          if (preferences.getBool(PREFERENCES_DEVICE_REGISTRED_KEY, false) != true) // check the flag to avoid the re-writing
+                          {
+                            bool res = preferences.putBool(PREFERENCES_DEVICE_REGISTRED_KEY, true);
+                            if (res)
+                              Log.info("%s [%d]: Flag written true successfully\r\n", __FILE__, __LINE__);
+                            else
+                              Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                          }
+                        }
+                        else
+                        {
+                          // don't draw received logo
+                          status = false;
+                        }
+                      }
+                      else
+                      {
+                        Log.info("%s [%d]: End with NO logo.bmp\r\n", __FILE__, __LINE__);
+                        if (flag)
+                        {
+                          if (preferences.getBool(PREFERENCES_DEVICE_REGISTRED_KEY, false) != false) // check the flag to avoid the re-writing
+                          {
+                            bool res = preferences.putBool(PREFERENCES_DEVICE_REGISTRED_KEY, false);
+                            if (res)
+                              Log.info("%s [%d]: Flag written false successfully\r\n", __FILE__, __LINE__);
+                            else
+                              Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                          }
+                        }
+                        status = true;
+                      }
+                    }
+                  }
+                  else
+                  {
+                    Log.error("%s [%d]: identify failed\r\n", __FILE__, __LINE__);
+                  }
+                }
+                break;
+                case SF_REWIND:
+                {
+                  String action = doc["action"];
+                  if (action.equals("rewind"))
+                  {
+                    status = false;
+                    result = HTTPS_SUCCES;
+                    Log.info("%s [%d]: rewind success\r\n", __FILE__, __LINE__);
+                    showMessageWithLogo(BMP_FORMAT_ERROR);
+
+                    bool image_reverse = false;
+                    bmp_err_e res = parseBMPHeader(buffer, image_reverse);
+                    String error = "";
+                    switch (res)
+                    {
+                    case BMP_NO_ERR:
+                    {
+                      // show the image
+                      display_show_image(buffer, image_reverse);
+                    }
+                    break;
+                    default:
+                    {
+                    }
+                    break;
+                    }
+                    // Go to deep sleep
+                    // display_sleep();
+                    // goToSleep();
+                  }
+                  else
+                  {
+                    Log.error("%s [%d]: rewind failed\r\n", __FILE__, __LINE__);
+                  }
+                }
+                break;
+                case SF_SEND_TO_ME:
+                {
+                  String action = doc["action"];
+                  if (action.equals("send_to_me"))
+                  {
+                    status = false;
+                    result = HTTPS_SUCCES;
+                    Log.info("%s [%d]: rewind success\r\n", __FILE__, __LINE__);
+                  }
+                  else
+                  {
+                    Log.error("%s [%d]: rewind failed\r\n", __FILE__, __LINE__);
+                  }
+                }
+                break;
+                default:
+                  break;
+                }
+              }
+              break;
+              case 202:
+              {
+                result = HTTPS_NO_REGISTER;
+                Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
+                size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
+                Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+                status = false;
+              }
+              break;
+              case 500:
+              {
+                result = HTTPS_RESET;
+                Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
+                size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
+                Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+                status = false;
+              }
+              break;
+
+              default:
+                break;
+              }
+            }
           }
           else
           {
@@ -712,13 +1028,35 @@ static https_request_err_e downloadAndShow(const char *url)
 
                   bool image_reverse = false;
                   bmp_err_e res = parseBMPHeader(buffer, image_reverse);
+                  Serial.println();
                   String error = "";
                   switch (res)
                   {
                   case BMP_NO_ERR:
                   {
+
+                    if (filesystem_file_exists("/last.bmp") && filesystem_file_exists("/current.bmp"))
+                    {
+                      Log.info("%s [%d]: Last and current exist!\r\n", __FILE__, __LINE__);
+                      if (filesystem_file_delete("/last.bmp"))
+                      {
+                        if (filesystem_file_rename("/current.bmp", "/last.bmp"))
+                        {
+                          Log.info("%s [%d]: Current renamed to last!\r\n", __FILE__, __LINE__);
+                          delay(10);
+                          writeImageToFile("/current.bmp", buffer, sizeof(buffer));
+                        }
+                      }
+                    }
+                    else
+                    {
+                      Log.info("%s [%d]: Last and current don't exist!\r\n", __FILE__, __LINE__);
+                      writeImageToFile("/current.bmp", buffer, sizeof(buffer));
+                      writeImageToFile("/last.bmp", buffer, sizeof(buffer));
+                    }
                     // show the image
                     display_show_image(buffer, image_reverse);
+
                     if (result != HTTPS_PLUGIN_NOT_ATTACHED)
                       result = HTTPS_SUCCES;
                   }
@@ -920,20 +1258,13 @@ static void getDeviceCredentials(const char *url)
           {
             Log.info("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
 
-            bool res = readBufferFromFile("/logo.bmp", buffer);
             if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
             {
-              if (res)
-                display_show_msg(buffer, API_ERROR);
-              else
-                display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+              showMessageWithLogo(API_ERROR);
             }
             else
             {
-              if (res)
-                display_show_msg(buffer, WIFI_WEAK);
-              else
-                display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+              showMessageWithLogo(WIFI_WEAK);
             }
             memset(log_array, 0, sizeof(log_array));
             sprintf(log_array, "%d [%d]: returned code is not OK. Code - %d", getTime(), __LINE__, httpCode);
@@ -943,20 +1274,13 @@ static void getDeviceCredentials(const char *url)
         else
         {
           Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
-          bool res = readBufferFromFile("/logo.bmp", buffer);
           if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
           {
-            if (res)
-              display_show_msg(buffer, API_ERROR);
-            else
-              display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+            showMessageWithLogo(API_ERROR);
           }
           else
           {
-            if (res)
-              display_show_msg(buffer, WIFI_WEAK);
-            else
-              display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+            showMessageWithLogo(WIFI_WEAK);
           }
           memset(log_array, 0, sizeof(log_array));
           sprintf(log_array, "%d [%d]: HTTPS returned code is less then 0. Code - %d", getTime(), __LINE__, httpCode);
@@ -968,11 +1292,8 @@ static void getDeviceCredentials(const char *url)
       else
       {
         Log.error("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
-        bool res = readBufferFromFile("/logo.bmp", buffer);
-        if (res)
-          display_show_msg(buffer, WIFI_INTERNAL_ERROR);
-        else
-          display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_INTERNAL_ERROR);
+        showMessageWithLogo(WIFI_INTERNAL_ERROR);
+
         memset(log_array, 0, sizeof(log_array));
         sprintf(log_array, "%d [%d]: unable to connect to the API", getTime(), __LINE__);
         log_POST(log_array, strlen(log_array));
@@ -1013,11 +1334,7 @@ static void getDeviceCredentials(const char *url)
               {
                 Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
 
-                bool res = writeBufferToFile("/logo.bmp", buffer, sizeof(buffer));
-                if (res)
-                  Log.info("%s [%d]: File written!\r\n", __FILE__, __LINE__);
-                else
-                  Log.error("%s [%d]: File not written!\r\n", __FILE__, __LINE__);
+                writeImageToFile("/logo.bmp", buffer, sizeof(buffer));
 
                 // show the image
                 String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
@@ -1027,21 +1344,15 @@ static void getDeviceCredentials(const char *url)
               else
               {
                 Log.error("%s [%d]: Receiving failed. Readed: %d\r\n", __FILE__, __LINE__, counter);
-                bool res = readBufferFromFile("/logo.bmp", buffer);
                 if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
                 {
-                  if (res)
-                    display_show_msg(buffer, API_SIZE_ERROR);
-                  else
-                    display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
+                  showMessageWithLogo(API_SIZE_ERROR);
                 }
                 else
                 {
-                  if (res)
-                    display_show_msg(buffer, WIFI_WEAK);
-                  else
-                    display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+                  showMessageWithLogo(WIFI_WEAK);
                 }
+
                 memset(log_array, 0, sizeof(log_array));
                 sprintf(log_array, "%d [%d]:Receiving failed. Readed: %d", getTime(), __LINE__, counter);
                 log_POST(log_array, strlen(log_array));
@@ -1051,21 +1362,15 @@ static void getDeviceCredentials(const char *url)
             {
               Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
               https.end();
-              bool res = readBufferFromFile("/logo.bmp", buffer);
               if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
               {
-                if (res)
-                  display_show_msg(buffer, API_ERROR);
-                else
-                  display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+                showMessageWithLogo(API_ERROR);
               }
               else
               {
-                if (res)
-                  display_show_msg(buffer, WIFI_WEAK);
-                else
-                  display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+                showMessageWithLogo(WIFI_WEAK);
               }
+
               memset(log_array, 0, sizeof(log_array));
               sprintf(log_array, "%d [%d]: HTTPS received code is not OK. Code - %d", getTime(), __LINE__, httpCode);
               log_POST(log_array, strlen(log_array));
@@ -1074,21 +1379,15 @@ static void getDeviceCredentials(const char *url)
           else
           {
             Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
-            bool res = readBufferFromFile("/logo.bmp", buffer);
             if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
             {
-              if (res)
-                display_show_msg(buffer, API_ERROR);
-              else
-                display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+              showMessageWithLogo(API_ERROR);
             }
             else
             {
-              if (res)
-                display_show_msg(buffer, WIFI_WEAK);
-              else
-                display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+              showMessageWithLogo(WIFI_WEAK);
             }
+
             memset(log_array, 0, sizeof(log_array));
             sprintf(log_array, "%d [%d]: HTTPS returned code is less then 0. Code - %d", getTime(), __LINE__, httpCode);
             log_POST(log_array, strlen(log_array));
@@ -1097,21 +1396,15 @@ static void getDeviceCredentials(const char *url)
         else
         {
           Log.error("%s [%d]: unable to connect\r\n", __FILE__, __LINE__);
-          bool res = readBufferFromFile("/logo.bmp", buffer);
           if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
           {
-            if (res)
-              display_show_msg(buffer, API_ERROR);
-            else
-              display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+            showMessageWithLogo(API_ERROR);
           }
           else
           {
-            if (res)
-              display_show_msg(buffer, WIFI_WEAK);
-            else
-              display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+            showMessageWithLogo(WIFI_WEAK);
           }
+
           memset(log_array, 0, sizeof(log_array));
           sprintf(log_array, "%d [%d]: unable to connect to the APU", getTime(), __LINE__);
           log_POST(log_array, strlen(log_array));
@@ -1125,11 +1418,8 @@ static void getDeviceCredentials(const char *url)
   else
   {
     Log.error("%s [%d]: Unable to create client\r\n", __FILE__, __LINE__);
-    bool res = readBufferFromFile("/logo.bmp", buffer);
-    if (res)
-      display_show_msg(buffer, WIFI_INTERNAL_ERROR);
-    else
-      display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_INTERNAL_ERROR);
+    showMessageWithLogo(WIFI_INTERNAL_ERROR);
+
     memset(log_array, 0, sizeof(log_array));
     sprintf(log_array, "%d [%d]: unable to create the client", getTime(), __LINE__);
     log_POST(log_array, strlen(log_array));
@@ -1157,88 +1447,6 @@ static void resetDeviceCredentials(void)
 }
 
 /**
- * @brief Function to reading image buffer from file
- * @param out_buffer buffer pointer
- * @return 1 - if success; 0 - if failed
- */
-static bool readBufferFromFile(const char *name, uint8_t *out_buffer)
-{
-  if (SPIFFS.exists(name))
-  {
-    Log.info("%s [%d]: icon exists\r\n", __FILE__, __LINE__);
-    File file = SPIFFS.open("name", FILE_READ);
-    if (file)
-    {
-      if (file.size() == DISPLAY_BMP_IMAGE_SIZE)
-      {
-        Log.info("%s [%d]: the size is the same\r\n", __FILE__, __LINE__);
-        file.readBytes((char *)out_buffer, DISPLAY_BMP_IMAGE_SIZE);
-      }
-      else
-      {
-        Log.error("%s [%d]: the size is NOT the same %d\r\n", __FILE__, __LINE__, file.size());
-        return false;
-      }
-      file.close();
-      return true;
-    }
-    else
-    {
-      Log.error("%s [%d]: File open ERROR\r\n", __FILE__, __LINE__);
-      return false;
-    }
-  }
-  else
-  {
-    Log.error("%s [%d]: icon DOESN\'T exists\r\n", __FILE__, __LINE__);
-    return false;
-  }
-}
-
-/**
- * @brief Function to reading image buffer from file
- * @param name buffer pointer
- * @return 1 - if success; 0 - if failed
- */
-static bool writeBufferToFile(const char *name, uint8_t *in_buffer, uint16_t size)
-{
-  if (SPIFFS.exists(name))
-  {
-    Log.info("%s [%d]: file %s exists. Deleting...\r\n", __FILE__, __LINE__, name);
-    if (SPIFFS.remove(name))
-      Log.info("%s [%d]: file %s deleted\r\n", __FILE__, __LINE__, name);
-    else
-      Log.info("%s [%d]: file %s deleting failed\r\n", __FILE__, __LINE__, name);
-  }
-  else
-  {
-    Log.info("%s [%d]: file %s not exists.\r\n", __FILE__, __LINE__, name);
-  }
-  File file = SPIFFS.open(name, FILE_APPEND);
-  Serial.println(file);
-  if (file)
-  {
-    size_t res = file.write(in_buffer, size);
-    file.close();
-    if (res)
-    {
-      Log.info("%s [%d]: file %s writing success\r\n", __FILE__, __LINE__, name);
-      return true;
-    }
-    else
-    {
-      Log.error("%s [%d]: file %s writing error\r\n", __FILE__, __LINE__, name);
-      return false;
-    }
-  }
-  else
-  {
-    Log.error("%s [%d]: File open ERROR\r\n", __FILE__, __LINE__);
-    return false;
-  }
-}
-
-/**
  * @brief Function to check and performing OTA update
  * @param none
  * @return none
@@ -1262,69 +1470,43 @@ static void checkAndPerformFirmwareUpdate(void)
         if (Update.begin(contentLength))
         {
           Log.info("%s [%d]: Firmware update start\r\n", __FILE__, __LINE__);
-          bool res = readBufferFromFile("/logo.bmp", buffer);
-          if (res)
-            display_show_msg(buffer, FW_UPDATE);
-          else
-            display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE);
+          showMessageWithLogo(FW_UPDATE);
+
           if (Update.writeStream(https.getStream()))
           {
             if (Update.end(true))
             {
               Log.info("%s [%d]: Firmware update successful. Rebooting...\r\n", __FILE__, __LINE__);
-              bool res = readBufferFromFile("/logo.bmp", buffer);
-              if (res)
-                display_show_msg(buffer, FW_UPDATE_SUCCESS);
-              else
-                display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE_SUCCESS);
+              showMessageWithLogo(FW_UPDATE_SUCCESS);
             }
             else
             {
               Log.fatal("%s [%d]: Firmware update failed!\r\n", __FILE__, __LINE__);
-              bool res = readBufferFromFile("/logo.bmp", buffer);
-              if (res)
-                display_show_msg(buffer, FW_UPDATE_FAILED);
-              else
-                display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE_FAILED);
+              showMessageWithLogo(FW_UPDATE_FAILED);
             }
           }
           else
           {
             Log.fatal("%s [%d]: Write to firmware update stream failed!\r\n", __FILE__, __LINE__);
-            bool res = readBufferFromFile("/logo.bmp", buffer);
-            if (res)
-              display_show_msg(buffer, FW_UPDATE_FAILED);
-            else
-              display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE_FAILED);
+            showMessageWithLogo(FW_UPDATE_FAILED);
           }
         }
         else
         {
           Log.fatal("%s [%d]: Begin firmware update failed!\r\n", __FILE__, __LINE__);
-          bool res = readBufferFromFile("/logo.bmp", buffer);
-          if (res)
-            display_show_msg(buffer, FW_UPDATE_FAILED);
-          else
-            display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE_FAILED);
+          showMessageWithLogo(FW_UPDATE_FAILED);
         }
       }
       else
       {
         Log.fatal("%s [%d]: HTTP GET failed!\r\n", __FILE__, __LINE__);
-        bool res = readBufferFromFile("/logo.bmp", buffer);
         if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
         {
-          if (res)
-            display_show_msg(buffer, API_ERROR);
-          else
-            display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+          showMessageWithLogo(API_ERROR);
         }
         else
         {
-          if (res)
-            display_show_msg(buffer, WIFI_WEAK);
-          else
-            display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+          showMessageWithLogo(WIFI_WEAK);
         }
       }
       https.end();
@@ -1340,6 +1522,7 @@ static void checkAndPerformFirmwareUpdate(void)
  */
 static void goToSleep(void)
 {
+  filesystem_deinit();
   uint32_t time_to_sleep = SLEEP_TIME_TO_SLEEP;
   if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))
     time_to_sleep = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
@@ -1361,7 +1544,7 @@ static void goToSleep(void)
 static void setClock()
 {
   Log.info("%s [%d]: Time synchronization... Attempt 1...\r\n", __FILE__, __LINE__);
-  configTime(0, 0, "pool.ntp.org");
+  configTime(0, 0, "pool.ntp.org", "time.google.com", "time.windows.com");
   delay(500);
 
   // Wait for time to be set
@@ -1369,19 +1552,6 @@ static void setClock()
   if (!getLocalTime(&timeinfo))
   {
     Log.info("%s [%d]: Time synchronization failed... Attempt 2...\r\n", __FILE__, __LINE__);
-    configTime(0, 0, "time.windows.com");
-    delay(500);
-    if (!getLocalTime(&timeinfo))
-    {
-      Log.info("%s [%d]: Time synchronization failed... Attempt 3...\r\n", __FILE__, __LINE__);
-      configTime(0, 0, "time.google.com");
-      delay(500);
-      if (!getLocalTime(&timeinfo))
-      {
-        Log.info("%s [%d]: Time synchronization failed after 3 attempts...\r\n", __FILE__, __LINE__);
-        return;
-      }
-    }
   }
 
   Log.info("%s [%d]: Current time - %s\r\n", __FILE__, __LINE__, asctime(&timeinfo));
@@ -1424,6 +1594,7 @@ static void log_POST(char *log_buffer, size_t size)
     {
       // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
       HTTPClient https;
+      https.setTimeout(5);
       Log.info("%s [%d]: [HTTPS] begin...\r\n", __FILE__, __LINE__);
       if (https.begin(*client, "https://usetrmnl.com/api/log"))
       { // HTTPS
@@ -1694,4 +1865,68 @@ static void checkLogNotes(void)
       }
     }
   }
+}
+
+static void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size)
+{
+  size_t res = filesystem_write_to_file(name, in_buffer, size);
+  if (res != size)
+  {
+    Log.error("%s [%d]: File writing ERROR. Result - %d\r\n", __FILE__, __LINE__, res);
+    sprintf(log_array, "%d [%d]: error writing file - %s. Written - %d bytes", getTime(), __LINE__, name, res);
+    log_POST(log_array, strlen(log_array));
+  }
+  else
+  {
+    Log.info("%s [%d]: file %s writing success - %d bytes\r\n", __FILE__, __LINE__, name, res);
+  }
+}
+
+static void writeSpecialFunction(SPECIAL_FUNCTION function)
+{
+  if (preferences.isKey(PREFERENCES_SF_KEY))
+  {
+    Log.info("%s [%d]: SF saved. Reading...\r\n", __FILE__, __LINE__);
+    if ((SPECIAL_FUNCTION)preferences.getUInt(PREFERENCES_SF_KEY, 0) == function)
+    {
+      Log.info("%s [%d]: No needed to re-write\r\n", __FILE__, __LINE__);
+    }
+    else
+    {
+      Log.info("%s [%d]: Writing new special function\r\n", __FILE__, __LINE__);
+      bool res = preferences.putUInt(PREFERENCES_SF_KEY, function);
+      if (res)
+        Log.info("%s [%d]: Written new special function successfully\r\n", __FILE__, __LINE__);
+      else
+        Log.error("%s [%d]: Writing new special function failed\r\n", __FILE__, __LINE__);
+    }
+  }
+  else
+  {
+    Log.error("%s [%d]: SF not saved\r\n", __FILE__, __LINE__);
+    bool res = preferences.putUInt(PREFERENCES_SF_KEY, function);
+    if (res)
+      Log.info("%s [%d]: Written new special function successfully\r\n", __FILE__, __LINE__);
+    else
+      Log.error("%s [%d]: Writing new special function failed\r\n", __FILE__, __LINE__);
+  }
+}
+
+static void showMessageWithLogo(MSG message_type)
+{
+  display_show_msg(storedLogoOrDefault(), message_type);
+}
+
+static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
+{
+  display_show_msg(storedLogoOrDefault(), message_type, friendly_id, id, fw_version, message);
+}
+
+static uint8_t *storedLogoOrDefault(void)
+{
+  if (filesystem_read_from_file("/logo.bmp", buffer, sizeof(buffer)))
+  {
+    return buffer;
+  }
+  return const_cast<uint8_t *>(default_icon);
 }
