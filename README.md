@@ -237,6 +237,9 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
 [v.1.2.18]
    - replaced 3 attempts of getting UTC to 1 with multiple NTP servers
    - added double click handler
+   - added special functions(Identify, Sleep, Multi WiFi, Restart playlist, Rewind, Send to me)
+   - changed core version from 6.5.0 to 6.7.0
+   - created filesystem library
 
 ## **Compilation guide**
 1. Install the VScode https://code.visualstudio.com

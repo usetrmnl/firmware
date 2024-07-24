@@ -12,12 +12,12 @@
 #include <stdlib.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncTCP.h>
-#include <SPIFFS.h>
 #include <ImageData.h>
 #include <Preferences.h>
 #include <cstdint>
 #include <bmp.h>
 #include <math.h>
+#include <filesystem.h>
 
 bool pref_clear = false;
 WiFiManager wm;
@@ -45,24 +45,23 @@ bool twice = false;
 
 Preferences preferences;
 
-static https_request_err_e downloadAndShow(const char *url);                      // download and show the image
-static void getDeviceCredentials(const char *url);                                // receiveing API key and Friendly ID
-static void resetDeviceCredentials(void);                                         // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
-static bool fileReadBufferFrom(const char *name, uint8_t *out_buffer);            // file reading
-static bool fileWriteBufferTo(const char *name, uint8_t *in_buffer, size_t size); // filw writing
-static bool fileExists(const char *name);
-static bool fileDelete(const char *name);
-static bool fileRename(const char *old_name, const char *new_name);
-static void checkAndPerformFirmwareUpdate(void);     // OTA update
-static void goToSleep(void);                         // sleep prepearing
-static void setClock(void);                          // clock synchrinization
-static float readBatteryVoltage(void);               // battery voltage reading
-static void log_POST(char *log_buffer, size_t size); // log sending
+static https_request_err_e downloadAndShow(const char *url); // download and show the image
+static void getDeviceCredentials(const char *url);           // receiveing API key and Friendly ID
+static void resetDeviceCredentials(void);                    // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
+static void checkAndPerformFirmwareUpdate(void);             // OTA update
+static void goToSleep(void);                                 // sleep prepearing
+static void setClock(void);                                  // clock synchrinization
+static float readBatteryVoltage(void);                       // battery voltage reading
+static void log_POST(char *log_buffer, size_t size);         // log sending
 static void handleRoute(void);
 static void bindServerCallback(void);
 static void checkLogNotes(void);
 static void writeSpecialFunction(SPECIAL_FUNCTION function);
+static void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size);
 static uint32_t getTime(void);
+static void showMessageWithLogo(MSG message_type);
+static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message);
+static uint8_t *storedLogoOrDefault(void);
 
 /**
  * @brief Function to init business logic module
@@ -201,15 +200,7 @@ void bl_init(void)
   }
 
   // Mount SPIFFS
-  if (!SPIFFS.begin(true))
-  {
-    Log.fatal("%s [%d]: Failed to mount SPIFFS\r\n", __FILE__, __LINE__);
-    ESP.restart();
-  }
-  else
-  {
-    Log.info("%s [%d]: SPIFFS mounted\r\n", __FILE__, __LINE__);
-  }
+  filesystem_init();
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
   if (wm.getWiFiIsSaved())
@@ -238,11 +229,7 @@ void bl_init(void)
 
       if (current_msg != WIFI_FAILED)
       {
-        res = fileReadBufferFrom("/logo.bmp", buffer);
-        if (res)
-          display_show_msg(buffer, WIFI_FAILED);
-        else
-          display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_FAILED);
+        showMessageWithLogo(WIFI_FAILED);
         current_msg = WIFI_FAILED;
       }
 
@@ -267,17 +254,8 @@ void bl_init(void)
     String fw = fw_version;
 
     Log.info("%s [%d]: FW version %s\r\n", __FILE__, __LINE__, fw_version);
-    res = fileReadBufferFrom("/logo.bmp", buffer);
-    if (res)
-    {
-      Log.info("%s [%d]: logo not exists. Use default\r\n", __FILE__, __LINE__);
-      display_show_msg(buffer, WIFI_CONNECT, "", false, fw.c_str(), "");
-    }
-    else
-    {
-      Log.info("%s [%d]: logo not exists. Use default\r\n", __FILE__, __LINE__);
-      display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_CONNECT, "", false, fw.c_str(), "");
-    }
+
+    showMessageWithLogo(WIFI_CONNECT, "", false, fw.c_str(), "");
 
     wm.setClass("invert");
     wm.setConnectTimeout(10);
@@ -298,11 +276,7 @@ void bl_init(void)
 
       WiFi.disconnect();
 
-      res = fileReadBufferFrom("/logo.bmp", buffer);
-      if (res)
-        display_show_msg(buffer, WIFI_FAILED);
-      else
-        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_FAILED);
+      showMessageWithLogo(WIFI_FAILED);
 
       memset(log_array, 0, sizeof(log_array));
       sprintf(log_array, "%d [%d]: connection to the new WiFi failed", getTime(), __LINE__);
@@ -345,11 +319,7 @@ void bl_init(void)
   {
     // show the image
     String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
-    bool res = fileReadBufferFrom("/logo.bmp", buffer);
-    if (res)
-      display_show_msg(buffer, FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
-    else
-      display_show_msg(const_cast<uint8_t *>(default_icon), FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
+    showMessageWithLogo(FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
     need_to_refresh_display = 0;
   }
 
@@ -371,86 +341,53 @@ void bl_init(void)
   {
   case HTTPS_REQUEST_FAILED:
   {
-    bool res = fileReadBufferFrom("/logo.bmp", buffer);
     if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
     {
-      if (res)
-        display_show_msg(buffer, API_ERROR);
-      else
-        display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+      showMessageWithLogo(API_ERROR);
     }
     else
     {
-      if (res)
-        display_show_msg(buffer, WIFI_WEAK);
-      else
-        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+      showMessageWithLogo(WIFI_WEAK);
     }
   }
   break;
   case HTTPS_RESPONSE_CODE_INVALID:
   {
-    bool res = fileReadBufferFrom("/logo.bmp", buffer);
-    if (res)
-      display_show_msg(buffer, WIFI_INTERNAL_ERROR);
-    else
-      display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_INTERNAL_ERROR);
+    showMessageWithLogo(WIFI_INTERNAL_ERROR);
   }
   break;
   case HTTPS_UNABLE_TO_CONNECT:
   {
-    bool res = fileReadBufferFrom("/logo.bmp", buffer);
     if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
     {
-      if (res)
-        display_show_msg(buffer, API_ERROR);
-      else
-        display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+      showMessageWithLogo(API_ERROR);
     }
     else
     {
-      if (res)
-        display_show_msg(buffer, WIFI_WEAK);
-      else
-        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+      showMessageWithLogo(WIFI_WEAK);
     }
   }
   break;
   case HTTPS_WRONG_IMAGE_FORMAT:
   {
-    bool rs = fileReadBufferFrom("/logo.bmp", buffer);
-    if (rs)
-      display_show_msg(buffer, BMP_FORMAT_ERROR);
-    else
-      display_show_msg(const_cast<uint8_t *>(default_icon), BMP_FORMAT_ERROR);
+    showMessageWithLogo(BMP_FORMAT_ERROR);
   }
   break;
   case HTTPS_WRONG_IMAGE_SIZE:
   {
-    bool res = fileReadBufferFrom("/logo.bmp", buffer);
     if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
     {
-      if (res)
-        display_show_msg(buffer, API_SIZE_ERROR);
-      else
-        display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
+      showMessageWithLogo(API_SIZE_ERROR);
     }
     else
     {
-      if (res)
-        display_show_msg(buffer, WIFI_WEAK);
-      else
-        display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+      showMessageWithLogo(WIFI_WEAK);
     }
   }
   break;
   case HTTPS_CLIENT_FAILED:
   {
-    bool res = fileReadBufferFrom("/logo.bmp", buffer);
-    if (res)
-      display_show_msg(buffer, WIFI_INTERNAL_ERROR);
-    else
-      display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_INTERNAL_ERROR);
+    showMessageWithLogo(WIFI_INTERNAL_ERROR);
   }
   break;
   case HTTPS_PLUGIN_NOT_ATTACHED:
@@ -941,9 +878,7 @@ static https_request_err_e downloadAndShow(const char *url)
                     status = false;
                     result = HTTPS_SUCCES;
                     Log.info("%s [%d]: rewind success\r\n", __FILE__, __LINE__);
-                    bool result = fileReadBufferFrom("/last.bmp", buffer);
-                    if (!result)
-                      display_show_msg(const_cast<uint8_t *>(default_icon), BMP_FORMAT_ERROR);
+                    showMessageWithLogo(BMP_FORMAT_ERROR);
 
                     bool image_reverse = false;
                     bmp_err_e res = parseBMPHeader(buffer, image_reverse);
@@ -958,7 +893,6 @@ static https_request_err_e downloadAndShow(const char *url)
                     break;
                     default:
                     {
-                      display_show_msg(const_cast<uint8_t *>(default_icon), BMP_FORMAT_ERROR);
                     }
                     break;
                     }
@@ -1100,27 +1034,27 @@ static https_request_err_e downloadAndShow(const char *url)
                   {
                   case BMP_NO_ERR:
                   {
-                    // show the image
-                    if (fileExists("/last.bmp") && fileExists("/current.bmp"))
+
+                    if (filesystem_file_exists("/last.bmp") && filesystem_file_exists("/current.bmp"))
                     {
                       Log.info("%s [%d]: Last and current exist!\r\n", __FILE__, __LINE__);
-                      if (fileDelete("/last.bmp"))
+                      if (filesystem_file_delete("/last.bmp"))
                       {
-                        if (fileRename("/current.bmp", "/last.bmp"))
+                        if (filesystem_file_rename("/current.bmp", "/last.bmp"))
                         {
                           Log.info("%s [%d]: Current renamed to last!\r\n", __FILE__, __LINE__);
                           delay(10);
-                          fileWriteBufferTo("/current.bmp", buffer, sizeof(buffer));
+                          writeImageToFile("/current.bmp", buffer, sizeof(buffer));
                         }
                       }
                     }
                     else
                     {
                       Log.info("%s [%d]: Last and current don't exist!\r\n", __FILE__, __LINE__);
-                      fileWriteBufferTo("/current.bmp", buffer, sizeof(buffer));
-                      fileWriteBufferTo("/last.bmp", buffer, sizeof(buffer));
+                      writeImageToFile("/current.bmp", buffer, sizeof(buffer));
+                      writeImageToFile("/last.bmp", buffer, sizeof(buffer));
                     }
-
+                    // show the image
                     display_show_image(buffer, image_reverse);
 
                     if (result != HTTPS_PLUGIN_NOT_ATTACHED)
@@ -1324,20 +1258,13 @@ static void getDeviceCredentials(const char *url)
           {
             Log.info("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
 
-            bool res = fileReadBufferFrom("/logo.bmp", buffer);
             if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
             {
-              if (res)
-                display_show_msg(buffer, API_ERROR);
-              else
-                display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+              showMessageWithLogo(API_ERROR);
             }
             else
             {
-              if (res)
-                display_show_msg(buffer, WIFI_WEAK);
-              else
-                display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+              showMessageWithLogo(WIFI_WEAK);
             }
             memset(log_array, 0, sizeof(log_array));
             sprintf(log_array, "%d [%d]: returned code is not OK. Code - %d", getTime(), __LINE__, httpCode);
@@ -1347,20 +1274,13 @@ static void getDeviceCredentials(const char *url)
         else
         {
           Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
-          bool res = fileReadBufferFrom("/logo.bmp", buffer);
           if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
           {
-            if (res)
-              display_show_msg(buffer, API_ERROR);
-            else
-              display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+            showMessageWithLogo(API_ERROR);
           }
           else
           {
-            if (res)
-              display_show_msg(buffer, WIFI_WEAK);
-            else
-              display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+            showMessageWithLogo(WIFI_WEAK);
           }
           memset(log_array, 0, sizeof(log_array));
           sprintf(log_array, "%d [%d]: HTTPS returned code is less then 0. Code - %d", getTime(), __LINE__, httpCode);
@@ -1372,11 +1292,8 @@ static void getDeviceCredentials(const char *url)
       else
       {
         Log.error("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
-        bool res = fileReadBufferFrom("/logo.bmp", buffer);
-        if (res)
-          display_show_msg(buffer, WIFI_INTERNAL_ERROR);
-        else
-          display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_INTERNAL_ERROR);
+        showMessageWithLogo(WIFI_INTERNAL_ERROR);
+
         memset(log_array, 0, sizeof(log_array));
         sprintf(log_array, "%d [%d]: unable to connect to the API", getTime(), __LINE__);
         log_POST(log_array, strlen(log_array));
@@ -1417,11 +1334,7 @@ static void getDeviceCredentials(const char *url)
               {
                 Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
 
-                bool res = fileWriteBufferTo("/logo.bmp", buffer, sizeof(buffer));
-                if (res)
-                  Log.info("%s [%d]: File written!\r\n", __FILE__, __LINE__);
-                else
-                  Log.error("%s [%d]: File not written!\r\n", __FILE__, __LINE__);
+                writeImageToFile("/logo.bmp", buffer, sizeof(buffer));
 
                 // show the image
                 String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
@@ -1431,21 +1344,15 @@ static void getDeviceCredentials(const char *url)
               else
               {
                 Log.error("%s [%d]: Receiving failed. Readed: %d\r\n", __FILE__, __LINE__, counter);
-                bool res = fileReadBufferFrom("/logo.bmp", buffer);
                 if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
                 {
-                  if (res)
-                    display_show_msg(buffer, API_SIZE_ERROR);
-                  else
-                    display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
+                  showMessageWithLogo(API_SIZE_ERROR);
                 }
                 else
                 {
-                  if (res)
-                    display_show_msg(buffer, WIFI_WEAK);
-                  else
-                    display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+                  showMessageWithLogo(WIFI_WEAK);
                 }
+
                 memset(log_array, 0, sizeof(log_array));
                 sprintf(log_array, "%d [%d]:Receiving failed. Readed: %d", getTime(), __LINE__, counter);
                 log_POST(log_array, strlen(log_array));
@@ -1455,21 +1362,15 @@ static void getDeviceCredentials(const char *url)
             {
               Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
               https.end();
-              bool res = fileReadBufferFrom("/logo.bmp", buffer);
               if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
               {
-                if (res)
-                  display_show_msg(buffer, API_ERROR);
-                else
-                  display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+                showMessageWithLogo(API_ERROR);
               }
               else
               {
-                if (res)
-                  display_show_msg(buffer, WIFI_WEAK);
-                else
-                  display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+                showMessageWithLogo(WIFI_WEAK);
               }
+
               memset(log_array, 0, sizeof(log_array));
               sprintf(log_array, "%d [%d]: HTTPS received code is not OK. Code - %d", getTime(), __LINE__, httpCode);
               log_POST(log_array, strlen(log_array));
@@ -1478,21 +1379,15 @@ static void getDeviceCredentials(const char *url)
           else
           {
             Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
-            bool res = fileReadBufferFrom("/logo.bmp", buffer);
             if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
             {
-              if (res)
-                display_show_msg(buffer, API_ERROR);
-              else
-                display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+              showMessageWithLogo(API_ERROR);
             }
             else
             {
-              if (res)
-                display_show_msg(buffer, WIFI_WEAK);
-              else
-                display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+              showMessageWithLogo(WIFI_WEAK);
             }
+
             memset(log_array, 0, sizeof(log_array));
             sprintf(log_array, "%d [%d]: HTTPS returned code is less then 0. Code - %d", getTime(), __LINE__, httpCode);
             log_POST(log_array, strlen(log_array));
@@ -1501,21 +1396,15 @@ static void getDeviceCredentials(const char *url)
         else
         {
           Log.error("%s [%d]: unable to connect\r\n", __FILE__, __LINE__);
-          bool res = fileReadBufferFrom("/logo.bmp", buffer);
           if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
           {
-            if (res)
-              display_show_msg(buffer, API_ERROR);
-            else
-              display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+            showMessageWithLogo(API_ERROR);
           }
           else
           {
-            if (res)
-              display_show_msg(buffer, WIFI_WEAK);
-            else
-              display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+            showMessageWithLogo(WIFI_WEAK);
           }
+
           memset(log_array, 0, sizeof(log_array));
           sprintf(log_array, "%d [%d]: unable to connect to the APU", getTime(), __LINE__);
           log_POST(log_array, strlen(log_array));
@@ -1529,11 +1418,8 @@ static void getDeviceCredentials(const char *url)
   else
   {
     Log.error("%s [%d]: Unable to create client\r\n", __FILE__, __LINE__);
-    bool res = fileReadBufferFrom("/logo.bmp", buffer);
-    if (res)
-      display_show_msg(buffer, WIFI_INTERNAL_ERROR);
-    else
-      display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_INTERNAL_ERROR);
+    showMessageWithLogo(WIFI_INTERNAL_ERROR);
+
     memset(log_array, 0, sizeof(log_array));
     sprintf(log_array, "%d [%d]: unable to create the client", getTime(), __LINE__);
     log_POST(log_array, strlen(log_array));
@@ -1561,186 +1447,6 @@ static void resetDeviceCredentials(void)
 }
 
 /**
- * @brief Function to reading image buffer from file
- * @param out_buffer buffer pointer
- * @return 1 - if success; 0 - if failed
- */
-static bool fileReadBufferFrom(const char *name, uint8_t *out_buffer)
-{
-  if (SPIFFS.exists(name))
-  {
-    Log.info("%s [%d]: icon exists\r\n", __FILE__, __LINE__);
-    File file = SPIFFS.open(name, FILE_READ);
-    if (file)
-    {
-      if (file.size() == DISPLAY_BMP_IMAGE_SIZE)
-      {
-        Log.info("%s [%d]: the size is the same\r\n", __FILE__, __LINE__);
-        file.readBytes((char *)out_buffer, DISPLAY_BMP_IMAGE_SIZE);
-      }
-      else
-      {
-        Log.error("%s [%d]: the size is NOT the same %d\r\n", __FILE__, __LINE__, file.size());
-        file.close();
-        return false;
-      }
-      file.close();
-      return true;
-    }
-    else
-    {
-      Log.error("%s [%d]: File open ERROR\r\n", __FILE__, __LINE__);
-      return false;
-    }
-  }
-  else
-  {
-    Log.error("%s [%d]: icon DOESN\'T exists\r\n", __FILE__, __LINE__);
-    return false;
-  }
-}
-
-/**
- * @brief Function to reading image buffer from file
- * @param name buffer pointer
- * @return 1 - if success; 0 - if failed
- */
-static bool fileWriteBufferTo(const char *name, uint8_t *in_buffer, size_t size)
-{
-  uint32_t SPIFFS_freeBytes = (SPIFFS.totalBytes() - SPIFFS.usedBytes());
-  Log.info("%s [%d]: SPIFFS freee space - %d\r\n", __FILE__, __LINE__, SPIFFS_freeBytes);
-  if (SPIFFS.exists(name))
-  {
-    Log.info("%s [%d]: file %s exists. Deleting...\r\n", __FILE__, __LINE__, name);
-    if (SPIFFS.remove(name))
-      Log.info("%s [%d]: file %s deleted\r\n", __FILE__, __LINE__, name);
-    else
-      Log.info("%s [%d]: file %s deleting failed\r\n", __FILE__, __LINE__, name);
-  }
-  else
-  {
-    Log.info("%s [%d]: file %s not exists.\r\n", __FILE__, __LINE__, name);
-  }
-  delay(100);
-  Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
-  Log.error("%s [%d]: free alloc heap - %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
-  File file = SPIFFS.open(name, FILE_WRITE);
-  if (file)
-  {
-    Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
-    Log.error("%s [%d]: free alloc heap - %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
-    // size_t res = file.write(in_buffer, size);
-    // if (res)
-    // {
-    //   Log.info("%s [%d]: file %s writing success\r\n", __FILE__, __LINE__, name);
-    //   file.close();
-    //   return true;
-    // }
-    // else
-    // {
-    //   Log.error("%s [%d]: file %s writing error. Written - %d. File size - %d\r\n", __FILE__, __LINE__, name, res, size);
-    //   file.close();
-    //   return false;
-    // }
-    // Write the buffer in chunks
-    size_t bytesWritten = 0;
-    while (bytesWritten < size)
-    {
-      // Log.info("%s [%d]: writing chunk\r\n", __FILE__, __LINE__);
-      size_t diff = size - bytesWritten;
-      size_t chunkSize = _min(4096, diff);
-      // Log.info("%s [%d]: chunksize - %d\r\n", __FILE__, __LINE__, chunkSize);
-      // delay(10);
-      uint16_t res = file.write(buffer + bytesWritten, chunkSize);
-      if (res != chunkSize)
-      {
-        Log.error("%s [%d]: File writing ERROR. Result - %d\r\n", __FILE__, __LINE__, res);
-        sprintf(log_array, "%d [%d]: error writing file - %s. Written - %d bytes", getTime(), __LINE__, name, bytesWritten);
-        log_POST(log_array, strlen(log_array));
-
-        file.close();
-        Serial.println("Erasing SPIFFS...");
-        if (SPIFFS.format())
-        {
-          Serial.println("SPIFFS erased successfully.");
-        }
-        else
-        {
-          Serial.println("Error erasing SPIFFS.");
-        }
-        return false;
-      }
-      bytesWritten += chunkSize;
-    }
-    Log.info("%s [%d]: file %s writing success - %d bytes\r\n", __FILE__, __LINE__, name, bytesWritten);
-    file.close();
-    return true;
-  }
-  else
-  {
-    Log.error("%s [%d]: File open ERROR\r\n", __FILE__, __LINE__);
-    return false;
-  }
-}
-
-static bool fileExists(const char *name)
-{
-  if (SPIFFS.exists(name))
-  {
-    Log.info("%s [%d]: file %s exists.\r\n", __FILE__, __LINE__, name);
-    return true;
-  }
-  else
-  {
-    Log.error("%s [%d]: file %s not exists.\r\n", __FILE__, __LINE__, name);
-    return false;
-  }
-}
-
-static bool fileDelete(const char *name)
-{
-  if (SPIFFS.exists(name))
-  {
-    if (SPIFFS.remove(name))
-    {
-      Log.info("%s [%d]: file %s deleted\r\n", __FILE__, __LINE__, name);
-      return true;
-    }
-    else
-    {
-      Log.error("%s [%d]: file %s deleting failed\r\n", __FILE__, __LINE__, name);
-      return false;
-    }
-  }
-  else
-  {
-    Log.info("%s [%d]: file %s doesn't exist\r\n", __FILE__, __LINE__, name);
-    return true;
-  }
-}
-
-static bool fileRename(const char *old_name, const char *new_name)
-{
-  if (SPIFFS.exists(old_name))
-  {
-    Log.info("%s [%d]: file %s exists.\r\n", __FILE__, __LINE__, old_name);
-    bool res = SPIFFS.rename(old_name, new_name);
-    if (res)
-    {
-      Log.info("%s [%d]: file %s renamed to %s.\r\n", __FILE__, __LINE__, old_name, new_name);
-      return true;
-    }
-    else
-      Log.error("%s [%d]: file %s wasn't renamed.\r\n", __FILE__, __LINE__, old_name);
-  }
-  else
-  {
-    Log.error("%s [%d]: file %s not exists.\r\n", __FILE__, __LINE__, old_name);
-    return false;
-  }
-}
-
-/**
  * @brief Function to check and performing OTA update
  * @param none
  * @return none
@@ -1764,69 +1470,43 @@ static void checkAndPerformFirmwareUpdate(void)
         if (Update.begin(contentLength))
         {
           Log.info("%s [%d]: Firmware update start\r\n", __FILE__, __LINE__);
-          bool res = fileReadBufferFrom("/logo.bmp", buffer);
-          if (res)
-            display_show_msg(buffer, FW_UPDATE);
-          else
-            display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE);
+          showMessageWithLogo(FW_UPDATE);
+
           if (Update.writeStream(https.getStream()))
           {
             if (Update.end(true))
             {
               Log.info("%s [%d]: Firmware update successful. Rebooting...\r\n", __FILE__, __LINE__);
-              bool res = fileReadBufferFrom("/logo.bmp", buffer);
-              if (res)
-                display_show_msg(buffer, FW_UPDATE_SUCCESS);
-              else
-                display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE_SUCCESS);
+              showMessageWithLogo(FW_UPDATE_SUCCESS);
             }
             else
             {
               Log.fatal("%s [%d]: Firmware update failed!\r\n", __FILE__, __LINE__);
-              bool res = fileReadBufferFrom("/logo.bmp", buffer);
-              if (res)
-                display_show_msg(buffer, FW_UPDATE_FAILED);
-              else
-                display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE_FAILED);
+              showMessageWithLogo(FW_UPDATE_FAILED);
             }
           }
           else
           {
             Log.fatal("%s [%d]: Write to firmware update stream failed!\r\n", __FILE__, __LINE__);
-            bool res = fileReadBufferFrom("/logo.bmp", buffer);
-            if (res)
-              display_show_msg(buffer, FW_UPDATE_FAILED);
-            else
-              display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE_FAILED);
+            showMessageWithLogo(FW_UPDATE_FAILED);
           }
         }
         else
         {
           Log.fatal("%s [%d]: Begin firmware update failed!\r\n", __FILE__, __LINE__);
-          bool res = fileReadBufferFrom("/logo.bmp", buffer);
-          if (res)
-            display_show_msg(buffer, FW_UPDATE_FAILED);
-          else
-            display_show_msg(const_cast<uint8_t *>(default_icon), FW_UPDATE_FAILED);
+          showMessageWithLogo(FW_UPDATE_FAILED);
         }
       }
       else
       {
         Log.fatal("%s [%d]: HTTP GET failed!\r\n", __FILE__, __LINE__);
-        bool res = fileReadBufferFrom("/logo.bmp", buffer);
         if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
         {
-          if (res)
-            display_show_msg(buffer, API_ERROR);
-          else
-            display_show_msg(const_cast<uint8_t *>(default_icon), API_ERROR);
+          showMessageWithLogo(API_ERROR);
         }
         else
         {
-          if (res)
-            display_show_msg(buffer, WIFI_WEAK);
-          else
-            display_show_msg(const_cast<uint8_t *>(default_icon), WIFI_WEAK);
+          showMessageWithLogo(WIFI_WEAK);
         }
       }
       https.end();
@@ -1842,7 +1522,7 @@ static void checkAndPerformFirmwareUpdate(void)
  */
 static void goToSleep(void)
 {
-  SPIFFS.end();
+  filesystem_deinit();
   uint32_t time_to_sleep = SLEEP_TIME_TO_SLEEP;
   if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))
     time_to_sleep = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
@@ -2187,6 +1867,21 @@ static void checkLogNotes(void)
   }
 }
 
+static void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size)
+{
+  size_t res = filesystem_write_to_file(name, in_buffer, size);
+  if (res != size)
+  {
+    Log.error("%s [%d]: File writing ERROR. Result - %d\r\n", __FILE__, __LINE__, res);
+    sprintf(log_array, "%d [%d]: error writing file - %s. Written - %d bytes", getTime(), __LINE__, name, res);
+    log_POST(log_array, strlen(log_array));
+  }
+  else
+  {
+    Log.info("%s [%d]: file %s writing success - %d bytes\r\n", __FILE__, __LINE__, name, res);
+  }
+}
+
 static void writeSpecialFunction(SPECIAL_FUNCTION function)
 {
   if (preferences.isKey(PREFERENCES_SF_KEY))
@@ -2215,4 +1910,23 @@ static void writeSpecialFunction(SPECIAL_FUNCTION function)
     else
       Log.error("%s [%d]: Writing new special function failed\r\n", __FILE__, __LINE__);
   }
+}
+
+static void showMessageWithLogo(MSG message_type)
+{
+  display_show_msg(storedLogoOrDefault(), message_type);
+}
+
+static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
+{
+  display_show_msg(storedLogoOrDefault(), message_type, friendly_id, id, fw_version, message);
+}
+
+static uint8_t *storedLogoOrDefault(void)
+{
+  if (filesystem_read_from_file("/logo.bmp", buffer, sizeof(buffer)))
+  {
+    return buffer;
+  }
+  return const_cast<uint8_t *>(default_icon);
 }
