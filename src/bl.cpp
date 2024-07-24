@@ -642,6 +642,7 @@ static https_request_err_e downloadAndShow(const char *url)
                   special_function = SF_NONE;
                 }
                 writeSpecialFunction(special_function);
+                special_function = SF_NONE;
 
                 if (update_firmware)
                 {
@@ -1647,13 +1648,26 @@ static bool fileWriteBufferTo(const char *name, uint8_t *in_buffer, size_t size)
     {
       // Log.info("%s [%d]: writing chunk\r\n", __FILE__, __LINE__);
       size_t diff = size - bytesWritten;
-      size_t chunkSize = _min(8196, diff);
+      size_t chunkSize = _min(4096, diff);
       // Log.info("%s [%d]: chunksize - %d\r\n", __FILE__, __LINE__, chunkSize);
+      // delay(10);
       uint16_t res = file.write(buffer + bytesWritten, chunkSize);
       if (res != chunkSize)
       {
-        Log.error("%s [%d]: File writing ERROR\r\n", __FILE__, __LINE__);
+        Log.error("%s [%d]: File writing ERROR. Result - %d\r\n", __FILE__, __LINE__, res);
+        sprintf(log_array, "%d [%d]: error writing file - %s. Written - %d bytes", getTime(), __LINE__, name, bytesWritten);
+        log_POST(log_array, strlen(log_array));
+
         file.close();
+        Serial.println("Erasing SPIFFS...");
+        if (SPIFFS.format())
+        {
+          Serial.println("SPIFFS erased successfully.");
+        }
+        else
+        {
+          Serial.println("Error erasing SPIFFS.");
+        }
         return false;
       }
       bytesWritten += chunkSize;
