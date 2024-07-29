@@ -1,6 +1,6 @@
 name: build
 
-on: [push]
+on: [push, pull_request]
 
 jobs:
   build:
@@ -28,3 +28,6 @@ jobs:
 
       - name: test
         run: pio test -e native
+
+      - name: static analysis
+        run: pio check --skip-packages --fail-on-defect high

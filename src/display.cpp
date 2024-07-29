@@ -40,7 +40,7 @@ void display_reset(void)
 /**
  * @brief Function to show the image on the display
  * @param image_buffer pointer to the uint8_t image buffer
- * @param reverse shows if the color scheme is reverse 
+ * @param reverse shows if the color scheme is reverse
  * @return none
  */
 void display_show_image(uint8_t *image_buffer, bool reverse)
@@ -49,6 +49,7 @@ void display_show_image(uint8_t *image_buffer, bool reverse)
     UBYTE *BlackImage;
     /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
     UWORD Imagesize = ((EPD_7IN5_V2_WIDTH % 8 == 0) ? (EPD_7IN5_V2_WIDTH / 8) : (EPD_7IN5_V2_WIDTH / 8 + 1)) * EPD_7IN5_V2_HEIGHT;
+    
     Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
     Log.error("%s [%d]: free alloc heap - %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
     if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
@@ -60,6 +61,7 @@ void display_show_image(uint8_t *image_buffer, bool reverse)
     // if (reverse)
     //     Paint_NewImage(BlackImage, EPD_7IN5_V2_WIDTH, EPD_7IN5_V2_HEIGHT, 0, BLACK);
     // else
+    
     Paint_NewImage(BlackImage, EPD_7IN5_V2_WIDTH, EPD_7IN5_V2_HEIGHT, 0, WHITE);
 
     Log.info("%s [%d]: show image for array\r\n", __FILE__, __LINE__);
@@ -67,6 +69,7 @@ void display_show_image(uint8_t *image_buffer, bool reverse)
     Paint_Clear(WHITE);
     if (reverse)
     {
+        Log.info("%s [%d]: inverse the image\r\n", __FILE__, __LINE__);
         for (size_t i = 0; i < DISPLAY_BMP_IMAGE_SIZE; i++)
         {
             image_buffer[i] = ~image_buffer[i];

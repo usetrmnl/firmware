@@ -3,7 +3,7 @@
 
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 2
-#define FW_PATCH_VERSION 17
+#define FW_PATCH_VERSION 18
 
 #define LOG_MAX_NOTES_NUMBER 5
 
@@ -15,10 +15,11 @@
 #define PREFERENCES_LOG_KEY "log_"
 #define PREFERENCES_LOG_BUFFER_HEAD_KEY "log_head"
 #define PREFERENCES_DEVICE_REGISTRED_KEY "plugin"
+#define PREFERENCES_SF_KEY "sf"
 
 #define WIFI_CONNECTION_ATTEMPTS 5
 #define WIFI_PORTAL_TIMEOUT 120
-#define WIFI_CONNECTION_RSSI -100
+#define WIFI_CONNECTION_RSSI (-100)
 
 #define DISPLAY_BMP_IMAGE_SIZE 48062 // in bytes - 62 bytes - header; 48000 bytes - bitmap (480*800 1bpp) / 8
 
