@@ -64,11 +64,13 @@ void WifiCaptive::setUpWebserver(AsyncWebServer &server, const IPAddress &localI
 		} else {
 			for (int i = 0; i < n; ++i){
 				String ssid = WiFi.SSID(i);
+				String rssi = String(WiFi.RSSI(i));
 				// Escape invalid characters
 				ssid.replace("\\","\\\\");
 				ssid.replace("\"","\\\"");
 				json+= "{";
 				json+= "\"name\":\""+ssid+"\",";
+				json+= "\"rssi\":\""+rssi+"\",";
 				json+= "\"open\":"+String(WiFi.encryptionType(i) == WIFI_AUTH_OPEN ? "true": "false");
 				json+= "}";
 				if(i != n-1) json += ",";
