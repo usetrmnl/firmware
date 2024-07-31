@@ -365,7 +365,7 @@ static void EPD_7IN5_V2_TurnOnDisplay(void)
 {
     EPD_SendCommand(0x12); // DISPLAY REFRESH
     DEV_Delay_ms(100);     //!!!The delay here is necessary, 200uS at least!!!
-    EPD_WaitUntilIdle();
+    //EPD_WaitUntilIdle();
 }
 
 /******************************************************************************
@@ -520,6 +520,7 @@ parameter:
 ******************************************************************************/
 void EPD_7IN5_V2_Clear(void)
 {
+    EPD_WaitUntilIdle();
     /*
     UWORD Width, Height;
     Width = (EPD_7IN5_V2_WIDTH % 8 == 0) ? (EPD_7IN5_V2_WIDTH / 8) : (EPD_7IN5_V2_WIDTH / 8 + 1);
@@ -566,6 +567,7 @@ parameter:
 ******************************************************************************/
 void EPD_7IN5_V2_Display(const UBYTE *blackimage)
 {
+    EPD_WaitUntilIdle();
     UDOUBLE Width, Height;
     Width = (EPD_7IN5_V2_WIDTH % 8 == 0) ? (EPD_7IN5_V2_WIDTH / 8) : (EPD_7IN5_V2_WIDTH / 8 + 1);
     Height = EPD_7IN5_V2_HEIGHT;
@@ -596,6 +598,7 @@ parameter:
 ******************************************************************************/
 void EPD_7IN5_V2_Sleep(void)
 {
+    EPD_WaitUntilIdle();
     EPD_SendCommand(0X02); // power off
     EPD_WaitUntilIdle();
     EPD_SendCommand(0X07); // deep sleep

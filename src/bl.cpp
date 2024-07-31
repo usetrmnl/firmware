@@ -908,11 +908,35 @@ static https_request_err_e downloadAndShow(const char *url)
                   {
                     status = false;
                     result = HTTPS_SUCCES;
-                    Log.info("%s [%d]: rewind success\r\n", __FILE__, __LINE__);
+                    Log.info("%s [%d]: send_to_me success\r\n", __FILE__, __LINE__);
+                    bool result = filesystem_read_from_file("/current.bmp", buffer, sizeof(buffer));
+                    if (result)
+                    {
+                      bool image_reverse = false;
+                      bmp_err_e res = parseBMPHeader(buffer, image_reverse);
+                      String error = "";
+                      switch (res)
+                      {
+                      case BMP_NO_ERR:
+                      {
+                        // show the image
+                        display_show_image(buffer, image_reverse);
+                      }
+                      break;
+                      default:
+                      {
+                      }
+                      break;
+                      }
+                    }
+                    else
+                    {
+                      showMessageWithLogo(BMP_FORMAT_ERROR);
+                    }
                   }
                   else
                   {
-                    Log.error("%s [%d]: rewind failed\r\n", __FILE__, __LINE__);
+                    Log.error("%s [%d]: send_to_me failed\r\n", __FILE__, __LINE__);
                   }
                 }
                 break;

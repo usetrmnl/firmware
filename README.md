@@ -245,6 +245,10 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
    - fixed "rewind" special function to show "bad bmp format"
    - added new beatiful custom Wi-Fi configuration portal
 
+[v.1.3.1]
+   - changed block draw function to non-block 
+   - added current image showing in "send to me" special function
+
 ## **Compilation guide**
 1. Install the VScode https://code.visualstudio.com
 2. Install PlatformIO https://platformio.org/install/ide?install=vscode

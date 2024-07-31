@@ -16,14 +16,14 @@
 #define WIFI_PASSWORD NULL
 
 // Define the DNS interval in milliseconds between processing DNS requests
-#define DNS_INTERVAL 30
+#define DNS_INTERVAL 60
 // Define the maximum number of clients that can connect to the server
-#define MAX_CLIENTS 4
+#define MAX_CLIENTS 1
 // Define the WiFi channel to be used (channel 6 in this case)
 #define WIFI_CHANNEL 6
 
 // Define max connection timeout
-#define CONNECTION_TIMEOUT 10000
+#define CONNECTION_TIMEOUT 100000
 
 #define LocalIPURL "http://4.3.2.1"
 
