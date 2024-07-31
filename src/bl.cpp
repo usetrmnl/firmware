@@ -2,7 +2,7 @@
 #include <bl.h>
 #include <types.h>
 #include <ArduinoLog.h>
-#include <WiFiManager.h>
+#include <WifiCaptive.h>
 #include <pins.h>
 #include <config.h>
 #include <HTTPClient.h>
@@ -16,11 +16,11 @@
 #include <Preferences.h>
 #include <cstdint>
 #include <bmp.h>
+#include <Update.h>
 #include <math.h>
 #include <filesystem.h>
 
 bool pref_clear = false;
-WiFiManager wm;
 
 uint8_t buffer[48062];    // image buffer
 char filename[1024];      // image URL
@@ -54,7 +54,6 @@ static void setClock(void);                                  // clock synchriniz
 static float readBatteryVoltage(void);                       // battery voltage reading
 static void log_POST(char *log_buffer, size_t size);         // log sending
 static void handleRoute(void);
-static void bindServerCallback(void);
 static void checkLogNotes(void);
 static void writeSpecialFunction(SPECIAL_FUNCTION function);
 static void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size);
@@ -113,7 +112,7 @@ void bl_init(void)
       if (digitalRead(PIN_INTERRUPT) == LOW && millis() - button_timer > BUTTON_HOLD_TIME)
       {
         Log.info("%s [%d]: WiFi reset\r\n", __FILE__, __LINE__);
-        wm.resetSettings();
+        WifiCaptivePortal.resetSettings();
         special_function = SF_NONE;
         break;
       }
@@ -203,11 +202,11 @@ void bl_init(void)
   filesystem_init();
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
-  if (wm.getWiFiIsSaved())
+  if (WifiCaptivePortal.isSaved())
   {
     // WiFi saved, connection
     Log.info("%s [%d]: WiFi saved\r\n", __FILE__, __LINE__);
-    WiFi.begin(wm.getWiFiSSID(), wm.getWiFiPass());
+    WiFi.begin(WifiCaptivePortal.getSSID().c_str(), WifiCaptivePortal.getPassword().c_str());
 
     uint8_t attepmts = 0;
     Log.info("%s [%d]: wifi connection...\r\n", __FILE__, __LINE__);
@@ -256,23 +255,11 @@ void bl_init(void)
     Log.info("%s [%d]: FW version %s\r\n", __FILE__, __LINE__, fw_version);
 
     showMessageWithLogo(WIFI_CONNECT, "", false, fw.c_str(), "");
-
-    wm.setClass("invert");
-    wm.setConnectTimeout(10);
-
-    wm.setWebServerCallback(bindServerCallback);
-    const char *menuhtml = "<form action='/custom' method='get'><button>Soft Reset</button></form><br/>\n";
-    wm.setCustomMenuHTML(menuhtml);
-
-    std::vector<const char *> menu = {"wifi", "custom"};
-    wm.setMenu(menu);
-    wm.setCustomHeadElement("<div style='text-align:center; '><h2>Warning!\nIf the portal closes before you enter the Wi-Fi credentials, please open the portal again</h2></div>");
-    res = wm.startConfigPortal("TRMNL"); // password protected ap
+    WifiCaptivePortal.setResetSettingsCallback(resetDeviceCredentials);
+    res = WifiCaptivePortal.startPortal();
     if (!res)
     {
       Log.error("%s [%d]: Failed to connect or hit timeout\r\n", __FILE__, __LINE__);
-      wm.disconnect();
-      wm.stopWebPortal();
 
       WiFi.disconnect();
 
@@ -1435,7 +1422,7 @@ static void resetDeviceCredentials(void)
 {
   Log.info("%s [%d]: The device will be reset now...\r\n", __FILE__, __LINE__);
   Log.info("%s [%d]: WiFi reseting...\r\n", __FILE__, __LINE__);
-  wm.resetSettings();
+  WifiCaptivePortal.resetSettings();
   need_to_refresh_display = 1;
   bool res = preferences.clear();
   if (res)
@@ -1721,20 +1708,6 @@ static void log_POST(char *log_buffer, size_t size)
         Log.info("%s [%d]: head note writing failed\r\n", __FILE__, __LINE__);
     }
   }
-}
-
-static void handleRoute(void)
-{
-  Log.info("%s [%d]: handle portal callback\r\n", __FILE__, __LINE__);
-
-  wm.stopConfigPortal();
-  resetDeviceCredentials();
-}
-
-static void bindServerCallback(void)
-{
-  wm.server->on("/custom", handleRoute); // this is now crashing esp32 for some reason
-  // wm.server->on("/info",handleRoute); // you can override wm!
 }
 
 static uint32_t getTime(void)
