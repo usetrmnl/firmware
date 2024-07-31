@@ -241,6 +241,10 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
    - changed core version from 6.5.0 to 6.7.0
    - created filesystem library
 
+[v.1.3.0]
+   - fixed "rewind" special function to show "bad bmp format"
+   - added new beatiful custom Wi-Fi configuration portal
+
 ## **Compilation guide**
 1. Install the VScode https://code.visualstudio.com
 2. Install PlatformIO https://platformio.org/install/ide?install=vscode

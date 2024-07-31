@@ -43,7 +43,7 @@ bool filesystem_read_from_file(const char *name, uint8_t *out_buffer, size_t siz
 {
     if (SPIFFS.exists(name))
     {
-        Log.info("%s [%d]: icon exists\r\n", __FILE__, __LINE__);
+        Log.info("%s [%d]: file %s exists\r\n", __FILE__, __LINE__, name);
         File file = SPIFFS.open(name, FILE_READ);
         if (file)
         {
@@ -52,13 +52,13 @@ bool filesystem_read_from_file(const char *name, uint8_t *out_buffer, size_t siz
         }
         else
         {
-            Log.error("%s [%d]: File open ERROR\r\n", __FILE__, __LINE__);
+            Log.error("%s [%d]: File %s open error\r\n", __FILE__, __LINE__, name);
             return false;
         }
     }
     else
     {
-        Log.error("%s [%d]: icon DOESN\'T exists\r\n", __FILE__, __LINE__);
+        Log.error("%s [%d]: file %s doesn\'t exists\r\n", __FILE__, __LINE__, name);
         return false;
     }
 }

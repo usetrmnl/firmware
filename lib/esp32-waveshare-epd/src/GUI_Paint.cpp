@@ -935,10 +935,6 @@ void Paint_DrawBitMap(const unsigned char *image_buffer)
     UWORD x, y;
     UDOUBLE Addr = 0;
     UDOUBLE Addr_in = 0;
-    Serial.print("Width: ");
-    Serial.println(Paint.WidthByte);
-    Serial.print("Height: ");
-    Serial.println(Paint.HeightByte);
     for (y = 0; y < Paint.HeightByte; y++)
     {
         for (x = 0; x < Paint.WidthByte; x++)
