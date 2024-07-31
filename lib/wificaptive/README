@@ -1,0 +1,21 @@
+# TRMNL WiFi Configuration Portal
+
+Custom Wifi Portal implemented for TRMNL.
+
+## Directories
+
+- /src - library source files
+- /portal - captive web portal
+
+## Editing web portal
+
+After changing the web portal (index.html), run `convert.py` python script
+to convert it to the compressed gzip format. This script updates the `src/WifiCaptivePage.h`
+automatically.
+
+## Acknowledgments
+
+Insipired by:
+
+- [EspConnect](https://github.com/ayushsharma82/ESPConnect)
+- [Config-WiFi-CaptivePortal](https://github.com/dev-kian/Config-WiFi-CaptivePortal)
