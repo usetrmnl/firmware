@@ -61,6 +61,8 @@ static uint32_t getTime(void);
 static void showMessageWithLogo(MSG message_type);
 static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message);
 static uint8_t *storedLogoOrDefault(void);
+static bool saveCurrentFileName(String &name);
+static bool checkCureentFileName(String &newName);
 
 /**
  * @brief Function to init business logic module
@@ -78,7 +80,7 @@ void bl_init(void)
   button_timer = millis();
 
   wakeup_reason = esp_sleep_get_wakeup_cause();
-  Serial.printf("Wakeup was not caused by deep sleep: %d\n", wakeup_reason);
+  Log.info("%s [%d]: Wakeup was not caused by deep sleep: %d\r\n", __FILE__, __LINE__, wakeup_reason);
 
   Log.info("%s [%d]: preferences start\r\n", __FILE__, __LINE__);
   bool res = preferences.begin("data", false);
@@ -105,6 +107,7 @@ void bl_init(void)
 
   special_function = SF_NONE;
 
+  Log.info("%s [%d]: Wakeup was not caused by deep sleep: %d\r\n", __FILE__, __LINE__, wakeup_reason);
   if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO)
   {
     while (1)
@@ -192,7 +195,7 @@ void bl_init(void)
   Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
   display_init();
 
-  if (wakeup_reason != 4)
+  if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
   {
     Log.info("%s [%d]: Display clear\r\n", __FILE__, __LINE__);
     display_reset();
@@ -626,7 +629,26 @@ static https_request_err_e downloadAndShow(const char *url)
                           Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
                       }
                     }
-                    status = true;
+                    // Find the start and end positions of the string to extract
+                    int startPos = image_url.indexOf(".com/") + 5; // ".com/" is 5 characters long
+                    int endPos = image_url.indexOf("?", startPos);
+
+                    // Extract the string
+                    String extractedString = image_url.substring(startPos, endPos);
+
+                    // Print the extracted string
+                    Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, extractedString.c_str());
+                    if (!checkCureentFileName(extractedString) || wakeup_reason == ESP_SLEEP_WAKEUP_GPIO || wakeup_reason == ESP_SLEEP_WAKEUP_UNDEFINED)
+                    {
+                      Log.info("%s [%d]: New image. Show it.\r\n", __FILE__, __LINE__);
+                      status = true;
+                    }
+                    else
+                    {
+                      Log.info("%s [%d]: Old image. No needed to show it.\r\n", __FILE__, __LINE__);
+                      status = false;
+                      result = HTTPS_SUCCES;
+                    }
                   }
                 }
                 Log.info("%s [%d]: update_firmware: %d\r\n", __FILE__, __LINE__, update_firmware);
@@ -886,9 +908,6 @@ static https_request_err_e downloadAndShow(const char *url)
                       }
                       break;
                       }
-                      // Go to deep sleep
-                      // display_sleep();
-                      // goToSleep();
                     }
                     else
                     {
@@ -1075,6 +1094,24 @@ static https_request_err_e downloadAndShow(const char *url)
                     }
                     // show the image
                     display_show_image(buffer, image_reverse);
+
+                    String image_url = String(filename);
+
+                    // Find the start and end positions of the string to extract
+                    int startPos = image_url.indexOf(".com/") + 5; // ".com/" is 5 characters long
+                    int endPos = image_url.indexOf("?", startPos);
+
+                    // Extract the string
+                    String extractedString = image_url.substring(startPos, endPos);
+
+                    // Print the extracted string
+                    Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, extractedString.c_str());
+
+                    bool res = saveCurrentFileName(extractedString);
+                    if (res)
+                      Log.info("%s [%d]: New filename saved\r\n", __FILE__, __LINE__);
+                    else
+                      Log.error("%s [%d]: New image name saving error!", __FILE__, __LINE__);
 
                     if (result != HTTPS_PLUGIN_NOT_ATTACHED)
                       result = HTTPS_SUCCES;
@@ -1934,4 +1971,42 @@ static uint8_t *storedLogoOrDefault(void)
     return buffer;
   }
   return const_cast<uint8_t *>(default_icon);
+}
+
+static bool saveCurrentFileName(String &name)
+{
+  if (!preferences.getString(PREFERENCES_FILENAME_KEY, "").equals(name))
+  {
+    size_t res = preferences.putString(PREFERENCES_FILENAME_KEY, name);
+    if (res > 0)
+    {
+      Log.info("%s [%d]: New filename saved in the preferences - %d\r\n", __FILE__, __LINE__, res);
+      return true;
+    }
+    else
+    {
+      Log.error("%s [%d]: New filename saving error!\r\n", __FILE__, __LINE__);
+      return false;
+    }
+  }
+  else
+  {
+    Log.info("%s [%d]: No needed to re-write\r\n", __FILE__, __LINE__);
+    return true;
+  }
+}
+
+static bool checkCureentFileName(String &newName)
+{
+  String currentFilename = preferences.getString(PREFERENCES_FILENAME_KEY, "");
+  if (currentFilename.equals(newName))
+  {
+    Log.info("%s [%d]: Currrent filename equals to the new filename\r\n", __FILE__, __LINE__);
+    return true;
+  }
+  else
+  {
+    Log.error("%s [%d]: Currrent filename doesn't equal to the new filename\r\n", __FILE__, __LINE__);
+    return false;
+  }
 }

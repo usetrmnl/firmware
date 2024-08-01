@@ -249,6 +249,9 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
    - changed block draw function to non-block 
    - added current image showing in "send to me" special function
 
+[v.1.3.2]
+   - added filename saving. It prevent unnecessary screen flicker on dupe content 
+
 ## **Compilation guide**
 1. Install the VScode https://code.visualstudio.com
 2. Install PlatformIO https://platformio.org/install/ide?install=vscode
