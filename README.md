@@ -252,6 +252,11 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
 [v.1.3.2]
    - added filename saving. It prevent unnecessary screen flicker on dupe content 
 
+[v.1.3.3]
+   - added animation while networks scanning
+   - added rssi sorting and showing only one ssid with the same name with the highest rssi
+   - added filtering for networks with name "TRMNL" 
+
 ## **Compilation guide**
 1. Install the VScode https://code.visualstudio.com
 2. Install PlatformIO https://platformio.org/install/ide?install=vscode

@@ -21,6 +21,7 @@
       padding-left: 8px;
       text-align: left;
     }
+
     table td {
       text-align: right;
     }
@@ -143,7 +144,7 @@
       font-size: 18px;
       border-radius: 5px;
     }
-    
+
     .button:disabled {
       opacity: .65;
     }
@@ -198,6 +199,7 @@
       margin-left: auto;
       margin-right: auto;
     }
+
     #toggler {
       position: absolute;
       font-size: 20px;
@@ -205,35 +207,72 @@
       cursor: pointer;
       margin-top: 32px;
     }
+
     .bi::before {
       display: inline-block;
       content: "";
       vertical-align: -.125em;
       background-repeat: no-repeat;
       background-size: 1rem 1rem;
-      width:20px;
+      width: 20px;
       height: 20px;
     }
+
     .bi-wifi::before {
       background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-wifi' viewBox='0 0 16 16'><path d='M15.384 6.115a.485.485 0 0 0-.047-.736A12.44 12.44 0 0 0 8 3C5.259 3 2.723 3.882.663 5.379a.485.485 0 0 0-.048.736.52.52 0 0 0 .668.05A11.45 11.45 0 0 1 8 4c2.507 0 4.827.802 6.716 2.164.205.148.49.13.668-.049'/><path d='M13.229 8.271a.482.482 0 0 0-.063-.745A9.46 9.46 0 0 0 8 6c-1.905 0-3.68.56-5.166 1.526a.48.48 0 0 0-.063.745.525.525 0 0 0 .652.065A8.46 8.46 0 0 1 8 7a8.46 8.46 0 0 1 4.576 1.336c.206.132.48.108.653-.065m-2.183 2.183c.226-.226.185-.605-.1-.75A6.5 6.5 0 0 0 8 9c-1.06 0-2.062.254-2.946.704-.285.145-.326.524-.1.75l.015.015c.16.16.407.19.611.09A5.5 5.5 0 0 1 8 10c.868 0 1.69.201 2.42.56.203.1.45.07.61-.091zM9.06 12.44c.196-.196.198-.52-.04-.66A2 2 0 0 0 8 11.5a2 2 0 0 0-1.02.28c-.238.14-.236.464-.04.66l.706.706a.5.5 0 0 0 .707 0l.707-.707z'/></svg>");
     }
+
     .bi-wifi-1::before {
       background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-wifi-1' viewBox='0 0 16 16'><path d='M11.046 10.454c.226-.226.185-.605-.1-.75A6.5 6.5 0 0 0 8 9c-1.06 0-2.062.254-2.946.704-.285.145-.326.524-.1.75l.015.015c.16.16.407.19.611.09A5.5 5.5 0 0 1 8 10c.868 0 1.69.201 2.42.56.203.1.45.07.611-.091zM9.06 12.44c.196-.196.198-.52-.04-.66A2 2 0 0 0 8 11.5a2 2 0 0 0-1.02.28c-.238.14-.236.464-.04.66l.706.706a.5.5 0 0 0 .707 0l.708-.707z'/></svg>");
     }
+
     .bi-wifi-2::before {
       background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-wifi-2' viewBox='0 0 16 16'><path d='M13.229 8.271c.216-.216.194-.578-.063-.745A9.46 9.46 0 0 0 8 6c-1.905 0-3.68.56-5.166 1.526a.48.48 0 0 0-.063.745.525.525 0 0 0 .652.065A8.46 8.46 0 0 1 8 7a8.46 8.46 0 0 1 4.577 1.336c.205.132.48.108.652-.065m-2.183 2.183c.226-.226.185-.605-.1-.75A6.5 6.5 0 0 0 8 9c-1.06 0-2.062.254-2.946.704-.285.145-.326.524-.1.75l.015.015c.16.16.408.19.611.09A5.5 5.5 0 0 1 8 10c.868 0 1.69.201 2.42.56.203.1.45.07.611-.091zM9.06 12.44c.196-.196.198-.52-.04-.66A2 2 0 0 0 8 11.5a2 2 0 0 0-1.02.28c-.238.14-.236.464-.04.66l.706.706a.5.5 0 0 0 .708 0l.707-.707z'/></svg>");
     }
+
     .bi-eye::before {
       background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-eye' viewBox='0 0 16 16'><path d='M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z'/><path d='M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0'/></svg>");
     }
+
     .bi-eye-slash::before {
       background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-eye-slash' viewBox='0 0 16 16'><path d='M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7 7 0 0 0-2.79.588l.77.771A6 6 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755q-.247.248-.517.486z'/><path d='M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829'/><path d='M3.35 5.47q-.27.24-.518.487A13 13 0 0 0 1.172 8l.195.288c.335.48.83 1.12 1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7 7 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .708-.708 12 12z'/></svg>");
     }
 
+    .loader {
+      border: 6px solid #f3f3f3;
+      border-radius: 50%;
+      border-top:6px solid #F86527;
+      width: 40px;
+      height: 40px;
+      -webkit-animation: spin 2s linear infinite;
+      /* Safari */
+      animation: spin 2s linear infinite;
+    }
+
+    /* Safari */
+    @-webkit-keyframes spin {
+      0% {
+        -webkit-transform: rotate(0deg);
+      }
+
+      100% {
+        -webkit-transform: rotate(360deg);
+      }
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
   </style>
   <script>
     const lockIcon = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgZmlsbD0iY3VycmVudENvbG9yIiBjbGFzcz0iYmkgYmktbG9jayIgdmlld0JveD0iMCAwIDE2IDE2Ij4KICA8cGF0aCBkPSJNOCAxYTIgMiAwIDAgMSAyIDJ2NEg2VjNhMiAyIDAgMCAxIDItMm0zIDZWM2EzIDMgMCAwIDAtNiAwdjRhMiAyIDAgMCAwLTIgMnY1YTIgMiAwIDAgMCAyIDJoNmEyIDIgMCAwIDAgMi0yVjlhMiAyIDAgMCAwLTItMk01IDhoNmExIDEgMCAwIDEgMSAxdjVhMSAxIDAgMCAxLTEgMUg1YTEgMSAwIDAgMS0xLTFWOWExIDEgMCAwIDEgMS0xIi8+Cjwvc3ZnPg==";
-    
+
     function refresh() {
       location.reload();
     }
@@ -285,7 +324,7 @@
     function togglePassword() {
       var icon = document.getElementById("toggler");
       var input = document.getElementById("password")
-      if (icon.classList.contains("bi-eye")){
+      if (icon.classList.contains("bi-eye")) {
         icon.classList.add("bi-eye-slash");
         icon.classList.remove("bi-eye");
         input.type = "text";
@@ -298,17 +337,20 @@
 
     async function getInfo() {
       let scanningInfoBox = document.getElementById('scanning-info');
+      let scanningLoader = document.getElementById('scanning-loader');
       let response = await fetch('/scan', {
         method: 'GET',
       })
-      .catch(_ => {
-        scanningInfoBox.textContent =
+        .catch(_ => {
+          scanningLoader.style.display = 'none';
+          scanningInfoBox.textContent =
             'There was an error while scanning networks. Please refresh the page or enter your wifi name manually';
-      });
+        });
 
       if (response && response.status == 200) {
         var json = await response.json();
         scanningInfoBox.style.display = 'none';
+        scanningLoader.style.display = 'none';
         json.forEach((item, row) => {
           appendWifiToTable(item.name, item.open, item.rssi);
         });
@@ -422,6 +464,7 @@
       </tbody>
     </table>
     <p id="scanning-info">Scanning networks, please wait...</p>
+    <div id="scanning-loader" class="loader"></div>
   </div>
   <div class="div-container">
     <div class="form-group">

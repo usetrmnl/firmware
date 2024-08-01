@@ -72,21 +72,70 @@ void WifiCaptive::setUpWebserver(AsyncWebServer &server, const IPAddress &localI
 		} else if(n == WIFI_SCAN_RUNNING){
 			return request->send(202);
 		} else {
-			for (int i = 0; i < n; ++i){
-				String ssid = WiFi.SSID(i);
-				String rssi = String(WiFi.RSSI(i));
+			// Data structure to store the highest RSSI for each SSID
+			
+			struct Network {
+				String ssid;
+				int32_t rssi;
+				bool open;
+			};
+
+			std::vector<Network> uniqueNetworks;
+
+			// Process each found network
+			for (int i = 0; i < n; ++i) {
+				if(!WiFi.SSID(i).equals("TRMNL"))
+				{
+					String ssid = WiFi.SSID(i);
+					int32_t rssi = WiFi.RSSI(i);
+					bool open = WiFi.encryptionType(i);
+
+					bool found = false;
+					for (auto& network : uniqueNetworks) 
+					{
+						if (network.ssid == ssid) 
+						{
+							Serial.println("Equal SSID");
+							found = true;
+							if (network.rssi < rssi) {
+								network.rssi = rssi; // Update to higher RSSI
+							}
+							break;
+						}
+					}
+
+					if (!found) 
+					{
+						uniqueNetworks.push_back({ ssid, rssi, open });
+					}
+				}
+			}
+			
+			size_t size = 0;
+			for (const auto& network : uniqueNetworks) 
+			{
+				String ssid = network.ssid;
+				String rssi = String(network.rssi);
+
 				// Escape invalid characters
 				ssid.replace("\\","\\\\");
 				ssid.replace("\"","\\\"");
 				json+= "{";
 				json+= "\"name\":\""+ssid+"\",";
 				json+= "\"rssi\":\""+rssi+"\",";
-				json+= "\"open\":"+String(WiFi.encryptionType(i) == WIFI_AUTH_OPEN ? "true": "false");
+				json+= "\"open\":"+String(network.open == WIFI_AUTH_OPEN ? "true": "false");
 				json+= "}";
-				if(i != n-1) json += ",";
+
+				size += 1;
+
+				if (size != uniqueNetworks.size())
+				{
+					json+= ",";
+				}
 			}
+
 			WiFi.scanDelete();
-			
+			Serial.println(json);
 			if (WiFi.scanComplete() == -2){
 				WiFi.scanNetworks(true);
 			}
