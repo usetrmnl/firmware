@@ -19,6 +19,7 @@
 #include <Update.h>
 #include <math.h>
 #include <filesystem.h>
+#include "log.h"
 
 bool pref_clear = false;
 
@@ -74,8 +75,8 @@ void bl_init(void)
 
   Serial.begin(115200);
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
-  Log.info("%s [%d]: BL init success\r\n", __FILE__, __LINE__);
-  Log.info("%s [%d]: Firware version %d.%d.%d\r\n", __FILE__, __LINE__, FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
+  Log_info("BL init success");
+  Log_info("Firware version %d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
   pins_init();
   button_timer = millis();
 
@@ -93,7 +94,7 @@ void bl_init(void)
       if (res)
         Log.info("%s [%d]: preferences cleared success\r\n", __FILE__, __LINE__);
       else
-        Log.fatal("%s [%d]: preferences clearing error\r\n", __FILE__, __LINE__);
+        Log_fatal("preferences clearing error");
     }
   }
   else
@@ -187,7 +188,7 @@ void bl_init(void)
     }
     else
     {
-      Log.error("%s [%d]: SF not saved\r\n", __FILE__, __LINE__);
+      Log_error("SF not saved");
     }
   }
   // EPD init
