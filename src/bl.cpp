@@ -21,6 +21,7 @@
 #include <filesystem.h>
 #include "log.h"
 #include <stored_logs.h>
+#include <button.h>
 
 bool pref_clear = false;
 
@@ -34,16 +35,11 @@ bool status = false;          // need to download a new image
 bool update_firmware = false; // need to download a new firmaware
 bool reset_firmware = false;  // need to reset credentials
 bool send_log = false;        // need to send logs
-bool not_reset = false;
 bool double_click = false;
 esp_sleep_wakeup_cause_t wakeup_reason = ESP_SLEEP_WAKEUP_UNDEFINED; // wake-up reason
 MSG current_msg = NONE;
 SPECIAL_FUNCTION special_function = SF_NONE;
 RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
-
-// timers
-uint32_t button_timer = 0;
-bool twice = false;
 
 Preferences preferences;
 
@@ -69,6 +65,17 @@ int submitLog(const char *format, ...);
 
 #define submit_log(format, ...) submitLog("%d [%d]: " format, getTime(), __LINE__, ##__VA_ARGS__);
 
+void wait_for_serial()
+{
+#ifdef WAIT_FOR_SERIAL
+  for (int i = 10; i > 0 && !Serial; i--)
+  {
+    Log_info("## Waiting for serial.. %d", i);
+    delay(1000);
+  }
+#endif
+}
+
 /**
  * @brief Function to init business logic module
  * @param none
@@ -82,10 +89,8 @@ void bl_init(void)
   Log_info("BL init success");
   Log_info("Firware version %d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
   pins_init();
-  button_timer = millis();
 
   wakeup_reason = esp_sleep_get_wakeup_cause();
-  Log.info("%s [%d]: Wakeup was not caused by deep sleep: %d\r\n", __FILE__, __LINE__, wakeup_reason);
 
   Log.info("%s [%d]: preferences start\r\n", __FILE__, __LINE__);
   bool res = preferences.begin("data", false);
@@ -108,41 +113,29 @@ void bl_init(void)
   }
   Log.info("%s [%d]: preferences end\r\n", __FILE__, __LINE__);
 
-  Log.info("%s [%d]: button handling start\r\n", __FILE__, __LINE__);
-
-  special_function = SF_NONE;
-
-  Log.info("%s [%d]: Wakeup was not caused by deep sleep: %d\r\n", __FILE__, __LINE__, wakeup_reason);
   if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO)
   {
-    while (1)
+    auto button = read_button_presses();
+    wait_for_serial();
+    Log_info("GPIO wakeup (%d) -> button was read (%s)", wakeup_reason, ButtonPressResultNames[button]);
+    switch (button)
     {
-      if (digitalRead(PIN_INTERRUPT) == LOW && millis() - button_timer > BUTTON_HOLD_TIME)
-      {
-        Log.info("%s [%d]: WiFi reset\r\n", __FILE__, __LINE__);
-        WifiCaptivePortal.resetSettings();
-        special_function = SF_NONE;
-        break;
-      }
-      else if (digitalRead(PIN_INTERRUPT) == HIGH && !not_reset)
-      {
-        Log.info("%s [%d]: WiFi NOT reset\r\n", __FILE__, __LINE__);
-        not_reset = true;
-      }
-      else if (digitalRead(PIN_INTERRUPT) == LOW && not_reset)
-      {
-        Log.info("%s [%d]: double click\r\n", __FILE__, __LINE__);
-        double_click = true;
-        break;
-      }
-      else if (digitalRead(PIN_INTERRUPT) == HIGH && millis() - button_timer > 2000)
-      {
-        Log.info("%s [%d]: NOT reset. Out\r\n", __FILE__, __LINE__);
-        special_function = SF_NONE;
-        break;
-      }
+    case LongPress:
+      Log_info("WiFi reset");
+      WifiCaptivePortal.resetSettings();
+      break;
+    case DoubleClick:
+      double_click = true;
+      break;
+    case NoAction:
+      break;
     }
-    Log.info("%s [%d]: button handling end\r\n", __FILE__, __LINE__);
+    Log_info("button handling end");
+  }
+  else
+  {
+    wait_for_serial();
+    Log_info("Non-GPIO wakeup (%d) -> didn't read buttons", wakeup_reason);
   }
 
   if (double_click)
