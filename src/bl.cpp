@@ -1873,8 +1873,7 @@ static void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size)
   if (res != size)
   {
     Log.error("%s [%d]: File writing ERROR. Result - %d\r\n", __FILE__, __LINE__, res);
-    sprintf(log_array, "%d [%d]: error writing file - %s. Written - %d bytes", getTime(), __LINE__, name, res);
-    log_POST(log_array, strlen(log_array));
+    submit_log("%d [%d]: error writing file - %s. Written - %d bytes", getTime(), __LINE__, name, res);
   }
   else
   {
