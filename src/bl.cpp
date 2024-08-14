@@ -22,6 +22,7 @@
 #include "log.h"
 #include <stored_logs.h>
 #include <button.h>
+#include "api-client/submit_log.h"
 
 bool pref_clear = false;
 
@@ -287,6 +288,8 @@ void bl_init(void)
     Log.info("%s [%d]: API key and friendly ID saved\r\n", __FILE__, __LINE__);
   }
 
+  submit_log("testing 456");
+
   // OTA checking, image checking and drawing
   https_request_err_e request_result = HTTPS_NO_ERR;
   uint8_t retries = 0;
@@ -426,7 +429,7 @@ static https_request_err_e downloadAndShow(const char *url)
       // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
       HTTPClient https;
       Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
-      Log.info("%s [%d]: [HTTPS] begin...\r\n", __FILE__, __LINE__);
+      Log.info("%s [%d]: [HTTPS] begin /api/display ...\r\n", __FILE__, __LINE__);
       char new_url[200];
       strcpy(new_url, url);
       strcat(new_url, "/api/display");
@@ -1219,7 +1222,7 @@ static void getDeviceCredentials(const char *url)
       // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
       HTTPClient https;
 
-      Log.info("%s [%d]: [HTTPS] begin...\r\n", __FILE__, __LINE__);
+      Log.info("%s [%d]: [HTTPS] begin /api/setup ...\r\n", __FILE__, __LINE__);
       char new_url[200];
       strcpy(new_url, url);
       strcat(new_url, "/api/setup");
@@ -1595,79 +1598,22 @@ static float readBatteryVoltage(void)
  */
 static void log_POST(char *log_buffer, size_t size)
 {
-  WiFiClientSecure *client = new WiFiClientSecure;
-  bool result = false;
-  if (client)
+  String api_key = "";
+  if (preferences.isKey(PREFERENCES_API_KEY))
   {
-    client->setInsecure();
-
-    {
-      // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
-      HTTPClient https;
-      https.setTimeout(5);
-      Log.info("%s [%d]: [HTTPS] begin...\r\n", __FILE__, __LINE__);
-      if (https.begin(*client, "https://usetrmnl.com/api/log"))
-      { // HTTPS
-        Log.info("%s [%d]: [HTTPS] POST...\r\n", __FILE__, __LINE__);
-
-        String api_key = "";
-        if (preferences.isKey(PREFERENCES_API_KEY))
-        {
-          api_key = preferences.getString(PREFERENCES_API_KEY, PREFERENCES_API_KEY_DEFAULT);
-          Log.info("%s [%d]: %s key exists. Value - %s\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY, api_key.c_str());
-        }
-        else
-        {
-          Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY);
-        }
-
-        https.addHeader("Accept", "application/json");
-        https.addHeader("Access-Token", api_key);
-        https.addHeader("Content-Type", "application/json");
-        char buffer[512] = {0};
-        sprintf(buffer, "{\"log\":{\"dump\":{\"error\":\"%s\"}}}", log_buffer);
-        Log.info("%s [%d]: Send log - %s\r\n", __FILE__, __LINE__, buffer);
-        // start connection and send HTTP header
-        int httpCode = https.POST(buffer);
-
-        // httpCode will be negative on error
-        if (httpCode > 0)
-        {
-          // HTTP header has been send and Server response header has been handled
-          Log.info("%s [%d]: [HTTPS] POST... code: %d\r\n", __FILE__, __LINE__, httpCode);
-          // file found at server
-          if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY || httpCode == HTTP_CODE_NO_CONTENT)
-          {
-            Log.info("%s [%d]: RESULT TRUE\r\n", __FILE__, __LINE__);
-            result = true;
-          }
-        }
-        else
-        {
-          Log.error("%s [%d]: [HTTPS] POST... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
-          result = false;
-        }
-
-        https.end();
-      }
-      else
-      {
-        Log.error("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
-        result = false;
-      }
-
-      // End extra scoping block
-    }
-
-    delete client;
+    api_key = preferences.getString(PREFERENCES_API_KEY, PREFERENCES_API_KEY_DEFAULT);
+    Log.info("%s [%d]: %s key exists. Value - %s\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY, api_key.c_str());
   }
   else
   {
-    Log.error("%s [%d]: [HTTPS] Unable to create client\r\n", __FILE__, __LINE__);
-    result = false;
+    Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY);
   }
+
+  LogApiInput input{api_key, log_buffer};
+  auto result = submitLogToApi(input);
   if (!result)
   {
+    Log_info("Was unable to send log to API; saving locally for later.");
     // log not send
     store_log(log_buffer, size, preferences);
   }
@@ -1691,82 +1637,25 @@ static void checkLogNotes(void)
   String log;
   gather_stored_logs(log, preferences);
 
+  String api_key = "";
+  if (preferences.isKey(PREFERENCES_API_KEY))
+  {
+    api_key = preferences.getString(PREFERENCES_API_KEY, PREFERENCES_API_KEY_DEFAULT);
+    Log.info("%s [%d]: %s key exists. Value - %s\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY, api_key.c_str());
+  }
+  else
+  {
+    Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY);
+  }
+
   bool result = false;
   if (log.length() > 0)
   {
     Log.info("%s [%d]: log string - %s\r\n", __FILE__, __LINE__, log.c_str());
     Log.info("%s [%d]: need to send the log\r\n", __FILE__, __LINE__);
-    WiFiClientSecure *client = new WiFiClientSecure;
 
-    if (client)
-    {
-      client->setInsecure();
-
-      {
-        // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
-        HTTPClient https;
-        Log.info("%s [%d]: [HTTPS] begin...\r\n", __FILE__, __LINE__);
-        if (https.begin(*client, "https://usetrmnl.com/api/log"))
-        { // HTTPS
-          Log.info("%s [%d]: [HTTPS] POST...\r\n", __FILE__, __LINE__);
-
-          String api_key = "";
-          if (preferences.isKey(PREFERENCES_API_KEY))
-          {
-            api_key = preferences.getString(PREFERENCES_API_KEY, PREFERENCES_API_KEY_DEFAULT);
-            Log.info("%s [%d]: %s key exists. Value - %s\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY, api_key.c_str());
-          }
-          else
-          {
-            Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY);
-          }
-
-          https.addHeader("Accept", "application/json");
-          https.addHeader("Access-Token", api_key);
-          https.addHeader("Content-Type", "application/json");
-
-          String buffer = "{\"log\":{\"dump\":{\"error\":\"" + log;
-          buffer = buffer + "\"}}}";
-
-          Log.info("%s [%d]: Send log - %s\r\n", __FILE__, __LINE__, buffer.c_str());
-          // start connection and send HTTP header
-          int httpCode = https.POST(buffer);
-
-          // httpCode will be negative on error
-          if (httpCode > 0)
-          {
-            // HTTP header has been send and Server response header has been handled
-            Log.info("%s [%d]: [HTTPS] POST... code: %d\r\n", __FILE__, __LINE__, httpCode);
-            // file found at server
-            if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY || httpCode == HTTP_CODE_NO_CONTENT)
-            {
-              result = true;
-              Log.info("%s [%d]: [HTTPS] POST OK\r\n", __FILE__, __LINE__);
-              // String payload = https.getString();
-            }
-          }
-          else
-          {
-            Log.error("%s [%d]: [HTTPS] POST... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
-            result = false;
-          }
-
-          https.end();
-        }
-        else
-        {
-          Log.error("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
-          result = false;
-        }
-      }
-
-      delete client;
-    }
-    else
-    {
-      Log.error("%s [%d]: [HTTPS] Unable to create client\r\n", __FILE__, __LINE__);
-      result = false;
-    }
+    LogApiInput input{api_key, log.c_str()};
+    submitLogToApi(input);
   }
   else
   {
