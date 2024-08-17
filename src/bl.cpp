@@ -23,6 +23,7 @@
 #include <stored_logs.h>
 #include <button.h>
 #include "api-client/submit_log.h"
+#include <special_function.h>
 
 bool pref_clear = false;
 
@@ -288,8 +289,6 @@ void bl_init(void)
     Log.info("%s [%d]: API key and friendly ID saved\r\n", __FILE__, __LINE__);
   }
 
-  submit_log("testing 456");
-
   // OTA checking, image checking and drawing
   https_request_err_e request_result = HTTPS_NO_ERR;
   uint8_t retries = 0;
@@ -530,43 +529,7 @@ static https_request_err_e downloadAndShow(const char *url)
                 bool sleep_5_seconds = false;
                 String special_function_str = doc["special_function"];
 
-                if (special_function_str.equals("identify"))
-                {
-                  Log.info("%s [%d]: New special function - identify\r\n", __FILE__, __LINE__);
-                  special_function = SF_IDENTIFY;
-                }
-                else if (special_function_str.equals("sleep"))
-                {
-                  Log.info("%s [%d]: New special function - sleep\r\n", __FILE__, __LINE__);
-                  special_function = SF_SLEEP;
-                }
-                else if (special_function_str.equals("add_wifi"))
-                {
-                  Log.info("%s [%d]: New special function - add_wifi\r\n", __FILE__, __LINE__);
-                  special_function = SF_ADD_WIFI;
-                }
-                else if (special_function_str.equals("restart_playlist"))
-                {
-                  Log.info("%s [%d]: New special function - restart_playlist\r\n", __FILE__, __LINE__);
-                  special_function = SF_RESTART_PLAYLIST;
-                }
-                else if (special_function_str.equals("rewind"))
-                {
-                  Log.info("%s [%d]: New special function - rewind\r\n", __FILE__, __LINE__);
-                  special_function = SF_REWIND;
-                }
-                else if (special_function_str.equals("send_to_me"))
-                {
-                  Log.info("%s [%d]: New special function - send_to_me\r\n", __FILE__, __LINE__);
-                  special_function = SF_SEND_TO_ME;
-                }
-                else
-                {
-                  Log.info("%s [%d]: No new special function\r\n", __FILE__, __LINE__);
-                  special_function = SF_NONE;
-                }
-                writeSpecialFunction(special_function);
-                special_function = SF_NONE;
+                writeSpecialFunction(parseSpecialFunction(special_function_str));
 
                 if (update_firmware)
                 {

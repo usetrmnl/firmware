@@ -11,6 +11,9 @@ public:
   void fatal(T msg, ...) {}
 
   template <class T>
+  void error(T msg, ...) {}
+
+  template <class T>
   void info(T msg, ...) {}
 };
 

@@ -1,4 +1,4 @@
-#include <ArduinoLog.h>
+#include <trmnl_log.h>
 
 #define Log_info(format, ...) Log.info("%s [%d]: " format "\r\n", __FILE__, __LINE__, ##__VA_ARGS__)
 
