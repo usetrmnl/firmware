@@ -1,6 +1,6 @@
 #include "stored_logs.h"
 #include "config.h"
-#include "log.h"
+#include "trmnl_log.h"
 
 void store_log(const char *log_buffer, size_t size, Preferences &preferences)
 {

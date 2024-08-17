@@ -1,6 +1,6 @@
 #include "api-client/submit_log.h"
 #include <stdio.h>
-#include <log.h>
+#include "trmnl_log.h"
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 
