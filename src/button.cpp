@@ -1,4 +1,4 @@
-#include "log.h"
+#include "trmnl_log.h"
 #include <config.h>
 #include "button.h"
 
