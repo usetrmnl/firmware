@@ -17,4 +17,4 @@ public:
   void info(T msg, ...) {}
 };
 
-Logging Log;
+extern Logging Log;
