@@ -40,11 +40,20 @@ void test_parseResponse_apiDisplay_deserializationError(void)
   assert_response_equal(expected, parseResponse_apiDisplay(input));
 }
 
+void test_parseResponse_apiDisplay_treats_unknown_sf_as_none(void)
+{
+  String input = "{\"status\":200,\"image_url\":\"http://example.com/foo.bmp\",\"update_firmware\":true,\"firmware_url\":\"https://example.com/firmware.bin\",\"refresh_rate\":123456,\"reset_firmware\":true,\"special_function\":\"unknown-string\",\"action\":\"special_action\"}";
+
+  auto parsed = parseResponse_apiDisplay(input);
+  TEST_ASSERT_EQUAL(parsed.special_function, SPECIAL_FUNCTION::SF_NONE);
+}
+
 void process()
 {
   UNITY_BEGIN();
   RUN_TEST(test_parseResponse_apiDisplay_success);
   RUN_TEST(test_parseResponse_apiDisplay_deserializationError);
+  RUN_TEST(test_parseResponse_apiDisplay_treats_unknown_sf_as_none);
   UNITY_END();
 }
 
