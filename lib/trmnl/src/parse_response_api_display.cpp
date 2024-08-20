@@ -2,6 +2,7 @@
 #include <ArduinoJson.h>
 #include "api_response_parsing.h"
 #include <trmnl_log.h>
+#include <special_function.h>
 
 ApiDisplayResponse parseResponse_apiDisplay(String &payload)
 {
@@ -13,6 +14,7 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload)
     Log_error("JSON deserialization error.");
     return {.outcome = ApiDisplayOutcome::DeserializationError};
   }
+  String special_function_str = doc["special_function"];
 
   return {
       .status = doc["status"],
@@ -21,6 +23,5 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload)
       .firmware_url = doc["firmware_url"],
       .refresh_rate = doc["refresh_rate"],
       .reset_firmware = doc["reset_firmware"],
-      .special_function = doc["special_function"],
-  };
+      .special_function = parseSpecialFunction(special_function_str)};
 }

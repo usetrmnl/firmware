@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include "special_function.h"
 
 enum class ApiSetupOutcome
 {
@@ -33,6 +34,6 @@ struct ApiDisplayResponse
   String firmware_url;
   uint64_t refresh_rate;
   bool reset_firmware;
-  String special_function;
+  SPECIAL_FUNCTION special_function;
   String action;
 };

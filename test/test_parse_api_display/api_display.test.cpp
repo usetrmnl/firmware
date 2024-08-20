@@ -10,12 +10,12 @@ void assert_response_equal(ApiDisplayResponse expected, ApiDisplayResponse actua
   TEST_ASSERT_EQUAL_STRING(expected.firmware_url.c_str(), actual.firmware_url.c_str());
   TEST_ASSERT_EQUAL_UINT64(expected.refresh_rate, actual.refresh_rate);
   TEST_ASSERT_EQUAL(expected.reset_firmware, actual.reset_firmware);
-  TEST_ASSERT_EQUAL_STRING(expected.special_function.c_str(), actual.special_function.c_str());
+  TEST_ASSERT_EQUAL(expected.special_function, actual.special_function);
 }
 
 void test_parseResponse_apiDisplay_success(void)
 {
-  String input = "{\"status\":200,\"image_url\":\"http://example.com/foo.bmp\",\"update_firmware\":true,\"firmware_url\":\"https://example.com/firmware.bin\",\"refresh_rate\":123456,\"reset_firmware\":true,\"special_function\":\"special\",\"action\":\"special_action\"}";
+  String input = "{\"status\":200,\"image_url\":\"http://example.com/foo.bmp\",\"update_firmware\":true,\"firmware_url\":\"https://example.com/firmware.bin\",\"refresh_rate\":123456,\"reset_firmware\":true,\"special_function\":\"identify\",\"action\":\"special_action\"}";
 
   ApiDisplayResponse expected = {
       .outcome = ApiDisplayOutcome::Ok,
@@ -24,7 +24,7 @@ void test_parseResponse_apiDisplay_success(void)
       .firmware_url = "https://example.com/firmware.bin",
       .refresh_rate = 123456,
       .reset_firmware = true,
-      .special_function = "special",
+      .special_function = SPECIAL_FUNCTION::SF_IDENTIFY,
       .action = "special_action"};
 
   assert_response_equal(expected, parseResponse_apiDisplay(input));

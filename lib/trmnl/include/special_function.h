@@ -1,3 +1,5 @@
+#pragma once
+
 #include <Arduino.h>
 
 enum SPECIAL_FUNCTION

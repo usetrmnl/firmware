@@ -530,9 +530,8 @@ static https_request_err_e downloadAndShow(const char *url)
                 reset_firmware = apiResponse.reset_firmware;
 
                 bool sleep_5_seconds = false;
-                String special_function_str = apiResponse.special_function;
 
-                writeSpecialFunction(parseSpecialFunction(special_function_str));
+                writeSpecialFunction(apiResponse.special_function);
 
                 if (update_firmware)
                 {
