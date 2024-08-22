@@ -340,7 +340,7 @@ void WifiCaptive::saveWifiCredentials(String ssid, String pass)
 {
     Log.info("Saving wifi credentials: %s\r\n", ssid.c_str());
 
-    for (u16_t i = WIFI_MAX_SAVED_CREDS - 1; i--; i >= 1)
+    for (u16_t i = WIFI_MAX_SAVED_CREDS - 1; i >= 1; i--)
     {
         _savedWifis[i].ssid = _savedWifis[i-1].ssid;
         _savedWifis[i].pswd = _savedWifis[i-1].pswd;
