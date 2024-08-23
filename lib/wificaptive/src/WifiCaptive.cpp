@@ -516,6 +516,7 @@ bool WifiCaptive::autoConnect()
             Log.info("Connected to %s\r\n", _lastUsed.ssid.c_str());
             return true;
         }
+        WiFi.disconnect();
     }
 
     std::vector<Network> scanResults = getScannedUniqueNetworks(true);
