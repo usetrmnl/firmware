@@ -27,6 +27,21 @@ void test_parseResponse_apiSetup_success(void)
   assert_response_equal(expected, parseResponse_apiSetup(input));
 }
 
+void test_parseResponse_apiSetup_missing_fields(void)
+{
+  String input = "{\"status\":200}";
+
+  ApiSetupResponse expected = {
+      .outcome = ApiSetupOutcome::Ok,
+      .status = 200,
+      .api_key = "",
+      .friendly_id = "",
+      .image_url = "",
+      .message = ""};
+
+  assert_response_equal(expected, parseResponse_apiSetup(input));
+}
+
 void test_parseResponse_apiSetup_statusError(void)
 {
   String input = "{\"status\":0}";
@@ -54,6 +69,7 @@ void process()
   RUN_TEST(test_parseResponse_apiSetup_success);
   RUN_TEST(test_parseResponse_apiSetup_statusError);
   RUN_TEST(test_parseResponse_apiSetup_deserializationError);
+  RUN_TEST(test_parseResponse_apiSetup_missing_fields);
   UNITY_END();
 }
 
