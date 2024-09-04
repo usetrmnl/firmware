@@ -257,6 +257,11 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
    - added rssi sorting and showing only one ssid with the same name with the highest rssi
    - added filtering for networks with name "TRMNL" 
 
+[v.1.3.4]
+   - added multiple WiFi support
+   - tested JSON parsing
+   - platform update 
+
 ## **Compilation guide**
 1. Install the VScode https://code.visualstudio.com
 2. Install PlatformIO https://platformio.org/install/ide?install=vscode
