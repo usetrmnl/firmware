@@ -163,7 +163,7 @@ void bl_init(void)
       case SF_ADD_WIFI:
       {
         Log.info("%s [%d]: Add WiFi function...\r\n", __FILE__, __LINE__);
-        // still in progress
+        WifiCaptivePortal.startPortal();
       }
       break;
       case SF_RESTART_PLAYLIST:
@@ -209,15 +209,7 @@ void bl_init(void)
   {
     // WiFi saved, connection
     Log.info("%s [%d]: WiFi saved\r\n", __FILE__, __LINE__);
-    WiFi.begin(WifiCaptivePortal.getSSID().c_str(), WifiCaptivePortal.getPassword().c_str());
-
-    uint8_t attepmts = 0;
-    Log.info("%s [%d]: wifi connection...\r\n", __FILE__, __LINE__);
-    while (WiFi.status() != WL_CONNECTED && attepmts < WIFI_CONNECTION_ATTEMPTS)
-    {
-      delay(1000);
-      attepmts++;
-    }
+    WifiCaptivePortal.autoConnect();
     Log.infoln("");
     // Check if connected
     if (WiFi.status() == WL_CONNECTED)
