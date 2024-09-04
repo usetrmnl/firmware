@@ -7,7 +7,6 @@
 #include <config.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
-#include <ArduinoJson.h>
 #include <display.h>
 #include <stdlib.h>
 #include <ESPAsyncWebServer.h>
@@ -24,6 +23,7 @@
 #include <button.h>
 #include "api-client/submit_log.h"
 #include <special_function.h>
+#include <api_response_parsing.h>
 
 bool pref_clear = false;
 
@@ -499,29 +499,31 @@ static https_request_err_e downloadAndShow(const char *url)
             Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, size);
             Log.info("%s [%d]: Free heap size: %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
             Log.info("%s [%d]: Payload - %s\r\n", __FILE__, __LINE__, payload.c_str());
-            JsonDocument doc;
-            DeserializationError error = deserializeJson(doc, payload);
+
+            auto apiResponse = parseResponse_apiDisplay(payload);
+            bool error = apiResponse.outcome == ApiDisplayOutcome::DeserializationError;
+
             if (error)
             {
               result = HTTPS_JSON_PARSING_ERR;
             }
             else if (!error && special_function == SF_NONE)
             {
-              uint64_t request_status = doc["status"];
+              uint64_t request_status = apiResponse.status;
               Log.info("%s [%d]: status: %d\r\n", __FILE__, __LINE__, request_status);
               switch (request_status)
               {
               case 0:
               {
-                String image_url = doc["image_url"];
-                update_firmware = doc["update_firmware"];
-                String firmware_url = doc["firmware_url"];
-                uint64_t rate = doc["refresh_rate"];
-                reset_firmware = doc["reset_firmware"];
-                bool sleep_5_seconds = false;
-                String special_function_str = doc["special_function"];
+                String image_url = apiResponse.image_url;
+                update_firmware = apiResponse.update_firmware;
+                String firmware_url = apiResponse.firmware_url;
+                uint64_t rate = apiResponse.refresh_rate;
+                reset_firmware = apiResponse.reset_firmware;
 
-                writeSpecialFunction(parseSpecialFunction(special_function_str));
+                bool sleep_5_seconds = false;
+
+                writeSpecialFunction(apiResponse.special_function);
 
                 if (update_firmware)
                 {
@@ -656,7 +658,7 @@ static https_request_err_e downloadAndShow(const char *url)
             }
             else if (!error && special_function != SF_NONE)
             {
-              uint64_t request_status = doc["status"];
+              uint64_t request_status = apiResponse.status;
               Log.info("%s [%d]: status: %d\r\n", __FILE__, __LINE__, request_status);
               switch (request_status)
               {
@@ -666,11 +668,11 @@ static https_request_err_e downloadAndShow(const char *url)
                 {
                 case SF_IDENTIFY:
                 {
-                  String action = doc["action"];
+                  String action = apiResponse.action;
                   if (action.equals("identify"))
                   {
                     Log.info("%s [%d]:Identify success\r\n", __FILE__, __LINE__);
-                    String image_url = doc["image_url"];
+                    String image_url = apiResponse.image_url;
                     if (image_url.length() > 0)
                     {
                       Log.info("%s [%d]: image_url: %s\r\n", __FILE__, __LINE__, image_url.c_str());
@@ -730,10 +732,10 @@ static https_request_err_e downloadAndShow(const char *url)
                 break;
                 case SF_SLEEP:
                 {
-                  String action = doc["action"];
+                  String action = apiResponse.action;
                   if (action.equals("sleep"))
                   {
-                    uint64_t rate = doc["refresh_rate"];
+                    uint64_t rate = apiResponse.refresh_rate;
                     Log.info("%s [%d]: refresh_rate: %d\r\n", __FILE__, __LINE__, rate);
                     if (rate != preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP))
                     {
@@ -754,7 +756,7 @@ static https_request_err_e downloadAndShow(const char *url)
                 break;
                 case SF_ADD_WIFI:
                 {
-                  String action = doc["action"];
+                  String action = apiResponse.action;
                   if (action.equals("add_wifi"))
                   {
                     status = false;
@@ -769,11 +771,11 @@ static https_request_err_e downloadAndShow(const char *url)
                 break;
                 case SF_RESTART_PLAYLIST:
                 {
-                  String action = doc["action"];
+                  String action = apiResponse.action;
                   if (action.equals("restart_playlist"))
                   {
                     Log.info("%s [%d]:Restart playlist success\r\n", __FILE__, __LINE__);
-                    String image_url = doc["image_url"];
+                    String image_url = apiResponse.image_url;
                     if (image_url.length() > 0)
                     {
                       Log.info("%s [%d]: image_url: %s\r\n", __FILE__, __LINE__, image_url.c_str());
@@ -833,7 +835,7 @@ static https_request_err_e downloadAndShow(const char *url)
                 break;
                 case SF_REWIND:
                 {
-                  String action = doc["action"];
+                  String action = apiResponse.action;
                   if (action.equals("rewind"))
                   {
                     status = false;
@@ -874,7 +876,7 @@ static https_request_err_e downloadAndShow(const char *url)
                 break;
                 case SF_SEND_TO_ME:
                 {
-                  String action = doc["action"];
+                  String action = apiResponse.action;
                   if (action.equals("send_to_me"))
                   {
                     status = false;
@@ -1203,36 +1205,37 @@ static void getDeviceCredentials(const char *url)
             Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
             String payload = https.getString();
             Log.info("%s [%d]: Payload: %s\r\n", __FILE__, __LINE__, payload.c_str());
-            JsonDocument doc;
-            DeserializationError error = deserializeJson(doc, payload);
-            if (error)
+
+            auto apiResponse = parseResponse_apiSetup(payload);
+
+            if (apiResponse.outcome == ApiSetupOutcome::DeserializationError)
             {
               Log.error("%s [%d]: JSON deserialization error.\r\n", __FILE__, __LINE__);
               https.end();
               client->stop();
               return;
             }
-            uint16_t url_status = doc["status"];
+            uint16_t url_status = apiResponse.status;
             if (url_status == 200)
             {
               status = true;
               Log.info("%s [%d]: status OK.\r\n", __FILE__, __LINE__);
 
-              String api_key = doc["api_key"];
+              String api_key = apiResponse.api_key;
               Log.info("%s [%d]: API key - %s\r\n", __FILE__, __LINE__, api_key.c_str());
               size_t res = preferences.putString(PREFERENCES_API_KEY, api_key);
               Log.info("%s [%d]: api key saved in the preferences - %d\r\n", __FILE__, __LINE__, res);
 
-              String friendly_id = doc["friendly_id"];
+              String friendly_id = apiResponse.friendly_id;
               Log.info("%s [%d]: friendly ID - %s\r\n", __FILE__, __LINE__, friendly_id.c_str());
               res = preferences.putString(PREFERENCES_FRIENDLY_ID, friendly_id);
               Log.info("%s [%d]: friendly ID saved in the preferences - %d\r\n", __FILE__, __LINE__, res);
 
-              String image_url = doc["image_url"];
+              String image_url = apiResponse.image_url;
               Log.info("%s [%d]: image_url - %s\r\n", __FILE__, __LINE__, image_url.c_str());
               image_url.toCharArray(filename, image_url.length() + 1);
 
-              String message_str = doc["message"];
+              String message_str = apiResponse.message;
               Log.info("%s [%d]: message - %s\r\n", __FILE__, __LINE__, message_str.c_str());
               message_str.toCharArray(message_buffer, message_str.length() + 1);
 
