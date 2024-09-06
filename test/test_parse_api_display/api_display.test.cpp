@@ -40,6 +40,23 @@ void test_parseResponse_apiDisplay_deserializationError(void)
   assert_response_equal(expected, parseResponse_apiDisplay(input));
 }
 
+void test_parseResponse_apiDisplay_missing_fields(void)
+{
+  String input = "{}";
+
+  ApiDisplayResponse expected = {
+      .outcome = ApiDisplayOutcome::Ok,
+      .image_url = "",
+      .update_firmware = false,
+      .firmware_url = "",
+      .refresh_rate = 0,
+      .reset_firmware = false,
+      .special_function = SPECIAL_FUNCTION::SF_NONE,
+      .action = ""};
+
+  assert_response_equal(expected, parseResponse_apiDisplay(input));
+}
+
 void test_parseResponse_apiDisplay_treats_unknown_sf_as_none(void)
 {
   String input = "{\"status\":200,\"image_url\":\"http://example.com/foo.bmp\",\"update_firmware\":true,\"firmware_url\":\"https://example.com/firmware.bin\",\"refresh_rate\":123456,\"reset_firmware\":true,\"special_function\":\"unknown-string\",\"action\":\"special_action\"}";
@@ -54,6 +71,7 @@ void process()
   RUN_TEST(test_parseResponse_apiDisplay_success);
   RUN_TEST(test_parseResponse_apiDisplay_deserializationError);
   RUN_TEST(test_parseResponse_apiDisplay_treats_unknown_sf_as_none);
+  RUN_TEST(test_parseResponse_apiDisplay_missing_fields);
   UNITY_END();
 }
 

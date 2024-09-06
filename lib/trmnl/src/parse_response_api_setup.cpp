@@ -24,14 +24,12 @@ ApiSetupResponse parseResponse_apiSetup(String &payload)
     return response;
   }
 
-  ApiSetupResponse response = {
+  return {
       .outcome = ApiSetupOutcome::Ok,
       .status = doc["status"],
-      .api_key = doc["api_key"],
-      .friendly_id = doc["friendly_id"],
-      .image_url = doc["image_url"],
-      .message = doc["message"],
+      .api_key = doc["api_key"] | "",
+      .friendly_id = doc["friendly_id"] | "",
+      .image_url = doc["image_url"] | "",
+      .message = doc["message"] | "",
   };
-
-  return response;
 }
