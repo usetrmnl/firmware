@@ -274,7 +274,7 @@ void bl_init(void)
   {
     Log.info("%s [%d]: API key or friendly ID not saved\r\n", __FILE__, __LINE__);
     // lets get the api key and friendly ID
-    getDeviceCredentials("https://usetrmnl.com");
+    getDeviceCredentials("https://trmnl.app");
   }
   else
   {
@@ -288,7 +288,7 @@ void bl_init(void)
   {
 
     Log.info("%s [%d]: request retry %d...\r\n", __FILE__, __LINE__, retries);
-    request_result = downloadAndShow("https://usetrmnl.com");
+    request_result = downloadAndShow("https://trmnl.app");
     Log.info("%s [%d]: request result - %d\r\n", __FILE__, __LINE__, request_result);
     retries++;
   }
@@ -465,7 +465,7 @@ static https_request_err_e downloadAndShow(const char *url)
       Log.info("%s [%d]: Added headers:\n\rID: %s\n\rSpecial function: %d\n\rAccess-Token: %s\n\rRefresh_Rate: %s\n\rBattery-Voltage: %s\n\rFW-Version: %s\r\nRSSI: %s\r\n", __FILE__, __LINE__, WiFi.macAddress().c_str(), special_function, api_key.c_str(), String(refresh_rate).c_str(), String(battery_voltage).c_str(), fw_version.c_str(), String(WiFi.RSSI()));
 
       // if (https.begin(*client, new_url))
-      if (https.begin(*client, "https://usetrmnl.com/api/display"))
+      if (https.begin(*client, "https://trmnl.app/api/display"))
       { // HTTPS
         Log.info("%s [%d]: [HTTPS] GET...\r\n", __FILE__, __LINE__);
         // start connection and send HTTP header

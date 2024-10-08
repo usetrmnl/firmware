@@ -37,5 +37,5 @@
 
 #define SERVER_MAX_RETRIES 3
 
-#define API_LOG_LINK "https://usetrmnl.com/api/log"
+#define API_LOG_LINK "https://trmnl.app/api/log"
 #endif
