@@ -19,7 +19,7 @@ bool submitLogToApi(LogApiInput &input)
       // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
       HTTPClient https;
       Log_info("[HTTPS] begin /api/log ...");
-      if (https.begin(*client, "https://usetrmnl.com/api/log"))
+      if (https.begin(*client, "https://trmnl.app/api/log"))
       { // HTTPS
         Log_info("[HTTPS] POST...");
 
