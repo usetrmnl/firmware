@@ -49,7 +49,7 @@ static https_request_err_e downloadAndShow(const char *url); // download and sho
 static void getDeviceCredentials(const char *url);           // receiveing API key and Friendly ID
 static void resetDeviceCredentials(void);                    // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
 static void checkAndPerformFirmwareUpdate(void);             // OTA update
-static void goToSleep(void);                                 // sleep prepearing
+static void goToSleep(void);                                 // sleep preparing
 static void setClock(void);                                  // clock synchrinization
 static float readBatteryVoltage(void);                       // battery voltage reading
 static void log_POST(char *log_buffer, size_t size);         // log sending
@@ -282,15 +282,60 @@ void bl_init(void)
   }
 
   // OTA checking, image checking and drawing
-  https_request_err_e request_result = HTTPS_NO_ERR;
-  uint8_t retries = 0;
-  while ((request_result != HTTPS_SUCCES && request_result != HTTPS_NO_REGISTER && request_result != HTTPS_RESET && request_result != HTTPS_PLUGIN_NOT_ATTACHED) && retries < SERVER_MAX_RETRIES)
-  {
+  https_request_err_e request_result = downloadAndShow("https://trmnl.app/");
+  Log.info("%s [%d]: request result - %d\r\n", __FILE__, __LINE__, request_result);
 
-    Log.info("%s [%d]: request retry %d...\r\n", __FILE__, __LINE__, retries);
-    request_result = downloadAndShow("https://trmnl.app");
-    Log.info("%s [%d]: request result - %d\r\n", __FILE__, __LINE__, request_result);
-    retries++;
+  if (!preferences.isKey(PREFERENCES_CONNECT_RETRY_COUNT))
+    {
+      preferences.putInt(PREFERENCES_CONNECT_RETRY_COUNT, 1);
+    }
+
+  if (request_result != HTTPS_SUCCES && request_result != HTTPS_NO_REGISTER && request_result != HTTPS_RESET && request_result != HTTPS_PLUGIN_NOT_ATTACHED)
+  {
+    uint8_t retries = preferences.getInt(PREFERENCES_CONNECT_RETRY_COUNT);
+
+    switch (retries)
+    {
+      case 1:
+      {
+        Log.info("%s [%d]: retry: %d - time to sleep: %d\r\n", __FILE__, __LINE__, retries, API_CONNECT_RETRY_TIME::FIRST_RETRY);
+        res = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, API_CONNECT_RETRY_TIME::FIRST_RETRY);
+        preferences.putInt(PREFERENCES_CONNECT_RETRY_COUNT, ++retries);
+        goToSleep();
+        break;
+      }
+
+      case 2:
+      {
+        Log.info("%s [%d]: retry:%d - time to sleep: %d\r\n", __FILE__, __LINE__, retries, API_CONNECT_RETRY_TIME::SECOND_RETRY);
+        res = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, API_CONNECT_RETRY_TIME::SECOND_RETRY);
+        preferences.putInt(PREFERENCES_CONNECT_RETRY_COUNT, ++retries);
+        goToSleep();
+        break;
+      }
+
+      case 3:
+      {
+        Log.info("%s [%d]: retry:%d - time to sleep: %d\r\n", __FILE__, __LINE__, retries, API_CONNECT_RETRY_TIME::THIRD_RETRY);
+        res = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, API_CONNECT_RETRY_TIME::THIRD_RETRY);
+        preferences.putInt(PREFERENCES_CONNECT_RETRY_COUNT, ++retries);
+        goToSleep();
+        break;
+      }
+
+      default:
+      {
+        Log.info("%s [%d]: Max retries done. Time to sleep: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_TO_SLEEP);
+        preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+        break;
+      }
+    }
+  }
+
+  else
+  {
+    Log.info("%s [%d]: Connection done successfully. Retries counter reseted.\r\n", __FILE__, __LINE__);
+    preferences.putInt(PREFERENCES_CONNECT_RETRY_COUNT, 1);
   }
 
   if (request_result == HTTPS_NO_REGISTER && need_to_refresh_display == 1)
@@ -464,8 +509,7 @@ static https_request_err_e downloadAndShow(const char *url)
 
       Log.info("%s [%d]: Added headers:\n\rID: %s\n\rSpecial function: %d\n\rAccess-Token: %s\n\rRefresh_Rate: %s\n\rBattery-Voltage: %s\n\rFW-Version: %s\r\nRSSI: %s\r\n", __FILE__, __LINE__, WiFi.macAddress().c_str(), special_function, api_key.c_str(), String(refresh_rate).c_str(), String(battery_voltage).c_str(), fw_version.c_str(), String(WiFi.RSSI()));
 
-      // if (https.begin(*client, new_url))
-      if (https.begin(*client, "https://trmnl.app/api/display"))
+      if (https.begin(*client, new_url))
       { // HTTPS
         Log.info("%s [%d]: [HTTPS] GET...\r\n", __FILE__, __LINE__);
         // start connection and send HTTP header
