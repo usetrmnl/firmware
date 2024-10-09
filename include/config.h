@@ -17,6 +17,7 @@
 #define PREFERENCES_DEVICE_REGISTRED_KEY "plugin"
 #define PREFERENCES_SF_KEY "sf"
 #define PREFERENCES_FILENAME_KEY "filename"
+#define PREFERENCES_CONNECT_RETRY_COUNT "retry_count"
 
 #define WIFI_CONNECTION_ATTEMPTS 5
 #define WIFI_PORTAL_TIMEOUT 120
@@ -28,6 +29,13 @@
 #define SLEEP_TIME_TO_SLEEP 900        /* Time ESP32 will go to sleep (in seconds) */
 #define SLEEP_TIME_WHILE_NOT_CONNECTED 5        /* Time ESP32 will go to sleep (in seconds) */
 #define SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED 5        /* Time ESP32 will go to sleep (in seconds) */
+
+enum API_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the API (in seconds)
+{
+    FIRST_RETRY = 5,
+    SECOND_RETRY = 10,
+    THIRD_RETRY = 30
+};
 
 #define PIN_RESET 9
 #define PIN_INTERRUPT 2
