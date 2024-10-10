@@ -274,7 +274,7 @@ void bl_init(void)
   {
     Log.info("%s [%d]: API key or friendly ID not saved\r\n", __FILE__, __LINE__);
     // lets get the api key and friendly ID
-    getDeviceCredentials("https://trmnl.app");
+    getDeviceCredentials(API_BASE_URL);
   }
   else
   {
@@ -282,7 +282,7 @@ void bl_init(void)
   }
 
   // OTA checking, image checking and drawing
-  https_request_err_e request_result = downloadAndShow("https://trmnl.app/");
+  https_request_err_e request_result = downloadAndShow(API_BASE_URL);
   Log.info("%s [%d]: request result - %d\r\n", __FILE__, __LINE__, request_result);
 
   if (!preferences.isKey(PREFERENCES_CONNECT_RETRY_COUNT))
@@ -1612,7 +1612,7 @@ static void log_POST(char *log_buffer, size_t size)
   }
 
   LogApiInput input{api_key, log_buffer};
-  auto result = submitLogToApi(input);
+  auto result = submitLogToApi(input, API_BASE_URL);
   if (!result)
   {
     Log_info("Was unable to send log to API; saving locally for later.");
@@ -1657,7 +1657,7 @@ static void checkLogNotes(void)
     Log.info("%s [%d]: need to send the log\r\n", __FILE__, __LINE__);
 
     LogApiInput input{api_key, log.c_str()};
-    submitLogToApi(input);
+    submitLogToApi(input, API_BASE_URL);
   }
   else
   {
