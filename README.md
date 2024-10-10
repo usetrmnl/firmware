@@ -263,7 +263,13 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
 [v.1.3.4]
    - added multiple WiFi support
    - tested JSON parsing
-   - platform update 
+   - platform update
+
+[v.1.3.5]
+   - added tests for api responce parser and bmp reader
+   - changed API endpoint
+   - Added exponential entry time
+   - Fixed several logging bugs
 
 ## **Compilation guide**
 1. Install the VScode https://code.visualstudio.com
