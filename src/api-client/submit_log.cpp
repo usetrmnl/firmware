@@ -4,7 +4,7 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 
-bool submitLogToApi(LogApiInput &input)
+bool submitLogToApi(LogApiInput &input, const char *api_url)
 {
 
   String payload = "{\"log\":{\"dump\":{\"error\":\"" + String(input.log_buffer) + "\"}}}";
@@ -19,7 +19,12 @@ bool submitLogToApi(LogApiInput &input)
       // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
       HTTPClient https;
       Log_info("[HTTPS] begin /api/log ...");
-      if (https.begin(*client, "https://trmnl.app/api/log"))
+
+      char new_url[200];
+      strcpy(new_url, api_url);
+      strcat(new_url, "/api/log");
+      
+      if (https.begin(*client, new_url))
       { // HTTPS
         Log_info("[HTTPS] POST...");
 

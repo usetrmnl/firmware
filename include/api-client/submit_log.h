@@ -7,4 +7,4 @@ struct LogApiInput
   const char *log_buffer;
 };
 
-bool submitLogToApi(LogApiInput &input);
+bool submitLogToApi(LogApiInput &input, const char *api_url);

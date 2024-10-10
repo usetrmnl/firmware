@@ -45,5 +45,6 @@ enum API_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the API
 
 #define SERVER_MAX_RETRIES 3
 
-#define API_LOG_LINK "https://trmnl.app/api/log"
+#define API_BASE_URL "https://trmnl.app"
+
 #endif
