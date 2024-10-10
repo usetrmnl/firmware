@@ -252,12 +252,60 @@
     .loader {
       border: 6px solid #f3f3f3;
       border-radius: 50%;
-      border-top:6px solid #F86527;
+      border-top: 6px solid #F86527;
       width: 40px;
       height: 40px;
       -webkit-animation: spin 2s linear infinite;
       /* Safari */
       animation: spin 2s linear infinite;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgb(0, 0, 0);
+      background-color: rgba(0, 0, 0, 0.4);
+    }
+
+    .modal-content {
+      background-color: #fefefe;
+      margin: 15% auto;
+      padding: 20px;
+      border: 1px solid #888;
+      width: 80%;
+      max-width: 500px;
+      position: relative;
+    }
+
+    .close {
+      color: #aaa;
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+    }
+
+    .close:hover,
+    .close:focus {
+      color: black;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .button {
+      padding: 10px 20px;
+      margin: 5px;
+      cursor: pointer;
+    }
+
+    .modal-footer {
+      text-align: right;
+      margin-top: 20px;
     }
 
     /* Safari */
@@ -315,7 +363,12 @@
         });
     }
 
+    function confirmSoftReset() {
+      document.getElementById('confirmationModal').style.display = 'block';
+    }
+
     function softReset() {
+      closeModal();
       showLoader();
       fetch('/soft-reset', {
         method: 'GET',
@@ -328,6 +381,10 @@
           hideLoader();
           displayAlert('An error occured during the soft reset. Please try again or contact support if the issue persists.', "warning");
         });
+    }
+
+    function closeModal() {
+      document.getElementById('confirmationModal').style.display = 'none';
     }
 
     function togglePassword() {
@@ -511,7 +568,7 @@
 
     </span>
     <span style="margin-top: 20px;">
-      <button id="btnRefresh" class="button button-secondary" onclick="softReset()">Soft Reset</button>
+      <button id="btnRefresh" class="button button-secondary" onclick="confirmSoftReset()">Soft Reset</button>
     </span>
     <div class="form-group" style="margin-top: 10px;">
       <div class="alert alert-primary" id="info-message" role="alert" style="display: none;"></div>
@@ -519,6 +576,18 @@
   </div>
   <div id="loader-wrapper">
     <div id="loader"></div>
+  </div>
+  <!-- Confirmation Modal -->
+  <div id="confirmationModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeModal()">&times;</span>
+      <p>Are you sure? Soft resetting your TRMNL device will delete all WiFi credentials,
+        clear your Device's ID, and reset your API key.</p>
+      <div class="modal-footer">
+        <button class="button button-success" onclick="softReset()">Yes</button>
+        <button class="button button-primary" onclick="closeModal()">No</button>
+      </div>
+    </div>
   </div>
 </body>
 
