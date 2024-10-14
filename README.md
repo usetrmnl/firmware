@@ -271,6 +271,10 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
    - Added exponential entry time
    - Fixed several logging bugs
 
+[v.1.3.6]
+   - Added soft reset modal confirmation
+   - Fixed some build warnings
+
 ## **Compilation guide**
 1. Install the VScode https://code.visualstudio.com
 2. Install PlatformIO https://platformio.org/install/ide?install=vscode
