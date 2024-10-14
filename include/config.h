@@ -19,8 +19,6 @@
 #define PREFERENCES_FILENAME_KEY "filename"
 #define PREFERENCES_CONNECT_RETRY_COUNT "retry_count"
 
-#define WIFI_CONNECTION_ATTEMPTS 5
-#define WIFI_PORTAL_TIMEOUT 120
 #define WIFI_CONNECTION_RSSI (-100)
 
 #define DISPLAY_BMP_IMAGE_SIZE 48062 // in bytes - 62 bytes - header; 48000 bytes - bitmap (480*800 1bpp) / 8
