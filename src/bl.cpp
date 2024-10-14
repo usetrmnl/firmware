@@ -65,6 +65,8 @@ static bool saveCurrentFileName(String &name);
 static bool checkCureentFileName(String &newName);
 int submitLog(const char *format, ...);
 
+#define submit_log(format, ...) submitLog("%d [%d]: " format, getTime(), __LINE__, ##__VA_ARGS__);
+
 void wait_for_serial()
 {
 #ifdef WAIT_FOR_SERIAL
@@ -225,7 +227,7 @@ void bl_init(void)
         current_msg = WIFI_FAILED;
       }
 
-      submitLog("wifi connection failed");
+      submit_log("wifi connection failed");
 
       // Go to deep sleep
       display_sleep();
@@ -256,7 +258,7 @@ void bl_init(void)
 
       showMessageWithLogo(WIFI_FAILED);
 
-      submitLog("connection to the new WiFi failed");
+      submit_log("connection to the new WiFi failed");
 
       // Go to deep sleep
       display_sleep();
@@ -988,14 +990,14 @@ static https_request_err_e downloadAndShow(const char *url)
           {
             Log.info("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
             result = HTTPS_REQUEST_FAILED;
-            submitLog("returned code is not OK: %d", httpCode);
+            submit_log("returned code is not OK: %d", httpCode);
           }
         }
         else
         {
           Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
           result = HTTPS_RESPONSE_CODE_INVALID;
-          submitLog("HTTPS returned code is less then 0. Code: %d", httpCode);
+          submit_log("HTTPS returned code is less then 0. Code: %d", httpCode);
         }
 
         https.end();
@@ -1004,7 +1006,7 @@ static https_request_err_e downloadAndShow(const char *url)
       {
         Log.error("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
         result = HTTPS_UNABLE_TO_CONNECT;
-        submitLog("unable to connect to the API endpoint");
+        submit_log("unable to connect to the API endpoint");
       }
 
       if (status && !update_firmware && !reset_firmware)
@@ -1132,7 +1134,7 @@ static https_request_err_e downloadAndShow(const char *url)
 
                   if (res != BMP_NO_ERR)
                   {
-                    submitLog("error parsing bmp file - %d", error.c_str());
+                    submit_log("error parsing bmp file - %d", error.c_str());
 
                     result = HTTPS_WRONG_IMAGE_FORMAT;
                   }
@@ -1143,7 +1145,7 @@ static https_request_err_e downloadAndShow(const char *url)
                   Log.error("%s [%d]: Receiving failed. Readed: %d\r\n", __FILE__, __LINE__, counter);
 
                   // display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
-                  submitLog("HTTPS request error. Returned code - %d, available bytes - %d, received bytes - %d", httpCode, https.getSize(), counter);
+                  submit_log("HTTPS request error. Returned code - %d, available bytes - %d, received bytes - %d", httpCode, https.getSize(), counter);
 
                   result = HTTPS_WRONG_IMAGE_SIZE;
                 }
@@ -1152,7 +1154,7 @@ static https_request_err_e downloadAndShow(const char *url)
               {
                 Log.error("%s [%d]: Receiving failed. Bad file size\r\n", __FILE__, __LINE__);
 
-                submitLog("HTTPS request error. Returned code - %d, available bytes - %d, received bytes - %d", httpCode, https.getSize(), counter);
+                submit_log("HTTPS request error. Returned code - %d, available bytes - %d, received bytes - %d", httpCode, https.getSize(), counter);
 
                 result = HTTPS_REQUEST_FAILED;
               }
@@ -1162,14 +1164,14 @@ static https_request_err_e downloadAndShow(const char *url)
               Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
 
               result = HTTPS_REQUEST_FAILED;
-              submitLog("HTTPS returned code is not OK. Code - %d", httpCode);
+              submit_log("HTTPS returned code is not OK. Code - %d", httpCode);
             }
           }
           else
           {
             Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
 
-            submitLog("HTTPS request failed with error - %d, %s", httpCode, https.errorToString(httpCode).c_str());
+            submit_log("HTTPS request failed with error - %d, %s", httpCode, https.errorToString(httpCode).c_str());
 
             result = HTTPS_REQUEST_FAILED;
           }
@@ -1180,7 +1182,7 @@ static https_request_err_e downloadAndShow(const char *url)
         {
           Log.error("%s [%d]: unable to connect\r\n", __FILE__, __LINE__);
 
-          submitLog("unable to connect to the API");
+          submit_log("unable to connect to the API");
 
           result = HTTPS_UNABLE_TO_CONNECT;
         }
@@ -1300,7 +1302,7 @@ static void getDeviceCredentials(const char *url)
             {
               showMessageWithLogo(WIFI_WEAK);
             }
-            submitLog("returned code is not OK. Code - %d", httpCode);
+            submit_log("returned code is not OK. Code - %d", httpCode);
           }
         }
         else
@@ -1314,7 +1316,7 @@ static void getDeviceCredentials(const char *url)
           {
             showMessageWithLogo(WIFI_WEAK);
           }
-          submitLog("HTTPS returned code is less then 0. Code - %d", httpCode);
+          submit_log("HTTPS returned code is less then 0. Code - %d", httpCode);
         }
 
         https.end();
@@ -1323,7 +1325,7 @@ static void getDeviceCredentials(const char *url)
       {
         Log.error("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
         showMessageWithLogo(WIFI_INTERNAL_ERROR);
-        submitLog("unable to connect to the API");
+        submit_log("unable to connect to the API");
       }
       Log.info("%s [%d]: status - %d\r\n", __FILE__, __LINE__, status);
       if (status)
@@ -1379,7 +1381,7 @@ static void getDeviceCredentials(const char *url)
                 {
                   showMessageWithLogo(WIFI_WEAK);
                 }
-                submitLog("Receiving failed. Readed: %d", counter);
+                submit_log("Receiving failed. Readed: %d", counter);
               }
             }
             else
@@ -1394,7 +1396,7 @@ static void getDeviceCredentials(const char *url)
               {
                 showMessageWithLogo(WIFI_WEAK);
               }
-              submitLog("HTTPS received code is not OK. Code - %d", httpCode);
+              submit_log("HTTPS received code is not OK. Code - %d", httpCode);
             }
           }
           else
@@ -1408,7 +1410,7 @@ static void getDeviceCredentials(const char *url)
             {
               showMessageWithLogo(WIFI_WEAK);
             }
-            submitLog("HTTPS returned code is less then 0. Code - %d", httpCode);
+            submit_log("HTTPS returned code is less then 0. Code - %d", httpCode);
           }
         }
         else
@@ -1422,7 +1424,7 @@ static void getDeviceCredentials(const char *url)
           {
             showMessageWithLogo(WIFI_WEAK);
           }
-          submitLog("unable to connect to the APU");
+          submit_log("unable to connect to the APU");
         }
       }
       // End extra scoping block
@@ -1434,7 +1436,7 @@ static void getDeviceCredentials(const char *url)
   {
     Log.error("%s [%d]: Unable to create client\r\n", __FILE__, __LINE__);
     showMessageWithLogo(WIFI_INTERNAL_ERROR);
-    submitLog("unable to create the client");
+    submit_log("unable to create the client");
   }
 }
 
@@ -1672,7 +1674,7 @@ static void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size)
   if (res != size)
   {
     Log.error("%s [%d]: File writing ERROR. Result - %d\r\n", __FILE__, __LINE__, res);
-    submitLog("error writing file - %s. Written - %d bytes", name, res);
+    submit_log("error writing file - %s. Written - %d bytes", name, res);
   }
   else
   {
@@ -1771,19 +1773,15 @@ int submitLog(const char *format, ...)
 {
 
   memset(log_array, 0, sizeof(log_array));
-  snprintf(log_array, sizeof(log_array), "%d [%d]: ", getTime(), __LINE__);
-
-  char log_message[512];
 
   va_list args;
   va_start(args, format);
 
-  vsnprintf(log_message, sizeof(log_message), format, args);
+  int result = vsnprintf(log_array, sizeof(log_array), format, args);
 
   va_end(args);
 
-  strcat(log_array, log_message);
   log_POST(log_array, strlen(log_array));
 
-  return strlen(log_array);
+  return result;
 }
