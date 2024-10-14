@@ -199,6 +199,7 @@ bool filesystem_file_rename(const char *old_name, const char *new_name)
         }
         else
             Log.error("%s [%d]: file %s wasn't renamed.\r\n", __FILE__, __LINE__, old_name);
+            return false;
     }
     else
     {
