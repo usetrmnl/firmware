@@ -227,7 +227,7 @@ void bl_init(void)
         current_msg = WIFI_FAILED;
       }
 
-      submit_log("wifi connection failed");
+      submit_log("wifi connection failed with WL Status: %d, current sleep time: %d", WiFi.status(), preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY));
 
       // Go to deep sleep
       display_sleep();
@@ -301,6 +301,7 @@ void bl_init(void)
         Log.info("%s [%d]: retry: %d - time to sleep: %d\r\n", __FILE__, __LINE__, retries, API_CONNECT_RETRY_TIME::FIRST_RETRY);
         res = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, API_CONNECT_RETRY_TIME::FIRST_RETRY);
         preferences.putInt(PREFERENCES_CONNECT_RETRY_COUNT, ++retries);
+        display_sleep();
         goToSleep();
         break;
       }
@@ -310,6 +311,7 @@ void bl_init(void)
         Log.info("%s [%d]: retry:%d - time to sleep: %d\r\n", __FILE__, __LINE__, retries, API_CONNECT_RETRY_TIME::SECOND_RETRY);
         res = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, API_CONNECT_RETRY_TIME::SECOND_RETRY);
         preferences.putInt(PREFERENCES_CONNECT_RETRY_COUNT, ++retries);
+        display_sleep();
         goToSleep();
         break;
       }
@@ -319,6 +321,7 @@ void bl_init(void)
         Log.info("%s [%d]: retry:%d - time to sleep: %d\r\n", __FILE__, __LINE__, retries, API_CONNECT_RETRY_TIME::THIRD_RETRY);
         res = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, API_CONNECT_RETRY_TIME::THIRD_RETRY);
         preferences.putInt(PREFERENCES_CONNECT_RETRY_COUNT, ++retries);
+        display_sleep();
         goToSleep();
         break;
       }
@@ -1031,9 +1034,10 @@ static https_request_err_e downloadAndShow(const char *url)
             if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
             {
               Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
+              
               uint32_t counter = 0;
               if (https.getSize() == DISPLAY_BMP_IMAGE_SIZE)
-              {
+              { 
                 WiFiClient *stream = https.getStreamPtr();
                 Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
                 Log.info("%s [%d]: Stream timeout: %d\r\n", __FILE__, __LINE__, stream->getTimeout());
@@ -1046,9 +1050,23 @@ static https_request_err_e downloadAndShow(const char *url)
 
                 Log.info("%s [%d]: Stream available: %d\r\n", __FILE__, __LINE__, stream->available());
                 //  Read and save BMP data to buffer
+
                 if (stream->available() && https.getSize() == DISPLAY_BMP_IMAGE_SIZE)
                 {
-                  counter = stream->readBytes(buffer, sizeof(buffer));
+                  for (int retry = 0; retry < 3 && counter != DISPLAY_BMP_IMAGE_SIZE; retry++)
+                  {
+                    Log.info("%s [%d]: Available before read: %d \r\n", __FILE__, __LINE__, stream->available());
+                    counter += stream->readBytes(buffer + counter, sizeof(buffer) - counter);
+                    Log.info("%s [%d]: Retry: %d, counter: %d, available: %d \r\n", __FILE__, __LINE__, retry, counter, stream->available());
+                    if (counter == DISPLAY_BMP_IMAGE_SIZE)
+                    {
+                      break;
+                    }
+
+                    timer = millis();
+                    while (stream->available() < 1000 && millis() - timer < 1000)
+                    ;
+                  }
                 }
 
                 if (counter == DISPLAY_BMP_IMAGE_SIZE)
