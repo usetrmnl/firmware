@@ -275,6 +275,10 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
    - Added soft reset modal confirmation
    - Fixed some build warnings
 
+[v.1.3.7]
+   - Added option to download an image in up to 3 chunks
+   - Updated dependencies
+
 ## **Compilation guide**
 1. Install the VScode https://code.visualstudio.com
 2. Install PlatformIO https://platformio.org/install/ide?install=vscode
