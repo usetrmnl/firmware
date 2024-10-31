@@ -144,9 +144,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     case API_ERROR:
     {
         char string1[] = "WiFi connected, TRMNL not responding.";
-        Paint_DrawString_EN((800 - sizeof(string1) > 9) * 17 ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 400, string1, &Font24, WHITE, BLACK);
-        char string2[] = "Wait or reset by holding button on back.";
-        Paint_DrawString_EN((800 - sizeof(string2) > 9) * 17 ? (800 - sizeof(string2) * 17) / 2 + 9 : 0, 430, string2, &Font24, WHITE, BLACK);
+        Paint_DrawString_EN((800 - sizeof(string1) > 9) * 17 ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 340, string1, &Font24, WHITE, BLACK);
+        char string2[] = "Short click the button on back,";
+        Paint_DrawString_EN((800 - sizeof(string2) > 9) * 17 ? (800 - sizeof(string2) * 17) / 2 + 9 : 0, 400, string2, &Font24, WHITE, BLACK);
+        char string3[] = "otherwise check your internet.";
+        Paint_DrawString_EN((800 - sizeof(string3) > 9) * 17 ? (800 - sizeof(string3) * 17) / 2 + 9 : 0, 430, string3, &Font24, WHITE, BLACK);
     }
     break;
     case API_SIZE_ERROR:
