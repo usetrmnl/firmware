@@ -24,13 +24,14 @@
 #include "api-client/submit_log.h"
 #include <special_function.h>
 #include <api_response_parsing.h>
+#include "logging_parcers.h"
 
 bool pref_clear = false;
 
 uint8_t buffer[48062];    // image buffer
 char filename[1024];      // image URL
 char binUrl[1024];        // update URL
-char log_array[512];      // log
+char log_array[1024];      // log
 char message_buffer[128]; // message to show on the screen
 
 bool status = false;          // need to download a new image
@@ -63,9 +64,11 @@ static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, c
 static uint8_t *storedLogoOrDefault(void);
 static bool saveCurrentFileName(String &name);
 static bool checkCureentFileName(String &newName);
-int submitLog(const char *format, ...);
+static DeviceStatusStamp getDeviceStatusStamp();
+bool SerializeJsonLog(DeviceStatusStamp device_status_stamp, time_t timestamp, int codeline, const char* source_file, char* log_message);
+int submitLog(const char *format, time_t time, int line, const char *file, ...);
 
-#define submit_log(format, ...) submitLog("%d [%d]: " format, getTime(), __LINE__, ##__VA_ARGS__);
+#define submit_log(format, ...) submitLog(format, getTime(), __LINE__, __FILE__, ##__VA_ARGS__);
 
 void wait_for_serial()
 {
@@ -1442,7 +1445,7 @@ static void getDeviceCredentials(const char *url)
           {
             showMessageWithLogo(WIFI_WEAK);
           }
-          submit_log("unable to connect to the APU");
+          submit_log("unable to connect to the API");
         }
       }
       // End extra scoping block
@@ -1782,24 +1785,68 @@ static bool checkCureentFileName(String &newName)
   }
   else
   {
-    Log.error("%s [%d]: Currrent filename doesn't equal to the new filename\r\n", __FILE__, __LINE__);
+    Log.error("%s [%d]: Current filename doesn't equal to the new filename\r\n", __FILE__, __LINE__);
     return false;
   }
 }
 
-int submitLog(const char *format, ...)
+DeviceStatusStamp getDeviceStatusStamp()
 {
+    DeviceStatusStamp deviceStatus = {};
 
-  memset(log_array, 0, sizeof(log_array));
+    char fw_version[30]; 
+    sprintf(fw_version, "%d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
+
+    deviceStatus.wifi_rssi_level = WiFi.RSSI();
+    parseWifiStatusToStr(deviceStatus.wifi_status, sizeof(deviceStatus.wifi_status), WiFi.status());
+    deviceStatus.current_sleep_time = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY);
+    snprintf(deviceStatus.current_fw_version, sizeof(deviceStatus.current_fw_version), "%d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
+    parseSpecialFunctionToStr(deviceStatus.special_function, special_function);
+    deviceStatus.battery_voltage = readBatteryVoltage();
+    parseWakeupReasonToStr(deviceStatus.wakeup_reason, sizeof(deviceStatus.wakeup_reason), esp_sleep_get_wakeup_cause());
+    deviceStatus.free_heap_size = ESP.getFreeHeap();
+
+    return deviceStatus;
+}
+
+bool SerializeJsonLog(DeviceStatusStamp device_status_stamp, time_t timestamp, int codeline, const char* source_file, char* log_message)
+{
+  JsonDocument json_log;
+
+  json_log["creation_timestamp"] = timestamp;
+
+  json_log["device_status_stamp"]["wifi_rssi_level"] = device_status_stamp.wifi_rssi_level;
+  json_log["device_status_stamp"]["wifi_status"] = device_status_stamp.wifi_status;
+  json_log["device_status_stamp"]["current_sleep_time"] = device_status_stamp.current_sleep_time;
+  json_log["device_status_stamp"]["current_fw_version"] = device_status_stamp.current_fw_version;
+  json_log["device_status_stamp"]["special_function"] = device_status_stamp.special_function;
+  json_log["device_status_stamp"]["battery_voltage"] = device_status_stamp.battery_voltage;
+  json_log["device_status_stamp"]["wakeup_reason"] = device_status_stamp.wakeup_reason;
+  json_log["device_status_stamp"]["free_heap_size"] = device_status_stamp.free_heap_size;
+
+  json_log["log_message"] = log_message;
+  json_log["log_codeline"] = codeline;
+  json_log["log_sourcefile"] = source_file;
+
+  serializeJson(json_log, log_array);
+
+  log_POST(log_array, strlen(log_array));
+
+  return true;
+}
+
+int submitLog(const char *format, time_t time, int line, const char *file, ...)
+{
+  char log_message[1024];
 
   va_list args;
-  va_start(args, format);
+  va_start(args, file);
 
-  int result = vsnprintf(log_array, sizeof(log_array), format, args);
+  int result = vsnprintf(log_message, sizeof(log_message), format, args);
 
   va_end(args);
 
-  log_POST(log_array, strlen(log_array));
+  SerializeJsonLog(getDeviceStatusStamp(), time, line, file, log_message);
 
   return result;
 }
