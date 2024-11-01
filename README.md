@@ -279,6 +279,10 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
    - Added option to download an image in up to 3 chunks
    - Updated dependencies
 
+[v.1.4.0]
+   - Renewed logs
+   - Changed API ERROR message
+
 ## **Compilation guide**
 1. Install the VScode https://code.visualstudio.com
 2. Install PlatformIO https://platformio.org/install/ide?install=vscode
