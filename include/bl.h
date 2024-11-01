@@ -15,4 +15,25 @@ void bl_init(void);
  */
 void bl_process(void);
 
+typedef struct 
+{
+    char current_image[100];
+    char current_error_message[100];
+} ScreenStatus;
+
+typedef struct DeviceStatusStamp
+{
+    int wifi_rssi_level;
+    char wifi_status[30];
+    int current_sleep_time;
+    char current_fw_version[10];
+    char special_function[100];
+    float battery_voltage;
+    char wakeup_reason[30];
+    int free_heap_size;
+
+    ScreenStatus screen_status;
+    
+} DeviceStatusStamp;
+
 #endif

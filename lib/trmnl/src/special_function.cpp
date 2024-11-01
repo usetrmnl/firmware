@@ -30,3 +30,16 @@ SPECIAL_FUNCTION parseSpecialFunction(String &special_function_str)
   Log_info("No new special function");
   return SF_NONE;
 }
+
+bool parseSpecialFunctionToStr(char *buffer, SPECIAL_FUNCTION special_function)
+{
+  for (const SpecialFunctionMap &entry : specialFunctionMap)
+  {
+    if (special_function == entry.value)
+    {
+      strncpy(buffer, entry.name, sizeof(buffer));
+      return true;
+    }
+  }
+  return false;
+}
