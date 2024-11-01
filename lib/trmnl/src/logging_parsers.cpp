@@ -1,7 +1,6 @@
 #include <string.h>
 
-#include "WiFiType.h"
-#include "esp_sleep.h"
+#include "logging_parcers.h"
 
 
 struct WifiStatusNode
