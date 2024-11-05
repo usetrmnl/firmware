@@ -213,6 +213,14 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
  */
 void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
 {
+
+    if (message_type == WIFI_CONNECT)
+    {
+        Log.info("%s [%d]: Display set to black\r\n", __FILE__, __LINE__);
+        EPD_7IN5_V2_ClearWhite();
+        delay(1000);
+    }
+
     UBYTE *BlackImage;
     /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
     UWORD Imagesize = ((EPD_7IN5_V2_WIDTH % 8 == 0) ? (EPD_7IN5_V2_WIDTH / 8) : (EPD_7IN5_V2_WIDTH / 8 + 1)) * EPD_7IN5_V2_HEIGHT;

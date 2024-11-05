@@ -543,6 +543,8 @@ void EPD_7IN5_V2_Clear(void)
 
 void EPD_7IN5_V2_ClearBlack(void)
 {
+    EPD_WaitUntilIdle();
+
     UWORD Width, Height;
     Width = (EPD_7IN5_V2_WIDTH % 8 == 0) ? (EPD_7IN5_V2_WIDTH / 8) : (EPD_7IN5_V2_WIDTH / 8 + 1);
     Height = EPD_7IN5_V2_HEIGHT;
@@ -557,6 +559,28 @@ void EPD_7IN5_V2_ClearBlack(void)
     for (i = 0; i < Height * Width; i++)
     {
         EPD_SendData(0xFF);
+    }
+    EPD_7IN5_V2_TurnOnDisplay();
+}
+
+void EPD_7IN5_V2_ClearWhite(void)
+{
+    EPD_WaitUntilIdle();
+
+    UWORD Width, Height;
+    Width = (EPD_7IN5_V2_WIDTH % 8 == 0) ? (EPD_7IN5_V2_WIDTH / 8) : (EPD_7IN5_V2_WIDTH / 8 + 1);
+    Height = EPD_7IN5_V2_HEIGHT;
+
+    UWORD i;
+    EPD_SendCommand(0x10);
+    for (i = 0; i < Height * Width; i++)
+    {
+        EPD_SendData(0x00);
+    }
+    EPD_SendCommand(0x13);
+    for (i = 0; i < Height * Width; i++)
+    {
+        EPD_SendData(0x00);
     }
     EPD_7IN5_V2_TurnOnDisplay();
 }

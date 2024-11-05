@@ -6,7 +6,7 @@
 
 bool submitLogToApi(LogApiInput &input, const char *api_url)
 {
-  String payload = "{\"log\":{\"dump\":{\"error\":" + String(input.log_buffer) + "}}}";
+  String payload = "{\"log\":" + String(input.log_buffer) + "}";
 
   WiFiClientSecure *client = new WiFiClientSecure;
   bool result = false;
