@@ -216,7 +216,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 
     if (message_type == WIFI_CONNECT)
     {
-        Log.info("%s [%d]: Display set to black\r\n", __FILE__, __LINE__);
+        Log.info("%s [%d]: Display set to white\r\n", __FILE__, __LINE__);
         EPD_7IN5_V2_ClearWhite();
         delay(1000);
     }
@@ -259,13 +259,18 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     case WIFI_CONNECT:
     {
         Log.info("%s [%d]: wifi connect case\r\n", __FILE__, __LINE__);
+
         String string1 = "FW: ";
         string1 += fw_version;
-        string1 += ". WiFi is not saved.";
-        Log.info("%s [%d]: size of string1 - %d\r\n", __FILE__, __LINE__, string1.length());
-        Paint_DrawString_EN((800 - string1.length() * 17 > 9) ? (800 - string1.length() * 17) / 2 + 9 : 0, 400, string1.c_str(), &Font24, WHITE, BLACK);
-        char string2[] = "Please connect to TRMNL WiFi";
-        Paint_DrawString_EN((800 - sizeof(string2) * 17 > 9) ? (800 - sizeof(string2) * 17) / 2 + 9 : 0, 430, string2, &Font24, WHITE, BLACK);
+        Paint_DrawString_EN((800 - string1.length() * 17 > 9) ? (800 - string1.length() * 17) / 2 + 9 : 0, 340, string1.c_str(), &Font24, WHITE, BLACK);
+        char string2[] = "Connect to WiFi network";
+        Paint_DrawString_EN((800 - sizeof(string2) * 17 > 9) ? (800 - sizeof(string2) * 17) / 2 + 9 : 0, 370, string2, &Font24, WHITE, BLACK);
+        char string3[] = "called 'TRMNL' or scan";
+        Paint_DrawString_EN((800 - sizeof(string3) * 17 > 9) ? (800 - sizeof(string3) * 17) / 2 + 9 : 0, 400, string3, &Font24, WHITE, BLACK);
+        char string4[] = "QR code on your phone.";
+        Paint_DrawString_EN((800 - sizeof(string4) * 17 > 9) ? (800 - sizeof(string4) * 17) / 2 + 9 : 0, 430, string4, &Font24, WHITE, BLACK);
+
+        Paint_DrawImage(wifi_connect_qr, 640, 320, 150, 150);
     }
     break;
     default:

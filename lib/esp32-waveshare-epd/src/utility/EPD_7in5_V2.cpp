@@ -572,11 +572,11 @@ void EPD_7IN5_V2_ClearWhite(void)
     Height = EPD_7IN5_V2_HEIGHT;
 
     UWORD i;
-    EPD_SendCommand(0x10);
-    for (i = 0; i < Height * Width; i++)
-    {
-        EPD_SendData(0x00);
-    }
+    // EPD_SendCommand(0x10);
+    // for (i = 0; i < Height * Width; i++)
+    // {
+    //     EPD_SendData(0x00);
+    // }
     EPD_SendCommand(0x13);
     for (i = 0; i < Height * Width; i++)
     {

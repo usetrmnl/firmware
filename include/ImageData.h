@@ -35,6 +35,7 @@
 #include <Arduino.h>
 
 extern const uint8_t default_icon[];
+extern const uint8_t wifi_connect_qr[];
 
 #endif
 /* FILE END */
