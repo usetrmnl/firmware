@@ -14,6 +14,7 @@
 #define PREFERENCES_SLEEP_TIME_KEY "refresh_rate"
 #define PREFERENCES_LOG_KEY "log_"
 #define PREFERENCES_LOG_BUFFER_HEAD_KEY "log_head"
+#define PREFERENCES_LOG_ID_KEY "log_id"
 #define PREFERENCES_DEVICE_REGISTRED_KEY "plugin"
 #define PREFERENCES_SF_KEY "sf"
 #define PREFERENCES_FILENAME_KEY "filename"

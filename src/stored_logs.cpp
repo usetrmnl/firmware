@@ -82,7 +82,12 @@ void gather_stored_logs(String &log, Preferences &preferences)
       if (note.length() > 0)
       {
         log += note;
-        log += ",";
+
+        String next_key = PREFERENCES_LOG_KEY + String(i+1);
+        if (preferences.isKey(next_key.c_str()))
+        {
+          log += ",";
+        }
       }
     }
   }

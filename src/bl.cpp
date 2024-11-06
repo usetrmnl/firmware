@@ -39,6 +39,7 @@ bool update_firmware = false; // need to download a new firmaware
 bool reset_firmware = false;  // need to reset credentials
 bool send_log = false;        // need to send logs
 bool double_click = false;
+bool log_retry = false; // need to log connection retry
 esp_sleep_wakeup_cause_t wakeup_reason = ESP_SLEEP_WAKEUP_UNDEFINED; // wake-up reason
 MSG current_msg = NONE;
 SPECIAL_FUNCTION special_function = SF_NONE;
@@ -65,7 +66,7 @@ static uint8_t *storedLogoOrDefault(void);
 static bool saveCurrentFileName(String &name);
 static bool checkCureentFileName(String &newName);
 static DeviceStatusStamp getDeviceStatusStamp();
-bool SerializeJsonLog(DeviceStatusStamp device_status_stamp, time_t timestamp, int codeline, const char* source_file, char* log_message);
+bool SerializeJsonLog(DeviceStatusStamp device_status_stamp, time_t timestamp, int codeline, const char* source_file, char* log_message, uint32_t log_id);
 int submitLog(const char *format, time_t time, int line, const char *file, ...);
 
 #define submit_log(format, ...) submitLog(format, getTime(), __LINE__, __FILE__, ##__VA_ARGS__);
@@ -284,6 +285,8 @@ void bl_init(void)
     Log.info("%s [%d]: API key and friendly ID saved\r\n", __FILE__, __LINE__);
   }
 
+  log_retry = true;
+
   // OTA checking, image checking and drawing
   https_request_err_e request_result = downloadAndShow(API_BASE_URL);
   Log.info("%s [%d]: request result - %d\r\n", __FILE__, __LINE__, request_result);
@@ -333,6 +336,7 @@ void bl_init(void)
       {
         Log.info("%s [%d]: Max retries done. Time to sleep: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_TO_SLEEP);
         preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+        preferences.putInt(PREFERENCES_CONNECT_RETRY_COUNT, ++retries);
         break;
       }
     }
@@ -1809,7 +1813,7 @@ DeviceStatusStamp getDeviceStatusStamp()
     return deviceStatus;
 }
 
-bool SerializeJsonLog(DeviceStatusStamp device_status_stamp, time_t timestamp, int codeline, const char* source_file, char* log_message)
+bool SerializeJsonLog(DeviceStatusStamp device_status_stamp, time_t timestamp, int codeline, const char* source_file, char* log_message, uint32_t log_id)
 {
   JsonDocument json_log;
 
@@ -1824,9 +1828,15 @@ bool SerializeJsonLog(DeviceStatusStamp device_status_stamp, time_t timestamp, i
   json_log["device_status_stamp"]["wakeup_reason"] = device_status_stamp.wakeup_reason;
   json_log["device_status_stamp"]["free_heap_size"] = device_status_stamp.free_heap_size;
 
+  json_log["log_id"] = log_id;
   json_log["log_message"] = log_message;
   json_log["log_codeline"] = codeline;
   json_log["log_sourcefile"] = source_file;
+
+  if (log_retry)
+  {
+    json_log["additional_info"]["retry_attempt"] = preferences.getInt(PREFERENCES_CONNECT_RETRY_COUNT);
+  }
 
   serializeJson(json_log, log_array);
 
@@ -1837,6 +1847,8 @@ bool SerializeJsonLog(DeviceStatusStamp device_status_stamp, time_t timestamp, i
 
 int submitLog(const char *format, time_t time, int line, const char *file, ...)
 {
+  uint32_t log_id = preferences.getUInt(PREFERENCES_LOG_ID_KEY, 1);
+
   char log_message[1024];
 
   va_list args;
@@ -1846,7 +1858,9 @@ int submitLog(const char *format, time_t time, int line, const char *file, ...)
 
   va_end(args);
 
-  SerializeJsonLog(getDeviceStatusStamp(), time, line, file, log_message);
+  SerializeJsonLog(getDeviceStatusStamp(), time, line, file, log_message, log_id);
+
+  preferences.putUInt(PREFERENCES_LOG_ID_KEY, ++log_id);
 
   return result;
 }

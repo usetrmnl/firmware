@@ -23,14 +23,14 @@ typedef struct
 
 typedef struct DeviceStatusStamp
 {
-    int wifi_rssi_level;
+    int8_t wifi_rssi_level;
     char wifi_status[30];
-    int current_sleep_time;
+    uint32_t current_sleep_time;
     char current_fw_version[10];
     char special_function[100];
     float battery_voltage;
     char wakeup_reason[30];
-    int free_heap_size;
+    uint32_t free_heap_size;
 
     ScreenStatus screen_status;
     
