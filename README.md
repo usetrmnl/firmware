@@ -284,11 +284,11 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
    - Changed API ERROR message
 
 ## **Compilation guide**
-1. Install the VScode https://code.visualstudio.com
-2. Install PlatformIO https://platformio.org/install/ide?install=vscode
-3. Install Git https://git-scm.com/book/en/v2/Appendix-A%3A-Git-in-Other-Environments-Git-in-Visual-Studio-Code
-4. Clone repository from github https://github.com/usetrmnl/firmware
-5. After cloning “Open” project in workspace
+1. Install VS Code: https://code.visualstudio.com
+2. Install PlatformIO: https://platformio.org/install/ide?install=vscode
+3. Install Git: https://git-scm.com/book/en/v2/Appendix-A%3A-Git-in-Other-Environments-Git-in-Visual-Studio-Code
+4. Clone repository: https://github.com/usetrmnl/firmware
+5. After cloning, open project in VS Code workspace
 6. After configuring the project, click on the PlatformIO -> Build button located at the bottom of the screen
 
 ![Image Alt text](/pics/build_icon.JPG "Build")
@@ -297,23 +297,19 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
 
 ![Image Alt text](/pics/console.JPG "Console")
 
-9. You can find the compiled file in the folder shown in the picture
+9. You can find the compiled file in the folder shown in the picture.
 
 ![Image Alt text](/pics/bin_folder.JPG "Bin")
 
 ## **Uploading guide (PlatformIO)**
 
-1. Connect PCB to PC using USB cable.
+1. Turn off PCB. Connect PCB to PC using USB-C cable. While holding down the boot button, turn on PCB. Let go of boot button. This puts board in flashing mode.
 
-2. Select the proper COM port from drop-down list
+2. Select the proper COM port from drop-down list (or leave on "Auto").
 
 ![Image Alt text](/pics/fs.jpg "FS")
 
-3. Click on "PlatformIO: Upload" button 
-
-> [!WARNING]
-
-> If the board does not want to be flashed, then try to enter the flashing mode manually. To do this, turn off the board using the switch, hold the button and turn on the board. After it you can try to upload firmware again
+3. Click on "PlatformIO: Upload" button.
 
 ## **Uploading guide (ESP32 Flash Download Tool)**
 
@@ -369,19 +365,7 @@ finally, set the following parameters at the bottom of the Flash Tool interface:
 
 ![Image Alt text](/pics/start.jpg "start")
 
-### Step 4 - Setup device by Mac Address
-The Flash Tool will quickly add the firmware to the TRMNL PCB, and you need to copy the “STA” value from the info panel. this is the device Mac Address:
-
-![Image Alt text](/pics/finish.jpg "finish")
-
-In this example, the device’s Mac Address is:
-> DC:DA:0C:C5:7E:4C
-
-This Mac Address should be provided to the TRMNL web application [admin panel > Devices > New Device](https://usetrmnl.com/admin/devices/new) to instantiate this device to be ‘claimed’ by a customer later, when they unbox the product.
-
-![Image Alt text](/pics/new_device.jpg "new_device")
-
-### Step 5 - Prepare for new device flashing
+### Step 4 - Prepare for new device flashing
 Inside the Flash Tool click the “STOP” button.
 
 ![Image Alt text](/pics/stop.jpg "stop")
