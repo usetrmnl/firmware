@@ -33,6 +33,7 @@ char filename[1024];      // image URL
 char binUrl[1024];        // update URL
 char log_array[1024];      // log
 char message_buffer[128]; // message to show on the screen
+uint32_t time_since_sleep;
 
 bool status = false;          // need to download a new image
 bool update_firmware = false; // need to download a new firmaware
@@ -52,7 +53,7 @@ static void getDeviceCredentials(const char *url);           // receiveing API k
 static void resetDeviceCredentials(void);                    // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
 static void checkAndPerformFirmwareUpdate(void);             // OTA update
 static void goToSleep(void);                                 // sleep preparing
-static void setClock(void);                                  // clock synchrinization
+static bool setClock(void);                                  // clock synchrinization
 static float readBatteryVoltage(void);                       // battery voltage reading
 static void log_POST(char *log_buffer, size_t size);         // log sending
 static void handleRoute(void);
@@ -203,6 +204,7 @@ void bl_init(void)
   {
     Log.info("%s [%d]: Display clear\r\n", __FILE__, __LINE__);
     display_reset();
+    preferences.putString(PREFERENCES_FILENAME_KEY, "");
   }
 
   // Mount SPIFFS
@@ -272,7 +274,18 @@ void bl_init(void)
   }
 
   // clock synchronization
-  setClock();
+  if (setClock())
+  {
+    time_since_sleep = preferences.getUInt(PREFERENCES_LAST_SLEEP_TIME, 0);
+    time_since_sleep = time_since_sleep ? getTime() - time_since_sleep : 0;
+  }
+  else
+  {
+    time_since_sleep = 0;
+    Log.info("%s [%d]: Time wasn't synced.\r\n", __FILE__, __LINE__);
+  }
+
+  Log.info("%s [%d]: Time since last sleep: %d\r\n", __FILE__, __LINE__, time_since_sleep);
 
   if (!preferences.isKey(PREFERENCES_API_KEY) || !preferences.isKey(PREFERENCES_FRIENDLY_ID))
   {
@@ -646,7 +659,7 @@ static https_request_err_e downloadAndShow(const char *url)
 
                     // Print the extracted string
                     Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, extractedString.c_str());
-                    if (!checkCureentFileName(extractedString) || wakeup_reason == ESP_SLEEP_WAKEUP_GPIO || wakeup_reason == ESP_SLEEP_WAKEUP_UNDEFINED)
+                    if (!checkCureentFileName(extractedString))
                     {
                       Log.info("%s [%d]: New image. Show it.\r\n", __FILE__, __LINE__);
                       status = true;
@@ -1566,6 +1579,7 @@ static void goToSleep(void)
   if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))
     time_to_sleep = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
   Log.info("%s [%d]: time to sleep - %d\r\n", __FILE__, __LINE__, time_to_sleep);
+  preferences.putUInt(PREFERENCES_LAST_SLEEP_TIME, getTime());
   preferences.end();
   esp_sleep_enable_timer_wakeup(time_to_sleep * SLEEP_uS_TO_S_FACTOR);
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT,
@@ -1580,20 +1594,28 @@ static void goToSleep(void)
  * @param none
  * @return none
  */
-static void setClock()
+static bool setClock()
 {
-  Log.info("%s [%d]: Time synchronization... Attempt 1...\r\n", __FILE__, __LINE__);
-  configTime(0, 0, "pool.ntp.org", "time.google.com", "time.windows.com");
-  delay(500);
-
-  // Wait for time to be set
+  bool sync_status = false;
   struct tm timeinfo;
-  if (!getLocalTime(&timeinfo))
+
+  configTime(0, 0, "pool.ntp.org", "time.google.com", "time.windows.com");
+  Log.info("%s [%d]: Time synchronization...\r\n", __FILE__, __LINE__);
+  
+  // Wait for time to be set
+  if (getLocalTime(&timeinfo))
   {
-    Log.info("%s [%d]: Time synchronization failed... Attempt 2...\r\n", __FILE__, __LINE__);
+    sync_status = true;
+    Log.info("%s [%d]: Time synchronization succeed!\r\n", __FILE__, __LINE__);
+  }
+  else
+  {
+    Log.info("%s [%d]: Time synchronization failed...\r\n", __FILE__, __LINE__);
   }
 
   Log.info("%s [%d]: Current time - %s\r\n", __FILE__, __LINE__, asctime(&timeinfo));
+
+  return sync_status;
 }
 
 /**
@@ -1649,7 +1671,7 @@ static uint32_t getTime(void)
 {
   time_t now;
   struct tm timeinfo;
-  if (!getLocalTime(&timeinfo))
+  if (!getLocalTime(&timeinfo, 200))
   {
     Log.info("%s [%d]: Failed to obtain time. \r\n", __FILE__, __LINE__);
     return (0);
@@ -1803,7 +1825,8 @@ DeviceStatusStamp getDeviceStatusStamp()
 
     deviceStatus.wifi_rssi_level = WiFi.RSSI();
     parseWifiStatusToStr(deviceStatus.wifi_status, sizeof(deviceStatus.wifi_status), WiFi.status());
-    deviceStatus.current_sleep_time = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY);
+    deviceStatus.refresh_rate = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY);
+    deviceStatus.time_since_last_sleep = time_since_sleep;
     snprintf(deviceStatus.current_fw_version, sizeof(deviceStatus.current_fw_version), "%d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
     parseSpecialFunctionToStr(deviceStatus.special_function, special_function);
     deviceStatus.battery_voltage = readBatteryVoltage();
@@ -1821,7 +1844,8 @@ bool SerializeJsonLog(DeviceStatusStamp device_status_stamp, time_t timestamp, i
 
   json_log["device_status_stamp"]["wifi_rssi_level"] = device_status_stamp.wifi_rssi_level;
   json_log["device_status_stamp"]["wifi_status"] = device_status_stamp.wifi_status;
-  json_log["device_status_stamp"]["current_sleep_time"] = device_status_stamp.current_sleep_time;
+  json_log["device_status_stamp"]["refresh_rate"] = device_status_stamp.refresh_rate;
+  json_log["device_status_stamp"]["time_since_last_sleep_start"] = device_status_stamp.time_since_last_sleep;
   json_log["device_status_stamp"]["current_fw_version"] = device_status_stamp.current_fw_version;
   json_log["device_status_stamp"]["special_function"] = device_status_stamp.special_function;
   json_log["device_status_stamp"]["battery_voltage"] = device_status_stamp.battery_voltage;

@@ -283,6 +283,12 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
    - Renewed logs
    - Changed API ERROR message
 
+[v.1.4.1]
+   - Added white screen before wifi connect message
+   - Added QR code to wifi captive image and changed text
+   - Updated logs, added new fields and fixed some bugs
+
+
 ## **Compilation guide**
 1. Install VS Code: https://code.visualstudio.com
 2. Install PlatformIO: https://platformio.org/install/ide?install=vscode

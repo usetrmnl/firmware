@@ -263,14 +263,14 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         String string1 = "FW: ";
         string1 += fw_version;
         Paint_DrawString_EN((800 - string1.length() * 17 > 9) ? (800 - string1.length() * 17) / 2 + 9 : 0, 340, string1.c_str(), &Font24, WHITE, BLACK);
-        char string2[] = "Connect to WiFi network";
+        char string2[] = "Connect phone or computer";
         Paint_DrawString_EN((800 - sizeof(string2) * 17 > 9) ? (800 - sizeof(string2) * 17) / 2 + 9 : 0, 370, string2, &Font24, WHITE, BLACK);
-        char string3[] = "called 'TRMNL' or scan";
+        char string3[] = "to \"TRMNL\" WiFi network";
         Paint_DrawString_EN((800 - sizeof(string3) * 17 > 9) ? (800 - sizeof(string3) * 17) / 2 + 9 : 0, 400, string3, &Font24, WHITE, BLACK);
-        char string4[] = "QR code on your phone.";
+        char string4[] = "or scan QR code for help.";
         Paint_DrawString_EN((800 - sizeof(string4) * 17 > 9) ? (800 - sizeof(string4) * 17) / 2 + 9 : 0, 430, string4, &Font24, WHITE, BLACK);
 
-        Paint_DrawImage(wifi_connect_qr, 640, 320, 150, 150);
+        Paint_DrawImage(wifi_connect_qr, 640, 337, 130, 130);
     }
     break;
     default:

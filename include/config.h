@@ -3,7 +3,7 @@
 
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 4
-#define FW_PATCH_VERSION 0
+#define FW_PATCH_VERSION 1
 
 #define LOG_MAX_NOTES_NUMBER 5
 
@@ -18,6 +18,7 @@
 #define PREFERENCES_DEVICE_REGISTRED_KEY "plugin"
 #define PREFERENCES_SF_KEY "sf"
 #define PREFERENCES_FILENAME_KEY "filename"
+#define PREFERENCES_LAST_SLEEP_TIME "last_sleep"
 #define PREFERENCES_CONNECT_RETRY_COUNT "retry_count"
 
 #define WIFI_CONNECTION_RSSI (-100)

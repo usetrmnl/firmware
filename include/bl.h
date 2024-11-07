@@ -25,7 +25,8 @@ typedef struct DeviceStatusStamp
 {
     int8_t wifi_rssi_level;
     char wifi_status[30];
-    uint32_t current_sleep_time;
+    uint32_t refresh_rate;
+    uint32_t time_since_last_sleep;
     char current_fw_version[10];
     char special_function[100];
     float battery_voltage;

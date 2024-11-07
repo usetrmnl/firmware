@@ -52,14 +52,14 @@ static const WifiStatusNode wifiStatusMap[] = {
 };
 
 static const WakeupReasonNode wakeupReasonMap[] = {
-    {"undefined", ESP_SLEEP_WAKEUP_UNDEFINED},
+    {"powercycle", ESP_SLEEP_WAKEUP_UNDEFINED},
     {"all", ESP_SLEEP_WAKEUP_ALL},
     {"EXT0", ESP_SLEEP_WAKEUP_EXT0},
     {"EXT1", ESP_SLEEP_WAKEUP_EXT1},
     {"timer", ESP_SLEEP_WAKEUP_TIMER},
     {"touchpad", ESP_SLEEP_WAKEUP_TOUCHPAD},
     {"ulp", ESP_SLEEP_WAKEUP_ULP},
-    {"gpio", ESP_SLEEP_WAKEUP_GPIO},
+    {"button", ESP_SLEEP_WAKEUP_GPIO},
     {"uart", ESP_SLEEP_WAKEUP_UART},
     {"wifi", ESP_SLEEP_WAKEUP_WIFI},
     {"cocpu", ESP_SLEEP_WAKEUP_COCPU},
