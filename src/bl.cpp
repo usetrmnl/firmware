@@ -215,17 +215,19 @@ void bl_init(void)
   {
     // WiFi saved, connection
     Log.info("%s [%d]: WiFi saved\r\n", __FILE__, __LINE__);
-    WifiCaptivePortal.autoConnect();
-    Log.infoln("");
+    int connection_res = WifiCaptivePortal.autoConnect();
+
+    Log.info("%s [%d]: Connection result: %d, WiFI Status: %d\r\n", __FILE__, __LINE__, connection_res, WiFi.status());
+
     // Check if connected
-    if (WiFi.status() == WL_CONNECTED)
+    if (connection_res)
     {
       String ip = String(WiFi.localIP());
       Log.info("%s [%d]:wifi_connection [DEBUG]: Connected: %s\r\n", __FILE__, __LINE__, ip.c_str());
     }
     else
     {
-      Log.fatal("%s [%d]: Connection failed!\r\n", __FILE__, __LINE__);
+      Log.fatal("%s [%d]: Connection failed! WL Status: %d\r\n", __FILE__, __LINE__, WiFi.status());
 
       if (current_msg != WIFI_FAILED)
       {
@@ -233,9 +235,10 @@ void bl_init(void)
         current_msg = WIFI_FAILED;
       }
 
-      submit_log("wifi connection failed with WL Status: %d, current sleep time: %d", WiFi.status(), preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY));
+      submit_log("wifi connection failed, current WL Status: %d", WiFi.status());
 
       // Go to deep sleep
+      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NO_WIFI);
       display_sleep();
       goToSleep();
     }
@@ -267,6 +270,7 @@ void bl_init(void)
       submit_log("connection to the new WiFi failed");
 
       // Go to deep sleep
+      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NO_WIFI);
       display_sleep();
       goToSleep();
     }
@@ -277,7 +281,7 @@ void bl_init(void)
   if (setClock())
   {
     time_since_sleep = preferences.getUInt(PREFERENCES_LAST_SLEEP_TIME, 0);
-    time_since_sleep = time_since_sleep ? getTime() - time_since_sleep : 0;
+    time_since_sleep = time_since_sleep ? getTime() - time_since_sleep : 0; // may be can be used even if no sync
   }
   else
   {
@@ -1020,7 +1024,7 @@ static https_request_err_e downloadAndShow(const char *url)
         {
           Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
           result = HTTPS_RESPONSE_CODE_INVALID;
-          submit_log("HTTPS returned code is less then 0. Code: %d", httpCode);
+          submit_log("HTTP Client failed with error: %s", https.errorToString(httpCode).c_str());
         }
 
         https.end();
@@ -1199,17 +1203,17 @@ static https_request_err_e downloadAndShow(const char *url)
             }
             else
             {
-              Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
+              Log.error("%s [%d]: [HTTPS] GET... failed, code: %d (%s)\r\n", __FILE__, __LINE__, httpCode, https.errorToString(httpCode).c_str());
 
               result = HTTPS_REQUEST_FAILED;
-              submit_log("HTTPS returned code is not OK. Code - %d", httpCode);
+              submit_log("HTTPS returned code is not OK. Code: %d", httpCode);
             }
           }
           else
           {
-            Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
+            Log.error("%s [%d]: [HTTPS] GET... failed, error: %d (%s)\r\n", __FILE__, __LINE__, httpCode, https.errorToString(httpCode).c_str());
 
-            submit_log("HTTPS request failed with error - %d, %s", httpCode, https.errorToString(httpCode).c_str());
+            submit_log("HTTP Client failed with error: %s", https.errorToString(httpCode).c_str());
 
             result = HTTPS_REQUEST_FAILED;
           }
@@ -1354,7 +1358,7 @@ static void getDeviceCredentials(const char *url)
           {
             showMessageWithLogo(WIFI_WEAK);
           }
-          submit_log("HTTPS returned code is less then 0. Code - %d", httpCode);
+          submit_log("HTTP Client failed with error: %s", https.errorToString(httpCode).c_str());
         }
 
         https.end();
@@ -1434,7 +1438,7 @@ static void getDeviceCredentials(const char *url)
               {
                 showMessageWithLogo(WIFI_WEAK);
               }
-              submit_log("HTTPS received code is not OK. Code - %d", httpCode);
+              submit_log("HTTPS received code is not OK. Code: %d", httpCode);
             }
           }
           else
@@ -1448,7 +1452,7 @@ static void getDeviceCredentials(const char *url)
             {
               showMessageWithLogo(WIFI_WEAK);
             }
-            submit_log("HTTPS returned code is less then 0. Code - %d", httpCode);
+            submit_log("HTTP Client failed with error: %s", https.errorToString(httpCode).c_str());
           }
         }
         else

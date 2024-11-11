@@ -27,7 +27,7 @@
 // Define the maximum number of connection attempts
 #define WIFI_CONNECTION_ATTEMPTS 3
 // Define max connection timeout
-#define CONNECTION_TIMEOUT 5000
+#define CONNECTION_TIMEOUT 15000
 // Local IP URL
 #define LocalIPURL "http://4.3.2.1"
 

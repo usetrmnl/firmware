@@ -256,21 +256,13 @@ void WifiCaptive::resetSettings()
 
 uint8_t WifiCaptive::connect(String ssid, String pass)
 {
-    uint8_t retry = 1;
     uint8_t connRes = (uint8_t)WL_NO_SSID_AVAIL;
 
-    while (retry <= WIFI_CONNECTION_ATTEMPTS && (connRes != WL_CONNECTED))
+    if (ssid != "")
     {
-        delay(500);
-        
-        if (ssid != "")
-        {
-            WiFi.enableSTA(true);
-            WiFi.begin(ssid.c_str(), pass.c_str());
-            connRes = waitForConnectResult();
-        }
-
-        retry++;
+        WiFi.enableSTA(true);
+        WiFi.begin(ssid.c_str(), pass.c_str());
+        connRes = waitForConnectResult();
     }
 
     return connRes;

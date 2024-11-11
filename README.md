@@ -288,6 +288,10 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
    - Added QR code to wifi captive image and changed text
    - Updated logs, added new fields and fixed some bugs
 
+[v.1.4.2]
+   - Test fix of wifi connection failure on some devices
+   - Defined device sleep time after failed connection (60 sec)
+
 
 ## **Compilation guide**
 1. Install VS Code: https://code.visualstudio.com
