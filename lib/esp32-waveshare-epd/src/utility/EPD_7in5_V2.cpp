@@ -272,11 +272,19 @@ parameter:
 ******************************************************************************/
 static void EPD_Reset(void)
 {
-    DEV_Digital_Write(EPD_RST_PIN, 1);
+    //DEV_Digital_Write(EPD_RST_PIN, 1);
+    REG_WRITE(GPIO_OUT_W1TS_REG, 1 << EPD_RST_PIN);
+
     DEV_Delay_ms(200);
-    DEV_Digital_Write(EPD_RST_PIN, 0);
+    
+    //DEV_Digital_Write(EPD_RST_PIN, 0);
+    REG_WRITE(GPIO_OUT_W1TC_REG, 1 << EPD_RST_PIN);
+
     DEV_Delay_ms(2);
-    DEV_Digital_Write(EPD_RST_PIN, 1);
+
+    //DEV_Digital_Write(EPD_RST_PIN, 1);
+    REG_WRITE(GPIO_OUT_W1TS_REG, 1 << EPD_RST_PIN);
+
     DEV_Delay_ms(200);
 }
 
@@ -287,10 +295,13 @@ parameter:
 ******************************************************************************/
 static void EPD_SendCommand(UBYTE Reg)
 {
-    DEV_Digital_Write(EPD_DC_PIN, 0);
-    DEV_Digital_Write(EPD_CS_PIN, 0);
+    //DEV_Digital_Write(EPD_DC_PIN, 0);
+    REG_WRITE(GPIO_OUT_W1TC_REG, 1 << EPD_DC_PIN);
+
     DEV_SPI_WriteByte(Reg);
-    DEV_Digital_Write(EPD_CS_PIN, 1);
+
+    //DEV_Digital_Write(EPD_CS_PIN, 1);
+    //REG_WRITE(GPIO_OUT_W1TS_REG, 1 << EPD_CS_PIN);
 }
 
 /******************************************************************************
@@ -300,10 +311,9 @@ parameter:
 ******************************************************************************/
 static void EPD_SendData(UBYTE Data)
 {
-    DEV_Digital_Write(EPD_DC_PIN, 1);
-    DEV_Digital_Write(EPD_CS_PIN, 0);
+    REG_WRITE(GPIO_OUT_W1TS_REG, 1 << EPD_DC_PIN);
+
     DEV_SPI_WriteByte(Data);
-    DEV_Digital_Write(EPD_CS_PIN, 1);
 }
 
 static void EPD_SendData2(uint16_t Data)
@@ -324,11 +334,12 @@ static void EPD_WaitUntilIdle(void)
     unsigned char busy;
     do
     {
-        EPD_SendCommand(0x71);
-        busy = DEV_Digital_Read(EPD_BUSY_PIN);
-        busy = !(busy & 0x01);
-    } while (busy);
-    DEV_Delay_ms(200);
+        delayMicroseconds(100);
+        //EPD_SendCommand(0x71);
+        //busy = DEV_Digital_Read(EPD_BUSY_PIN);
+        busy = gpio_get_level( (gpio_num_t)EPD_BUSY_PIN );
+    } while (!busy);
+    // DEV_Delay_ms(200);
     Debug("e-Paper busy release\r\n");
 }
 
@@ -364,7 +375,7 @@ parameter:
 static void EPD_7IN5_V2_TurnOnDisplay(void)
 {
     EPD_SendCommand(0x12); // DISPLAY REFRESH
-    DEV_Delay_ms(100);     //!!!The delay here is necessary, 200uS at least!!!
+    delayMicroseconds(500);    //!!!The delay here is necessary, 200uS at least!!!
     //EPD_WaitUntilIdle();
 }
 
@@ -550,11 +561,11 @@ void EPD_7IN5_V2_ClearBlack(void)
     Height = EPD_7IN5_V2_HEIGHT;
 
     UWORD i;
-    EPD_SendCommand(0x10);
-    for (i = 0; i < Height * Width; i++)
-    {
-        EPD_SendData(0x00);
-    }
+    // EPD_SendCommand(0x10);
+    // for (i = 0; i < Height * Width; i++)
+    // {
+    //     EPD_SendData(0x00);
+    // }
     EPD_SendCommand(0x13);
     for (i = 0; i < Height * Width; i++)
     {
@@ -596,14 +607,15 @@ void EPD_7IN5_V2_Display(const UBYTE *blackimage)
     Width = (EPD_7IN5_V2_WIDTH % 8 == 0) ? (EPD_7IN5_V2_WIDTH / 8) : (EPD_7IN5_V2_WIDTH / 8 + 1);
     Height = EPD_7IN5_V2_HEIGHT;
 
-    EPD_SendCommand(0x10);
-    for (UDOUBLE j = 0; j < Height; j++)
-    {
-        for (UDOUBLE i = 0; i < Width; i++)
-        {
-            EPD_SendData(blackimage[i + j * Width]);
-        }
-    }
+    // EPD_SendCommand(0x10);
+    // for (UDOUBLE j = 0; j < Height; j++)
+    // {
+    //     for (UDOUBLE i = 0; i < Width; i++)
+    //     {
+    //         EPD_SendData(~blackimage[i + j * Width]);
+    //     }
+    // }
+    
     // send black data
     EPD_SendCommand(0x13);
     for (UDOUBLE j = 0; j < Height; j++)

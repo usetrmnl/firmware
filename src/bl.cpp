@@ -63,6 +63,7 @@ static void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size);
 static uint32_t getTime(void);
 static void showMessageWithLogo(MSG message_type);
 static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message);
+static void wifiErrorDeepSleep();
 static uint8_t *storedLogoOrDefault(void);
 static bool saveCurrentFileName(String &name);
 static bool checkCureentFileName(String &newName);
@@ -202,8 +203,9 @@ void bl_init(void)
 
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
   {
-    Log.info("%s [%d]: Display clear\r\n", __FILE__, __LINE__);
-    display_reset();
+    Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
+    display_show_image(storedLogoOrDefault(), false);
+    Log.info("%s [%d]: Display TRMNL logo end\r\n", __FILE__, __LINE__);
     preferences.putString(PREFERENCES_FILENAME_KEY, "");
   }
 
@@ -224,6 +226,7 @@ void bl_init(void)
     {
       String ip = String(WiFi.localIP());
       Log.info("%s [%d]:wifi_connection [DEBUG]: Connected: %s\r\n", __FILE__, __LINE__, ip.c_str());
+      preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);
     }
     else
     {
@@ -238,9 +241,7 @@ void bl_init(void)
       submit_log("wifi connection failed, current WL Status: %d", WiFi.status());
 
       // Go to deep sleep
-      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NO_WIFI);
-      display_sleep();
-      goToSleep();
+      wifiErrorDeepSleep();
     }
   }
   else
@@ -270,11 +271,10 @@ void bl_init(void)
       submit_log("connection to the new WiFi failed");
 
       // Go to deep sleep
-      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NO_WIFI);
-      display_sleep();
-      goToSleep();
+      wifiErrorDeepSleep();
     }
     Log.info("%s [%d]: WiFi connected\r\n", __FILE__, __LINE__);
+    preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);
   }
 
   // clock synchronization
@@ -308,61 +308,53 @@ void bl_init(void)
   https_request_err_e request_result = downloadAndShow(API_BASE_URL);
   Log.info("%s [%d]: request result - %d\r\n", __FILE__, __LINE__, request_result);
 
-  if (!preferences.isKey(PREFERENCES_CONNECT_RETRY_COUNT))
-    {
-      preferences.putInt(PREFERENCES_CONNECT_RETRY_COUNT, 1);
-    }
+  if (!preferences.isKey(PREFERENCES_CONNECT_API_RETRY_COUNT))
+  {
+    preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, 1);
+  }
 
   if (request_result != HTTPS_SUCCES && request_result != HTTPS_NO_REGISTER && request_result != HTTPS_RESET && request_result != HTTPS_PLUGIN_NOT_ATTACHED)
   {
-    uint8_t retries = preferences.getInt(PREFERENCES_CONNECT_RETRY_COUNT);
+    uint8_t retries = preferences.getInt(PREFERENCES_CONNECT_API_RETRY_COUNT);
 
     switch (retries)
     {
-      case 1:
-      {
-        Log.info("%s [%d]: retry: %d - time to sleep: %d\r\n", __FILE__, __LINE__, retries, API_CONNECT_RETRY_TIME::FIRST_RETRY);
-        res = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, API_CONNECT_RETRY_TIME::FIRST_RETRY);
-        preferences.putInt(PREFERENCES_CONNECT_RETRY_COUNT, ++retries);
-        display_sleep();
-        goToSleep();
-        break;
-      }
+    case 1:
+      Log.info("%s [%d]: retry: %d - time to sleep: %d\r\n", __FILE__, __LINE__, retries, API_CONNECT_RETRY_TIME::API_FIRST_RETRY);
+      res = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, API_CONNECT_RETRY_TIME::API_FIRST_RETRY);
+      preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, ++retries);
+      display_sleep();
+      goToSleep();
+      break;
 
-      case 2:
-      {
-        Log.info("%s [%d]: retry:%d - time to sleep: %d\r\n", __FILE__, __LINE__, retries, API_CONNECT_RETRY_TIME::SECOND_RETRY);
-        res = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, API_CONNECT_RETRY_TIME::SECOND_RETRY);
-        preferences.putInt(PREFERENCES_CONNECT_RETRY_COUNT, ++retries);
-        display_sleep();
-        goToSleep();
-        break;
-      }
+    case 2:
+      Log.info("%s [%d]: retry:%d - time to sleep: %d\r\n", __FILE__, __LINE__, retries, API_CONNECT_RETRY_TIME::API_SECOND_RETRY);
+      res = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, API_CONNECT_RETRY_TIME::API_SECOND_RETRY);
+      preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, ++retries);
+      display_sleep();
+      goToSleep();
+      break;
 
-      case 3:
-      {
-        Log.info("%s [%d]: retry:%d - time to sleep: %d\r\n", __FILE__, __LINE__, retries, API_CONNECT_RETRY_TIME::THIRD_RETRY);
-        res = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, API_CONNECT_RETRY_TIME::THIRD_RETRY);
-        preferences.putInt(PREFERENCES_CONNECT_RETRY_COUNT, ++retries);
-        display_sleep();
-        goToSleep();
-        break;
-      }
+    case 3:
+      Log.info("%s [%d]: retry:%d - time to sleep: %d\r\n", __FILE__, __LINE__, retries, API_CONNECT_RETRY_TIME::API_THIRD_RETRY);
+      res = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, API_CONNECT_RETRY_TIME::API_THIRD_RETRY);
+      preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, ++retries);
+      display_sleep();
+      goToSleep();
+      break;
 
-      default:
-      {
-        Log.info("%s [%d]: Max retries done. Time to sleep: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_TO_SLEEP);
-        preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
-        preferences.putInt(PREFERENCES_CONNECT_RETRY_COUNT, ++retries);
-        break;
-      }
+    default:
+      Log.info("%s [%d]: Max retries done. Time to sleep: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_TO_SLEEP);
+      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+      preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, ++retries);
+      break;
     }
   }
 
   else
   {
     Log.info("%s [%d]: Connection done successfully. Retries counter reseted.\r\n", __FILE__, __LINE__);
-    preferences.putInt(PREFERENCES_CONNECT_RETRY_COUNT, 1);
+    preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, 1);
   }
 
   if (request_result == HTTPS_NO_REGISTER && need_to_refresh_display == 1)
@@ -1820,6 +1812,41 @@ static bool checkCureentFileName(String &newName)
   }
 }
 
+static void wifiErrorDeepSleep()
+{
+  if (!preferences.isKey(PREFERENCES_CONNECT_WIFI_RETRY_COUNT))
+  {
+    preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, 1);
+  }
+
+  uint8_t retry_count = preferences.getInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT);
+
+  Log_info("WIFI connection failed! Retry count: %d \n", retry_count);
+
+  switch (retry_count){
+  case 1:
+    preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, WIFI_CONNECT_RETRY_TIME::WIFI_FIRST_RETRY);
+    break;
+
+  case 2:
+    preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, WIFI_CONNECT_RETRY_TIME::WIFI_SECOND_RETRY);
+    break;
+
+  case 3:
+    preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, WIFI_CONNECT_RETRY_TIME::WIFI_THIRD_RETRY);
+    break;
+
+  default:
+    preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+    break;
+  }
+  retry_count++;
+  preferences.putInt(PREFERENCES_CONNECT_WIFI_RETRY_COUNT, retry_count);
+
+  display_sleep();
+  goToSleep();
+}
+
 DeviceStatusStamp getDeviceStatusStamp()
 {
     DeviceStatusStamp deviceStatus = {};
@@ -1863,7 +1890,7 @@ bool SerializeJsonLog(DeviceStatusStamp device_status_stamp, time_t timestamp, i
 
   if (log_retry)
   {
-    json_log["additional_info"]["retry_attempt"] = preferences.getInt(PREFERENCES_CONNECT_RETRY_COUNT);
+    json_log["additional_info"]["retry_attempt"] = preferences.getInt(PREFERENCES_CONNECT_API_RETRY_COUNT);
   }
 
   serializeJson(json_log, log_array);

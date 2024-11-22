@@ -292,6 +292,11 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
    - Test fix of wifi connection failure on some devices
    - Defined device sleep time after failed connection (60 sec)
 
+[v.1.4.3]
+   - Static device sleep time after failed wifi connection changed to progressive
+   - Made several optimizations to make power cycle last faster (~2.5 seconds)
+   - Changed "snow" image to TRMNL logo  
+
 
 ## **Compilation guide**
 1. Install VS Code: https://code.visualstudio.com

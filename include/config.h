@@ -3,7 +3,7 @@
 
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 4
-#define FW_PATCH_VERSION 2
+#define FW_PATCH_VERSION 3
 
 #define LOG_MAX_NOTES_NUMBER 5
 
@@ -19,7 +19,8 @@
 #define PREFERENCES_SF_KEY "sf"
 #define PREFERENCES_FILENAME_KEY "filename"
 #define PREFERENCES_LAST_SLEEP_TIME "last_sleep"
-#define PREFERENCES_CONNECT_RETRY_COUNT "retry_count"
+#define PREFERENCES_CONNECT_API_RETRY_COUNT "retry_count"
+#define PREFERENCES_CONNECT_WIFI_RETRY_COUNT "wifi_retry"
 
 #define WIFI_CONNECTION_RSSI (-100)
 
@@ -27,15 +28,21 @@
 
 #define SLEEP_uS_TO_S_FACTOR 1000000 /* Conversion factor for micro seconds to seconds */
 #define SLEEP_TIME_TO_SLEEP 900        /* Time ESP32 will go to sleep (in seconds) */
-#define SLEEP_TIME_WHILE_NO_WIFI 60         /* Time ESP will sleep if could not connect to the WiFi */
 #define SLEEP_TIME_WHILE_NOT_CONNECTED 5        /* Time ESP32 will go to sleep (in seconds) */
 #define SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED 5        /* Time ESP32 will go to sleep (in seconds) */
 
 enum API_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the API (in seconds)
 {
-    FIRST_RETRY = 5,
-    SECOND_RETRY = 10,
-    THIRD_RETRY = 30
+    API_FIRST_RETRY = 5,
+    API_SECOND_RETRY = 10,
+    API_THIRD_RETRY = 30
+};
+
+enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi-Fi (in seconds)
+{
+    WIFI_FIRST_RETRY = 60,
+    WIFI_SECOND_RETRY = 180,
+    WIFI_THIRD_RETRY = 300
 };
 
 #define PIN_RESET 9
