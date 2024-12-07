@@ -299,6 +299,9 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
 
 
 ## **Compilation guide**
+
+(If you prefer to skip this build step and simply grab the prepared bin file, download the latest build here: https://usetrmnl.com/api/firmware/latest)
+
 1. Install VS Code: https://code.visualstudio.com
 2. Install PlatformIO: https://platformio.org/install/ide?install=vscode
 3. Install Git: https://git-scm.com/book/en/v2/Appendix-A%3A-Git-in-Other-Environments-Git-in-Visual-Studio-Code
@@ -320,7 +323,7 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
 
 1. Turn off PCB. Connect PCB to PC using USB-C cable. While holding down the boot button, turn on PCB. Let go of boot button. This puts board in flashing mode.
 
-2. Select the proper COM port from drop-down list (or leave on "Auto").
+2. Mac/Windows: Select the proper COM port from drop-down list (or leave on "Auto"). Ubuntu: Look for something like "/dev/ttyACMO USB JTAG/serial debug unit" or "Espressif USB JTAG/serial debug unit" via lsusb.
 
 ![Image Alt text](/pics/fs.jpg "FS")
 
