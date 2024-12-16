@@ -264,7 +264,7 @@ void bl_init(void)
     {
       Log.error("%s [%d]: Failed to connect or hit timeout\r\n", __FILE__, __LINE__);
 
-      WiFi.disconnect();
+      WiFi.disconnect(true);
 
       showMessageWithLogo(WIFI_FAILED);
 
@@ -940,6 +940,7 @@ static https_request_err_e downloadAndShow(const char *url)
                 case SF_SEND_TO_ME:
                 {
                   String action = apiResponse.action;
+
                   if (action.equals("send_to_me"))
                   {
                     status = false;
@@ -1062,28 +1063,27 @@ static https_request_err_e downloadAndShow(const char *url)
 
                 uint32_t timer = millis();
                 while (stream->available() < 4000 && millis() - timer < 1000)
-                  ;
+                ;
 
                 Log.info("%s [%d]: Stream available: %d\r\n", __FILE__, __LINE__, stream->available());
+
                 //  Read and save BMP data to buffer
+                unsigned long download_start = millis();
+                int iteration_counter = 0;
 
-                if (stream->available() && https.getSize() == DISPLAY_BMP_IMAGE_SIZE)
+                Log.info("%s [%d]: Starting a download at: %d\r\n", __FILE__, __LINE__, getTime());
+                while (counter != DISPLAY_BMP_IMAGE_SIZE && millis() - download_start < 10000)
                 {
-                  for (int retry = 0; retry < 3 && counter != DISPLAY_BMP_IMAGE_SIZE; retry++)
+                  if (stream->available())
                   {
-                    Log.info("%s [%d]: Available before read: %d \r\n", __FILE__, __LINE__, stream->available());
+                    Log.info("%s [%d]: Downloading... Available bytes: %d\r\n", __FILE__, __LINE__, stream->available());
                     counter += stream->readBytes(buffer + counter, sizeof(buffer) - counter);
-                    Log.info("%s [%d]: Retry: %d, counter: %d, available: %d \r\n", __FILE__, __LINE__, retry, counter, stream->available());
-                    if (counter == DISPLAY_BMP_IMAGE_SIZE)
-                    {
-                      break;
-                    }
-
-                    timer = millis();
-                    while (stream->available() < 1000 && millis() - timer < 1000)
-                    ;
+                    iteration_counter++;
                   }
+
+                  delay(10);
                 }
+                Log.info("%s [%d]: Ending a download at: %d, in %d iterations\r\n", __FILE__, __LINE__, getTime(), iteration_counter);
 
                 if (counter == DISPLAY_BMP_IMAGE_SIZE)
                 {
@@ -1179,7 +1179,7 @@ static https_request_err_e downloadAndShow(const char *url)
                   Log.error("%s [%d]: Receiving failed. Readed: %d\r\n", __FILE__, __LINE__, counter);
 
                   // display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
-                  submit_log("HTTPS request error. Returned code - %d, available bytes - %d, received bytes - %d", httpCode, https.getSize(), counter);
+                  submit_log("HTTPS request error. Returned code - %d, available bytes - %d, received bytes - %d in %d iterations", httpCode, https.getSize(), counter, iteration_counter);
 
                   result = HTTPS_WRONG_IMAGE_SIZE;
                 }
@@ -1317,6 +1317,16 @@ static void getDeviceCredentials(const char *url)
               message_str.toCharArray(message_buffer, message_str.length() + 1);
 
               Log.info("%s [%d]: status - %d\r\n", __FILE__, __LINE__, status);
+            }
+            else if (url_status == 404 && apiResponse.message == "MAC Address not registered")
+            {
+              Log.info("%s [%d]: MAC Address is not registered on server\r\n", __FILE__, __LINE__);
+              showMessageWithLogo(MAC_NOT_REGISTERED);
+
+              preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+
+              display_sleep();
+              goToSleep();
             }
             else
             {
@@ -1570,6 +1580,7 @@ static void checkAndPerformFirmwareUpdate(void)
  */
 static void goToSleep(void)
 {
+  WiFi.disconnect(true);
   filesystem_deinit();
   uint32_t time_to_sleep = SLEEP_TIME_TO_SLEEP;
   if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))

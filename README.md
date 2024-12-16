@@ -295,7 +295,13 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
 [v.1.4.3]
    - Static device sleep time after failed wifi connection changed to progressive
    - Made several optimizations to make power cycle last faster (~2.5 seconds)
-   - Changed "snow" image to TRMNL logo  
+   - Changed "snow" image to TRMNL logo 
+
+[v.1.4.4]
+   - Fix of "send_to_me" special function
+   - Added QR code for error messages related to Wi-Fi
+   - Added "MAC Address not registered" handling and screen
+   - Experimental Wi-FI connection and downloading issues fixes
 
 
 ## **Compilation guide**

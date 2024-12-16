@@ -499,6 +499,8 @@ bool WifiCaptive::autoConnect()
 
     if (_lastUsed.ssid != "") {
         Log.info("Trying to connect to last used %s...\r\n", _lastUsed.ssid.c_str());
+        WiFi.setSleep(0);
+        WiFi.setMinSecurity(WIFI_AUTH_OPEN);
         WiFi.mode(WIFI_STA);
         connect(_lastUsed.ssid, _lastUsed.pswd);
         

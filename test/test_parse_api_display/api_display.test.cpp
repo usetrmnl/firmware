@@ -11,6 +11,7 @@ void assert_response_equal(ApiDisplayResponse expected, ApiDisplayResponse actua
   TEST_ASSERT_EQUAL_UINT64(expected.refresh_rate, actual.refresh_rate);
   TEST_ASSERT_EQUAL(expected.reset_firmware, actual.reset_firmware);
   TEST_ASSERT_EQUAL(expected.special_function, actual.special_function);
+  TEST_ASSERT_EQUAL(expected.action.c_str(), actual.action.c_str());
 }
 
 void test_parseResponse_apiDisplay_success(void)

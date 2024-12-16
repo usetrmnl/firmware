@@ -23,5 +23,7 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload)
       .firmware_url = doc["firmware_url"] | "",
       .refresh_rate = doc["refresh_rate"],
       .reset_firmware = doc["reset_firmware"],
-      .special_function = parseSpecialFunction(special_function_str)};
+      .special_function = parseSpecialFunction(special_function_str),
+      .action = doc["action"] | "",
+      };
 }
