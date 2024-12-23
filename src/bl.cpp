@@ -205,6 +205,8 @@ void bl_init(void)
   {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
     display_show_image(storedLogoOrDefault(), false);
+    need_to_refresh_display = 1;
+    preferences.putBool(PREFERENCES_DEVICE_REGISTRED_KEY, false);
     Log.info("%s [%d]: Display TRMNL logo end\r\n", __FILE__, __LINE__);
     preferences.putString(PREFERENCES_FILENAME_KEY, "");
   }
@@ -607,9 +609,9 @@ static https_request_err_e downloadAndShow(const char *url)
                   bool flag = preferences.getBool(PREFERENCES_DEVICE_REGISTRED_KEY, false);
                   Log.info("%s [%d]: flag: %d\r\n", __FILE__, __LINE__, flag);
 
-                  if (image_url.endsWith("/setup-logo.bmp"))
+                  if (apiResponse.filename == "empty_state")
                   {
-                    Log.info("%s [%d]: End with logo.bmp\r\n", __FILE__, __LINE__);
+                    Log.info("%s [%d]: End with empty_state\r\n", __FILE__, __LINE__);
                     if (!flag)
                     {
                       // draw received logo
@@ -634,7 +636,7 @@ static https_request_err_e downloadAndShow(const char *url)
                   }
                   else
                   {
-                    Log.info("%s [%d]: End with NO logo.bmp\r\n", __FILE__, __LINE__);
+                    Log.info("%s [%d]: End with NO empty_state\r\n", __FILE__, __LINE__);
                     if (flag)
                     {
                       if (preferences.getBool(PREFERENCES_DEVICE_REGISTRED_KEY, false) != false) // check the flag to avoid the re-writing
@@ -746,9 +748,9 @@ static https_request_err_e downloadAndShow(const char *url)
                       bool flag = preferences.getBool(PREFERENCES_DEVICE_REGISTRED_KEY, false);
                       Log.info("%s [%d]: flag: %d\r\n", __FILE__, __LINE__, flag);
 
-                      if (image_url.endsWith("/setup-logo.bmp"))
+                      if (apiResponse.filename == "empty_state")
                       {
-                        Log.info("%s [%d]: End with logo.bmp\r\n", __FILE__, __LINE__);
+                        Log.info("%s [%d]: End with empty_state\r\n", __FILE__, __LINE__);
                         if (!flag)
                         {
                           // draw received logo
@@ -771,7 +773,7 @@ static https_request_err_e downloadAndShow(const char *url)
                       }
                       else
                       {
-                        Log.info("%s [%d]: End with NO logo.bmp\r\n", __FILE__, __LINE__);
+                        Log.info("%s [%d]: End with NO empty_state\r\n", __FILE__, __LINE__);
                         if (flag)
                         {
                           if (preferences.getBool(PREFERENCES_DEVICE_REGISTRED_KEY, false) != false) // check the flag to avoid the re-writing
@@ -849,9 +851,9 @@ static https_request_err_e downloadAndShow(const char *url)
                       bool flag = preferences.getBool(PREFERENCES_DEVICE_REGISTRED_KEY, false);
                       Log.info("%s [%d]: flag: %d\r\n", __FILE__, __LINE__, flag);
 
-                      if (image_url.endsWith("/setup-logo.bmp"))
+                      if (apiResponse.filename == "empty_state")
                       {
-                        Log.info("%s [%d]: End with logo.bmp\r\n", __FILE__, __LINE__);
+                        Log.info("%s [%d]: End with empty_state\r\n", __FILE__, __LINE__);
                         if (!flag)
                         {
                           // draw received logo
@@ -874,7 +876,7 @@ static https_request_err_e downloadAndShow(const char *url)
                       }
                       else
                       {
-                        Log.info("%s [%d]: End with NO logo.bmp\r\n", __FILE__, __LINE__);
+                        Log.info("%s [%d]: End with NO empty_state\r\n", __FILE__, __LINE__);
                         if (flag)
                         {
                           if (preferences.getBool(PREFERENCES_DEVICE_REGISTRED_KEY, false) != false) // check the flag to avoid the re-writing
@@ -918,6 +920,7 @@ static https_request_err_e downloadAndShow(const char *url)
                       {
                         // show the image
                         display_show_image(buffer, image_reverse);
+                        need_to_refresh_display = 1;
                       }
                       break;
                       default:
@@ -958,6 +961,7 @@ static https_request_err_e downloadAndShow(const char *url)
                       {
                         // show the image
                         display_show_image(buffer, image_reverse);
+                        need_to_refresh_display = 1;
                       }
                       break;
                       default:
@@ -1119,6 +1123,7 @@ static https_request_err_e downloadAndShow(const char *url)
                     }
                     // show the image
                     display_show_image(buffer, image_reverse);
+                    need_to_refresh_display = 1;
 
                     String image_url = String(filename);
 
@@ -1769,11 +1774,15 @@ static void writeSpecialFunction(SPECIAL_FUNCTION function)
 static void showMessageWithLogo(MSG message_type)
 {
   display_show_msg(storedLogoOrDefault(), message_type);
+  need_to_refresh_display = 1;
+  preferences.putBool(PREFERENCES_DEVICE_REGISTRED_KEY, false);
 }
 
 static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
 {
   display_show_msg(storedLogoOrDefault(), message_type, friendly_id, id, fw_version, message);
+  need_to_refresh_display = 1;
+  preferences.putBool(PREFERENCES_DEVICE_REGISTRED_KEY, false);
 }
 
 static uint8_t *storedLogoOrDefault(void)

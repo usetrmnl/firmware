@@ -16,11 +16,12 @@ void assert_response_equal(ApiDisplayResponse expected, ApiDisplayResponse actua
 
 void test_parseResponse_apiDisplay_success(void)
 {
-  String input = "{\"status\":200,\"image_url\":\"http://example.com/foo.bmp\",\"update_firmware\":true,\"firmware_url\":\"https://example.com/firmware.bin\",\"refresh_rate\":123456,\"reset_firmware\":true,\"special_function\":\"identify\",\"action\":\"special_action\"}";
+  String input = "{\"status\":200,\"image_url\":\"http://example.com/foo.bmp\",\"filename\":\"empty_state\",\"update_firmware\":true,\"firmware_url\":\"https://example.com/firmware.bin\",\"refresh_rate\":123456,\"reset_firmware\":true,\"special_function\":\"identify\",\"action\":\"special_action\"}";
 
   ApiDisplayResponse expected = {
       .outcome = ApiDisplayOutcome::Ok,
       .image_url = "http://example.com/foo.bmp",
+      .filename = "empty_state",
       .update_firmware = true,
       .firmware_url = "https://example.com/firmware.bin",
       .refresh_rate = 123456,

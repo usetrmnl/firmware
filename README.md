@@ -303,6 +303,10 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
    - Added "MAC Address not registered" handling and screen
    - Experimental Wi-FI connection and downloading issues fixes
 
+[v.1.4.5]
+   - Fixed issue with friendly ID and setup_logo screens when they wouldn't render after an error
+   - Added "empty_state" support
+
 
 ## **Compilation guide**
 
