@@ -18,10 +18,10 @@ headers = {
 }
 
 response example (success):
-{ "status": 200, "api_key": "2r--SahjsAKCFksVcped2Q", "friendly_id": "917F0B", "image_url": "https://usetrmnl.com/images/setup/setup-logo.bmp", "image_name": "empty_state" }
+{ "status": 200, "api_key": "2r--SahjsAKCFksVcped2Q", "friendly_id": "917F0B", "image_url": "https://usetrmnl.com/images/setup/setup-logo.bmp", "filename": "empty_state" }
 
 response example (fail, device with this Mac Address not found)
-{ "status" => 404, "api_key" => nil, "friendly_id" => nil, "image_url" => nil, "image_name" => nil }
+{ "status" => 404, "api_key" => nil, "friendly_id" => nil, "image_url" => nil, "filename" => nil }
 ```
 
 assuming the Setup endpoint responded successfully, future requests are made solely for image / display content:
@@ -42,7 +42,7 @@ response example (success, device found with this access token):
 {
   "status"=>0, # will be 202 if no user_id is attached to device
   "image_url"=>"https://trmnl.s3.us-east-2.amazonaws.com/path-to-img.bmp",
-  "image_name"=>"2024-09-20T00:00:00",
+  "filename"=>"2024-09-20T00:00:00",
   "update_firmware"=>false,
   "firmware_url"=>nil,
   "refresh_rate"=>"1800",
@@ -53,7 +53,7 @@ response example (success, device found AND needs soft reset):
 {
  "status"=>0,
  "image_url"=>"https://trmnl.s3.us-east-2.amazonaws.com/path-to-img.bmp",
- "image_name"=>"name-of-img.bmp",
+ "filename"=>"name-of-img.bmp",
  "update_firmware"=>false,
  "firmware_url"=>nil,
  "refresh_rate"=>"1800",
@@ -64,7 +64,7 @@ response example (success, device found AND needs firmware update):
 {
  "status"=>0,
  "image_url"=>"https://trmnl.s3.us-east-2.amazonaws.com/path-to-img.bmp",
- "image_name"=>"name-of-img.bmp",
+ "filename"=>"name-of-img.bmp",
  "update_firmware"=>true,
  "firmware_url"=>"https://trmnl.s3.us-east-2.amazonaws.com/path-to-firmware.bin",
  "refresh_rate"=>"1800",
