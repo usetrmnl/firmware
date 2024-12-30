@@ -313,7 +313,7 @@ The pulse on the graph shows the voltage on the divider in sleep mode, further o
 A more user-friendly (and non developer) guide is available here:
 https://help.usetrmnl.com/en/articles/10271569-manually-flash-firmware
 
-If you prefer to skip this build step and simply grab the prepared bin file, download the latest build here: https://usetrmnl.com/api/firmware/latest.
+If you prefer to skip the build + upload steps below, flash directly from a web browser here: https://usetrmnl.com/flash.
 
 1. Install VS Code: https://code.visualstudio.com
 2. Install PlatformIO: https://platformio.org/install/ide?install=vscode
