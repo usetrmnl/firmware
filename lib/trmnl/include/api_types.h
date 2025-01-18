@@ -1,3 +1,5 @@
+#pragma once
+
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include "special_function.h"
