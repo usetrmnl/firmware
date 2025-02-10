@@ -25,7 +25,6 @@
 #include <special_function.h>
 #include <api_response_parsing.h>
 #include "logging_parcers.h"
-#include "EPD.h"
 
 bool pref_clear = false;
 
@@ -554,8 +553,8 @@ static https_request_err_e downloadAndShow(const char *url)
     https.addHeader("Battery-Voltage", String(battery_voltage));
     https.addHeader("FW-Version", fw_version);
     https.addHeader("RSSI", String(WiFi.RSSI()));
-    https.addHeader("Width", String(EPD_7IN5_V2_WIDTH));
-    https.addHeader("Height", String(EPD_7IN5_V2_HEIGHT));
+    https.addHeader("Width", String(display_width()));
+    https.addHeader("Height", String(display_height()));
 
     Log.info("%s [%d]: Special function - %d\r\n", __FILE__, __LINE__, special_function);
     if (special_function != SF_NONE)
