@@ -3,10 +3,20 @@
 #include <display.h>
 #include <ArduinoLog.h>
 #include "DEV_Config.h"
-#include "EPD.h"
+
 #include "GUI_Paint.h"
 #include <config.h>
 #include <ImageData.h>
+
+#ifdef EPDIY
+#include "epd_highlevel.h"
+#include "epdiy.h"
+#include "dragon.h"
+
+EpdiyHighlevelState hl;
+#else
+#include "EPD.h"
+#endif
 
 /**
  * @brief Function to init the display
@@ -16,11 +26,21 @@
 void display_init(void)
 {
     Log.info("%s [%d]: dev module start\r\n", __FILE__, __LINE__);
+    #ifdef EPDIY
+    epd_init(&epd_board_v7, &ED060XC3, EPD_LUT_64K);
+    epd_set_vcom(2550);
+    #else
     DEV_Module_Init();
+    #endif
     Log.info("%s [%d]: dev module end\r\n", __FILE__, __LINE__);
 
+
     Log.info("%s [%d]: screen hw start\r\n", __FILE__, __LINE__);
+    #ifdef EPDIY
+    hl = epd_hl_init(EPD_BUILTIN_WAVEFORM);
+    #else
     EPD_7IN5_V2_Init_New();
+    #endif
     Log.info("%s [%d]: screen hw end\r\n", __FILE__, __LINE__);
 }
 
@@ -32,7 +52,13 @@ void display_init(void)
 void display_reset(void)
 {
     Log.info("%s [%d]: e-Paper Clear start\r\n", __FILE__, __LINE__);
+    #ifdef EPDIY
+    int temperature = 25;
+    epd_poweron();
+    epd_fullclear(&hl, temperature);
+    #else
     EPD_7IN5_V2_Clear();
+    #endif
     Log.info("%s [%d]:  e-Paper Clear end\r\n", __FILE__, __LINE__);
     // DEV_Delay_ms(500);
 }
@@ -43,7 +69,11 @@ void display_reset(void)
  */
 uint16_t display_height()
 {
+    #ifdef EPDIY
+    return 758;
+    #else
     return EPD_7IN5_V2_HEIGHT;
+    #endif
 }
 
 /**
@@ -52,7 +82,11 @@ uint16_t display_height()
  */
 uint16_t display_width()
 {
+    #ifdef EPDIY
+    return 1024;
+    #else
     return EPD_7IN5_V2_WIDTH;
+    #endif
 }
 
 /**
@@ -63,13 +97,17 @@ uint16_t display_width()
  */
 void display_show_image(uint8_t *image_buffer, bool reverse)
 {
-    auto width = display_width();
-    auto height = display_height();
+    auto width = 800;
+    auto height = 480;
+
+
+    Log.info("%s [%d]: Paint_NewImage %d\r\n", __FILE__, __LINE__, reverse);
+
     //  Create a new image cache
     UBYTE *BlackImage;
     /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
-    
+
     Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
     Log.error("%s [%d]: free alloc heap - %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
     if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
@@ -77,11 +115,11 @@ void display_show_image(uint8_t *image_buffer, bool reverse)
         Log.fatal("%s [%d]: Failed to apply for black memory...\r\n", __FILE__, __LINE__);
         ESP.restart();
     }
-    Log.info("%s [%d]: Paint_NewImage %d\r\n", __FILE__, __LINE__, reverse);
+
     // if (reverse)
     //     Paint_NewImage(BlackImage, EPD_7IN5_V2_WIDTH, EPD_7IN5_V2_HEIGHT, 0, BLACK);
     // else
-    
+    //
     Paint_NewImage(BlackImage, width, height, 0, WHITE);
 
     Log.info("%s [%d]: show image for array\r\n", __FILE__, __LINE__);
@@ -95,10 +133,25 @@ void display_show_image(uint8_t *image_buffer, bool reverse)
             image_buffer[i] = ~image_buffer[i];
         }
     }
-    Paint_DrawBitMap(image_buffer + 62);
-    EPD_7IN5_V2_Display(BlackImage);
-    Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
+    Paint_DrawBitMap(image_buffer);
 
+#ifdef EPDIY
+    EpdRect dragon_area = { .x = 0, .y = 0, .width = 800, .height = 480 };
+
+    int temperature = 25;
+
+    epd_poweron();
+    epd_fullclear(&hl, temperature);
+    epd_copy_to_framebuffer(dragon_area, image_buffer + 62, epd_hl_get_framebuffer(&hl));
+
+    enum EpdDrawError _err = epd_hl_update_screen(&hl, MODE_GC16, temperature);
+    Log.info("%s [%d]: Paint_NewImage %s\r\n", __FILE__, __LINE__, _err);
+    epd_poweroff();
+#else
+
+    EPD_7IN5_V2_Display(BlackImage);
+#endif
+    Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
     free(BlackImage);
     BlackImage = NULL;
 }
@@ -111,6 +164,8 @@ void display_show_image(uint8_t *image_buffer, bool reverse)
  */
 void display_show_msg(uint8_t *image_buffer, MSG message_type)
 {
+    #ifdef EPDIY
+    #else
     auto width = display_width();
     auto height = display_height();
     UBYTE *BlackImage;
@@ -243,6 +298,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
     free(BlackImage);
     BlackImage = NULL;
+    #endif
 }
 
 /**
@@ -257,6 +313,8 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
  */
 void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
 {
+#ifdef EPDIY
+#else
     if (message_type == WIFI_CONNECT)
     {
         Log.info("%s [%d]: Display set to white\r\n", __FILE__, __LINE__);
@@ -326,6 +384,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
     free(BlackImage);
     BlackImage = NULL;
+#endif
 }
 
 /**
@@ -336,5 +395,9 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 void display_sleep(void)
 {
     Log.info("%s [%d]: Goto Sleep...\r\n", __FILE__, __LINE__);
+    #ifdef EPDIY
+     epd_poweroff();
+    #else
     EPD_7IN5B_V2_Sleep();
+    #endif
 }
