@@ -553,6 +553,8 @@ static https_request_err_e downloadAndShow(const char *url)
     https.addHeader("Battery-Voltage", String(battery_voltage));
     https.addHeader("FW-Version", fw_version);
     https.addHeader("RSSI", String(WiFi.RSSI()));
+    https.addHeader("Width", String(display_width()));
+    https.addHeader("Height", String(display_height()));
 
     Log.info("%s [%d]: Special function - %d\r\n", __FILE__, __LINE__, special_function);
     if (special_function != SF_NONE)
