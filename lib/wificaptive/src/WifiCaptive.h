@@ -54,7 +54,7 @@ private:
     AsyncWebServer *_server;
     String _ssid = "";
     String _password = "";
-    String _api_server = "https://trmnl.app";
+    String _api_server = "";
 
     std::function<void()> _resetcallback;
 
