@@ -373,6 +373,9 @@ void WifiCaptive::saveLastUsed(String ssid, String pass)
 
 void WifiCaptive::saveApiServer(String url)
 {
+    // if not URL is provided, don't save a preference and fall back to API_BASE_URL in config.h
+    if (url == "")
+        return;
     Preferences preferences;
     preferences.begin("data", false);
     preferences.putString("api_url", url);

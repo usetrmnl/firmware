@@ -360,10 +360,8 @@
       }
 
       // strip trailing slashes
+      server = server.trim();
       server = server.replace(/\/+$/, '');
-      if (!server) {
-        server = "https://trmnl.app";
-      }
 
       var body = { ssid: ssid, pswd: pswd, server: server };
 
