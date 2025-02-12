@@ -9,6 +9,7 @@
 
 #define PREFERENCES_API_KEY "api_key"
 #define PREFERENCES_API_KEY_DEFAULT ""
+#define PREFERENCES_API_URL "api_url"
 #define PREFERENCES_FRIENDLY_ID "friendly_id"
 #define PREFERENCES_FRIENDLY_ID_DEFAULT ""
 #define PREFERENCES_SLEEP_TIME_KEY "refresh_rate"
@@ -26,10 +27,10 @@
 
 #define DISPLAY_BMP_IMAGE_SIZE 48062 // in bytes - 62 bytes - header; 48000 bytes - bitmap (480*800 1bpp) / 8
 
-#define SLEEP_uS_TO_S_FACTOR 1000000 /* Conversion factor for micro seconds to seconds */
-#define SLEEP_TIME_TO_SLEEP 900        /* Time ESP32 will go to sleep (in seconds) */
-#define SLEEP_TIME_WHILE_NOT_CONNECTED 5        /* Time ESP32 will go to sleep (in seconds) */
-#define SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED 5        /* Time ESP32 will go to sleep (in seconds) */
+#define SLEEP_uS_TO_S_FACTOR 1000000           /* Conversion factor for micro seconds to seconds */
+#define SLEEP_TIME_TO_SLEEP 900                /* Time ESP32 will go to sleep (in seconds) */
+#define SLEEP_TIME_WHILE_NOT_CONNECTED 5       /* Time ESP32 will go to sleep (in seconds) */
+#define SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED 5 /* Time ESP32 will go to sleep (in seconds) */
 
 enum API_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the API (in seconds)
 {
