@@ -112,13 +112,15 @@ void WifiCaptive::setUpWebserver(AsyncWebServer &server, const IPAddress &localI
 		request->send(200, "application/json", json);
 		json = String(); });
 
-    AsyncCallbackJsonWebHandler *handler = new AsyncCallbackJsonWebHandler("/connect",[&](AsyncWebServerRequest *request, JsonVariant &json)
+    AsyncCallbackJsonWebHandler *handler = new AsyncCallbackJsonWebHandler("/connect", [&](AsyncWebServerRequest *request, JsonVariant &json)
                                                                            {
 		JsonObject data = json.as<JsonObject>();
 		String ssid = data["ssid"];
 		String pswd = data["pswd"];
+        String api_server = data["server"];
 		_ssid = ssid;
 		_password = pswd;
+        _api_server = api_server;
 		String mac = WiFi.macAddress();
 		String message =  "{\"ssid\":\"" + _ssid +"\",\"mac\":\"" + mac +"\"}";
 		request->send(200, "application/json", message); });
@@ -190,6 +192,7 @@ bool WifiCaptive::startPortal()
             if (res)
             {
                 saveWifiCredentials(_ssid, _password);
+                saveApiServer(_api_server);
                 succesfullyConnected = true;
                 break;
             }
@@ -236,7 +239,8 @@ void WifiCaptive::resetSettings()
 {
     Preferences preferences;
     preferences.begin("wificaptive", false);
-    for(int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
+    preferences.remove("api_url");
+    for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
         preferences.remove(WIFI_SSID_KEY(i));
         preferences.remove(WIFI_PSWD_KEY(i));
@@ -318,7 +322,7 @@ void WifiCaptive::readWifiCredentials()
     Preferences preferences;
     preferences.begin("wificaptive", true);
     size_t len = preferences.getBytesLength(WIFI_SSID_KEY(0));
-    for(int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
+    for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
         _savedWifis[i].ssid = preferences.getString(WIFI_SSID_KEY(i), "");
         _savedWifis[i].pswd = preferences.getString(WIFI_PSWD_KEY(i), "");
@@ -334,8 +338,8 @@ void WifiCaptive::saveWifiCredentials(String ssid, String pass)
 
     for (u16_t i = WIFI_MAX_SAVED_CREDS - 1; i >= 1; i--)
     {
-        _savedWifis[i].ssid = _savedWifis[i-1].ssid;
-        _savedWifis[i].pswd = _savedWifis[i-1].pswd;
+        _savedWifis[i].ssid = _savedWifis[i - 1].ssid;
+        _savedWifis[i].pswd = _savedWifis[i - 1].pswd;
     }
 
     _savedWifis[0].ssid = ssid;
@@ -345,7 +349,7 @@ void WifiCaptive::saveWifiCredentials(String ssid, String pass)
 
     Preferences preferences;
     preferences.begin("wificaptive", false);
-    for(int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
+    for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
         preferences.putString(WIFI_SSID_KEY(i), _savedWifis[i].ssid);
         preferences.putString(WIFI_PSWD_KEY(i), _savedWifis[i].pswd);
@@ -364,6 +368,14 @@ void WifiCaptive::saveLastUsed(String ssid, String pass)
     preferences.begin("wificaptive", false);
     preferences.putString(WIFI_LAST_USED_SSID_KEY, ssid);
     preferences.putString(WIFI_LAST_USED_PSWD_KEY, pass);
+    preferences.end();
+}
+
+void WifiCaptive::saveApiServer(String url)
+{
+    Preferences preferences;
+    preferences.begin("data", false);
+    preferences.putString("api_url", url);
     preferences.end();
 }
 
@@ -489,7 +501,7 @@ std::vector<WifiCaptive::Network> WifiCaptive::combineNetworks(
         }
     }
 
-    return combinedNetworks; 
+    return combinedNetworks;
 }
 
 bool WifiCaptive::autoConnect()
@@ -497,13 +509,14 @@ bool WifiCaptive::autoConnect()
     Log.info("Trying to autoconnect to wifi...\r\n");
     readWifiCredentials();
 
-    if (_lastUsed.ssid != "") {
+    if (_lastUsed.ssid != "")
+    {
         Log.info("Trying to connect to last used %s...\r\n", _lastUsed.ssid.c_str());
         WiFi.setSleep(0);
         WiFi.setMinSecurity(WIFI_AUTH_OPEN);
         WiFi.mode(WIFI_STA);
         connect(_lastUsed.ssid, _lastUsed.pswd);
-        
+
         // Check if connected
         if (WiFi.status() == WL_CONNECTED)
         {
@@ -529,7 +542,7 @@ bool WifiCaptive::autoConnect()
         {
             continue;
         }
-        
+
         connect(network.ssid, network.pswd);
 
         // Check if connected
