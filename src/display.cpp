@@ -11,7 +11,6 @@
 #ifdef EPDIY
 #include "epd_highlevel.h"
 #include "epdiy.h"
-#include "dragon.h"
 
 EpdiyHighlevelState hl;
 #else
@@ -89,6 +88,28 @@ uint16_t display_width()
     #endif
 }
 
+#ifdef EPDIY
+void convert_1bit_to_4bit(const uint8_t *fb_1bit, uint8_t *fb_4bit, int width, int height) {
+    int byte_width = width / 8;  // Each byte in 1-bit framebuffer stores 8 pixels
+    int row_size_out = width / 2; // Each row in the 4-bit framebuffer (2 pixels per byte)
+
+    for (int y = 0; y < height; y++) {
+        int out_row_index = (height - 1 - y) * row_size_out; // Flip Y-axis
+
+        for (int x = 0; x < width; x += 2) {
+            int byte_index = (y * byte_width) + (x / 8);
+            int bit_index1 = 7 - (x % 8);
+            int bit_index2 = 7 - ((x + 1) % 8);
+
+            uint8_t pixel1 = (fb_1bit[byte_index] >> bit_index1) & 1;
+            uint8_t pixel2 = (fb_1bit[byte_index] >> bit_index2) & 1;
+
+            fb_4bit[out_row_index++] = (pixel1 ? 0x0F : 0x00) << 4 | (pixel2 ? 0x0F : 0x00);
+        }
+    }
+}
+#endif
+
 /**
  * @brief Function to show the image on the display
  * @param image_buffer pointer to the uint8_t image buffer
@@ -97,12 +118,37 @@ uint16_t display_width()
  */
 void display_show_image(uint8_t *image_buffer, bool reverse)
 {
-    auto width = 800;
-    auto height = 480;
+    uint16_t width_d = display_width();
+    uint16_t height_d = display_height();
+
+#ifdef EPDIY
+    uint32_t width = *(uint32_t *)&image_buffer[18];
+    uint32_t height = *(uint32_t *)&image_buffer[22];
+
+    // set to default value if header is faulty
+    if(width == 0 || height == 0) {
+      width = 800;
+      height = 480;
+    }
+    Log.info("%s [%d]: Image width: %d, height: %d!\r\n", __FILE__, __LINE__, width, height);
+
+    EpdRect dragon_area = { .x = (width_d - width) / 2, .y = (height_d - height) / 2, .width = width, .height = height };
+    uint8_t *image_buffer_8bpp = new uint8_t[width * height];
+    convert_1bit_to_4bit(image_buffer+62, image_buffer_8bpp, width, height);
+
+    int temperature = 22;
+
+    epd_poweron();
+    epd_fullclear(&hl, temperature);
+
+    epd_copy_to_framebuffer(dragon_area, image_buffer_8bpp, epd_hl_get_framebuffer(&hl));
 
 
-    Log.info("%s [%d]: Paint_NewImage %d\r\n", __FILE__, __LINE__, reverse);
-
+    enum EpdDrawError _err = epd_hl_update_screen(&hl, MODE_GC16, temperature);
+    Log.info("%s [%d]: Paint_NewImage %s\r\n", __FILE__, __LINE__, _err);
+    delete[] image_buffer_8bpp;
+    epd_poweroff();
+#else
     //  Create a new image cache
     UBYTE *BlackImage;
     /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
@@ -115,11 +161,11 @@ void display_show_image(uint8_t *image_buffer, bool reverse)
         Log.fatal("%s [%d]: Failed to apply for black memory...\r\n", __FILE__, __LINE__);
         ESP.restart();
     }
-
+    Log.info("%s [%d]: Paint_NewImage %d\r\n", __FILE__, __LINE__, reverse);
     // if (reverse)
     //     Paint_NewImage(BlackImage, EPD_7IN5_V2_WIDTH, EPD_7IN5_V2_HEIGHT, 0, BLACK);
     // else
-    //
+
     Paint_NewImage(BlackImage, width, height, 0, WHITE);
 
     Log.info("%s [%d]: show image for array\r\n", __FILE__, __LINE__);
@@ -133,27 +179,14 @@ void display_show_image(uint8_t *image_buffer, bool reverse)
             image_buffer[i] = ~image_buffer[i];
         }
     }
-    Paint_DrawBitMap(image_buffer);
-
-#ifdef EPDIY
-    EpdRect dragon_area = { .x = 0, .y = 0, .width = 800, .height = 480 };
-
-    int temperature = 25;
-
-    epd_poweron();
-    epd_fullclear(&hl, temperature);
-    epd_copy_to_framebuffer(dragon_area, image_buffer + 62, epd_hl_get_framebuffer(&hl));
-
-    enum EpdDrawError _err = epd_hl_update_screen(&hl, MODE_GC16, temperature);
-    Log.info("%s [%d]: Paint_NewImage %s\r\n", __FILE__, __LINE__, _err);
-    epd_poweroff();
-#else
-
+    Paint_DrawBitMap(image_buffer + 62);
     EPD_7IN5_V2_Display(BlackImage);
-#endif
-    Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
+
     free(BlackImage);
     BlackImage = NULL;
+#endif
+    Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
+
 }
 
 /**
