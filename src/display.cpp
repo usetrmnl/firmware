@@ -124,29 +124,34 @@ void display_show_image(uint8_t *image_buffer, bool reverse)
 #ifdef EPDIY
     uint32_t width = *(uint32_t *)&image_buffer[18];
     uint32_t height = *(uint32_t *)&image_buffer[22];
+    uint32_t dataOffset = *(uint32_t *)&image_buffer[10];
 
     // set to default value if header is faulty
     if(width == 0 || height == 0) {
       width = 800;
       height = 480;
     }
+
+    if(dataOffset == 0) {
+      dataOffset = 62;
+    }
     Log.info("%s [%d]: Image width: %d, height: %d!\r\n", __FILE__, __LINE__, width, height);
+    Log.info("%s [%d]: Data offset: %d!\r\n", __FILE__, __LINE__, dataOffset);
 
     EpdRect dragon_area = { .x = (width_d - width) / 2, .y = (height_d - height) / 2, .width = width, .height = height };
-    uint8_t *image_buffer_8bpp = new uint8_t[width * height];
-    convert_1bit_to_4bit(image_buffer+62, image_buffer_8bpp, width, height);
+    uint8_t *image_buffer_4bpp = new uint8_t[width * height / 2];
+    convert_1bit_to_4bit(image_buffer + dataOffset, image_buffer_4bpp, width, height);
 
     int temperature = 22;
 
     epd_poweron();
     epd_fullclear(&hl, temperature);
 
-    epd_copy_to_framebuffer(dragon_area, image_buffer_8bpp, epd_hl_get_framebuffer(&hl));
+    epd_copy_to_framebuffer(dragon_area, image_buffer_4bpp, epd_hl_get_framebuffer(&hl));
 
-
-    enum EpdDrawError _err = epd_hl_update_screen(&hl, MODE_GC16, temperature);
+    enum EpdDrawError _err = epd_hl_update_screen(&hl, MODE_DU, temperature);
     Log.info("%s [%d]: Paint_NewImage %s\r\n", __FILE__, __LINE__, _err);
-    delete[] image_buffer_8bpp;
+    delete[] image_buffer_4bpp;
     epd_poweroff();
 #else
     //  Create a new image cache

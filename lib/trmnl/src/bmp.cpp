@@ -25,8 +25,10 @@ bmp_err_e parseBMPHeader(uint8_t *data, bool &reversed)
   uint32_t imageDataSize = *(uint32_t *)&data[34];
   uint32_t colorTableEntries = *(uint32_t *)&data[46];
 
+#ifndef EPDIY
   if (width != 800 || height != 480 || bitsPerPixel != 1 || imageDataSize != 48000 || colorTableEntries != 2)
     return BMP_BAD_SIZE;
+#endif
   // Get the offset of the pixel data
   uint32_t dataOffset = *(uint32_t *)&data[10];
 
