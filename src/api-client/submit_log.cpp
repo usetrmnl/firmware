@@ -15,9 +15,9 @@ bool submitLogToApi(LogApiInput &input, const char *api_url)
   
   // make_unique might throw bad_alloc if out of memory
   if (isHttps)
-    client = std::make_unique<WiFiClientSecure>();
+    client = std::unique_ptr<WiFiClientSecure>(new WiFiClientSecure());
   else
-    client = std::make_unique<WiFiClient>();
+    client = std::unique_ptr<WiFiClient>(new WiFiClient());
   
   HTTPClient https;
   Log_info("[HTTPS] begin /api/log ...");
