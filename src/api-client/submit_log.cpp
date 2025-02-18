@@ -11,13 +11,16 @@ bool submitLogToApi(LogApiInput &input, const char *api_url)
 
   bool isHttps = String(api_url).indexOf("https://") == 0;
 
-  std::unique_ptr<WiFiClient> client;
+  // because of the lack of virtual destructor in the derived class WiFiClientSecure we have to do some trickery...
+  std::unique_ptr<WiFiClientSecure> secureClient(new WiFiClientSecure());
+  std::unique_ptr<WiFiClient> baseClient(new WiFiClient());
+
+  WiFiClient *client;
   
-  // make_unique might throw bad_alloc if out of memory
   if (isHttps)
-    client = std::unique_ptr<WiFiClientSecure>(new WiFiClientSecure());
+    client = dynamic_cast<WiFiClient *>(secureClient.get());
   else
-    client = std::unique_ptr<WiFiClient>(new WiFiClient());
+    client = dynamic_cast<WiFiClient *>(baseClient.get());;
   
   HTTPClient https;
   Log_info("[HTTPS] begin /api/log ...");
