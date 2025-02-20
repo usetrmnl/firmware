@@ -14,7 +14,6 @@
 #include <ImageData.h>
 #include <Preferences.h>
 #include <cstdint>
-#include <bmp.h>
 #include <Update.h>
 #include <math.h>
 #include <filesystem.h>
@@ -25,10 +24,26 @@
 #include <special_function.h>
 #include <api_response_parsing.h>
 #include "logging_parcers.h"
+#include "onebit_bmp_png.h"
 
 bool pref_clear = false;
 
-uint8_t buffer[48062];    // image buffer
+const uint32_t trmnl_display_width = 800;
+const uint32_t trmnl_display_height = 480;
+const uint32_t bmp_header_size = 62;
+
+// should be 48062
+// bmp padding is multiple of 4 bytes
+constexpr uint32_t default_bitmap_size = (onebit_bmp_stride(trmnl_display_width) * trmnl_display_height) + bmp_header_size;
+uint8_t buffer[default_bitmap_size];    // image buffer
+
+// should be 48480
+constexpr uint32_t default_raw_png_size = (onebit_png_stride(trmnl_display_width) + 1) * trmnl_display_height; 
+//payload also serves as decompression buffer, hence the different size
+// png padding is one byte
+// at 800 pixels, both strides are the same but this is not always the case
+uint8_t payload[default_raw_png_size];    // fred: separate payload from image buffer
+
 char filename[1024];      // image URL
 char binUrl[1024];        // update URL
 char log_array[1024];      // log
@@ -584,13 +599,13 @@ static https_request_err_e downloadAndShow(const char *url)
       submit_log("returned code is not OK: %d", httpCode);
     }
 
-    String payload = https.getString();
+    String payloadString = https.getString();
     size_t size = https.getSize();
     Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, size);
     Log.info("%s [%d]: Free heap size: %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
-    Log.info("%s [%d]: Payload - %s\r\n", __FILE__, __LINE__, payload.c_str());
+    Log.info("%s [%d]: Payload - %s\r\n", __FILE__, __LINE__, payloadString.c_str());
 
-    auto apiResponse = parseResponse_apiDisplay(payload);
+    auto apiResponse = parseResponse_apiDisplay(payloadString);
     bool error = apiResponse.outcome == ApiDisplayOutcome::DeserializationError;
 
     if (error)
@@ -930,11 +945,13 @@ static https_request_err_e downloadAndShow(const char *url)
             Log.info("%s [%d]: rewind success\r\n", __FILE__, __LINE__);
             // showMessageWithLogo(BMP_FORMAT_ERROR);
 
-            bool result = filesystem_read_from_file("/last.bmp", buffer, sizeof(buffer));
+        // do not use buffer to read 
+            bool result = filesystem_read_from_file("/last.bmp", payload, default_bitmap_size);
             if (result)
             {
               bool image_reverse = false;
-              bmp_err_e res = parseBMPHeader(buffer, image_reverse);
+              // do we need to reparse ?
+              bitmap_err_e res = onebit_trmnl_decode_mem_bmp1((char*)buffer, (char*)payload, (int)default_bitmap_size, trmnl_display_width, trmnl_display_height);
               String error = "";
               switch (res)
               {
@@ -971,11 +988,11 @@ static https_request_err_e downloadAndShow(const char *url)
             status = false;
             result = HTTPS_SUCCES;
             Log.info("%s [%d]: send_to_me success\r\n", __FILE__, __LINE__);
-            bool result = filesystem_read_from_file("/current.bmp", buffer, sizeof(buffer));
+            bool result = filesystem_read_from_file("/last.bmp", payload, default_bitmap_size);
             if (result)
             {
               bool image_reverse = false;
-              bmp_err_e res = parseBMPHeader(buffer, image_reverse);
+              bitmap_err_e res = onebit_trmnl_decode_mem_bmp1((char*)buffer, (char*)payload, default_bitmap_size, trmnl_display_width, trmnl_display_height);
               String error = "";
               switch (res)
               {
@@ -1075,10 +1092,11 @@ static https_request_err_e downloadAndShow(const char *url)
         submit_log("HTTPS returned code is not OK. Code: %d", httpCode);
         return HTTPS_REQUEST_FAILED;
       }
-      Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
+      uint32_t payloadSize = https.getSize();
+      Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__,payloadSize);
       
       uint32_t counter = 0;
-      if (https.getSize() != DISPLAY_BMP_IMAGE_SIZE)
+      if (payloadSize >= DISPLAY_BMP_IMAGE_SIZE) // Fred: limit to BMP size, PNGs should be smaller
       {
         Log.error("%s [%d]: Receiving failed. Bad file size\r\n", __FILE__, __LINE__);
 
@@ -1102,8 +1120,9 @@ static https_request_err_e downloadAndShow(const char *url)
       unsigned long download_start = millis();
       int iteration_counter = 0;
 
+      
       Log.info("%s [%d]: Starting a download at: %d\r\n", __FILE__, __LINE__, getTime());
-      while (counter != DISPLAY_BMP_IMAGE_SIZE && millis() - download_start < 10000)
+      while (counter != payloadSize && millis() - download_start < 10000)
       {
         if (stream->available())
         {
@@ -1115,8 +1134,8 @@ static https_request_err_e downloadAndShow(const char *url)
         delay(10);
       }
       Log.info("%s [%d]: Ending a download at: %d, in %d iterations\r\n", __FILE__, __LINE__, getTime(), iteration_counter);
-
-      if (counter != DISPLAY_BMP_IMAGE_SIZE)
+     
+      if (counter != payloadSize)
       {
 
         Log.error("%s [%d]: Receiving failed. Readed: %d\r\n", __FILE__, __LINE__, counter);
@@ -1129,8 +1148,10 @@ static https_request_err_e downloadAndShow(const char *url)
 
       Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
 
+// Fred
       bool image_reverse = false;
-      bmp_err_e res = parseBMPHeader(buffer, image_reverse);
+     // bmp_err_e res = parseBMPHeader(buffer, image_reverse);
+       bitmap_err_e res = onebit_decode_to_trmnl((char*)buffer, (char*)payload, payloadSize, trmnl_display_width, trmnl_display_height);
       Serial.println();
       String error = "";
       switch (res)
@@ -1177,14 +1198,24 @@ static https_request_err_e downloadAndShow(const char *url)
           result = HTTPS_SUCCES;
       }
       break;
-      case BMP_NOT_BMP:
+      case TRMNL_INCOMPATIBLE:
       {
-        error = "First two header bytes are invalid!";
+        error = "Bitmap not compatible with TRMNL";
+      }
+      break;
+     case PNG_BAD_SIZE:
+      {
+        error = "PNG width or height are invalid";
       }
       break;
       case BMP_BAD_SIZE:
       {
-        error = "BMP width, height or size are invalid";
+        error = "BPM width, height or size are invalid";
+      }
+      break;
+      case PNG_COLOR_SCHEME_FAILED:
+      {
+        error = "PNG color scheme is invalid";
       }
       break;
       case BMP_COLOR_SCHEME_FAILED:
@@ -1203,7 +1234,7 @@ static https_request_err_e downloadAndShow(const char *url)
 
       if (res != BMP_NO_ERR)
       {
-        submit_log("error parsing bmp file - %s", error.c_str());
+        submit_log("error parsing payload file - %s", error.c_str());
 
         return HTTPS_WRONG_IMAGE_FORMAT;
       }
