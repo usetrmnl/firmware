@@ -38,6 +38,24 @@ void display_reset(void)
 }
 
 /**
+ * @brief Function to read the display height
+ * @return uint16_t - height of display in pixels
+ */
+uint16_t display_height()
+{
+    return EPD_7IN5_V2_HEIGHT;
+}
+
+/**
+ * @brief Function to read the display width
+ * @return uint16_t - width of display in pixels
+ */
+uint16_t display_width()
+{
+    return EPD_7IN5_V2_WIDTH;
+}
+
+/**
  * @brief Function to show the image on the display
  * @param image_buffer pointer to the uint8_t image buffer
  * @param reverse shows if the color scheme is reverse
@@ -45,10 +63,12 @@ void display_reset(void)
  */
 void display_show_image(uint8_t *image_buffer, bool reverse)
 {
+    auto width = display_width();
+    auto height = display_height();
     //  Create a new image cache
     UBYTE *BlackImage;
     /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
-    UWORD Imagesize = ((EPD_7IN5_V2_WIDTH % 8 == 0) ? (EPD_7IN5_V2_WIDTH / 8) : (EPD_7IN5_V2_WIDTH / 8 + 1)) * EPD_7IN5_V2_HEIGHT;
+    UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
     
     Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
     Log.error("%s [%d]: free alloc heap - %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
@@ -62,7 +82,7 @@ void display_show_image(uint8_t *image_buffer, bool reverse)
     //     Paint_NewImage(BlackImage, EPD_7IN5_V2_WIDTH, EPD_7IN5_V2_HEIGHT, 0, BLACK);
     // else
     
-    Paint_NewImage(BlackImage, EPD_7IN5_V2_WIDTH, EPD_7IN5_V2_HEIGHT, 0, WHITE);
+    Paint_NewImage(BlackImage, width, height, 0, WHITE);
 
     Log.info("%s [%d]: show image for array\r\n", __FILE__, __LINE__);
     Paint_SelectImage(BlackImage);
@@ -91,9 +111,11 @@ void display_show_image(uint8_t *image_buffer, bool reverse)
  */
 void display_show_msg(uint8_t *image_buffer, MSG message_type)
 {
+    auto width = display_width();
+    auto height = display_height();
     UBYTE *BlackImage;
     /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
-    UWORD Imagesize = ((EPD_7IN5_V2_WIDTH % 8 == 0) ? (EPD_7IN5_V2_WIDTH / 8) : (EPD_7IN5_V2_WIDTH / 8 + 1)) * EPD_7IN5_V2_HEIGHT;
+    UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
     Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
     Log.error("%s [%d]: free alloc heap - %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
     if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
@@ -103,7 +125,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     }
 
     Log.info("%s [%d]: Paint_NewImage\r\n", __FILE__, __LINE__);
-    Paint_NewImage(BlackImage, EPD_7IN5_V2_WIDTH, EPD_7IN5_V2_HEIGHT, 0, WHITE);
+    Paint_NewImage(BlackImage, width, height, 0, WHITE);
 
     Log.info("%s [%d]: show image for array\r\n", __FILE__, __LINE__);
     Paint_SelectImage(BlackImage);
@@ -235,7 +257,6 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
  */
 void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
 {
-
     if (message_type == WIFI_CONNECT)
     {
         Log.info("%s [%d]: Display set to white\r\n", __FILE__, __LINE__);
@@ -243,9 +264,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         delay(1000);
     }
 
+    auto width = display_width();
+    auto height = display_height();
     UBYTE *BlackImage;
     /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
-    UWORD Imagesize = ((EPD_7IN5_V2_WIDTH % 8 == 0) ? (EPD_7IN5_V2_WIDTH / 8) : (EPD_7IN5_V2_WIDTH / 8 + 1)) * EPD_7IN5_V2_HEIGHT;
+    UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
     Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
     Log.error("%s [%d]: free alloc heap - %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
     if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
@@ -255,7 +278,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     }
 
     Log.info("%s [%d]: Paint_NewImage\r\n", __FILE__, __LINE__);
-    Paint_NewImage(BlackImage, EPD_7IN5_V2_WIDTH, EPD_7IN5_V2_HEIGHT, 0, WHITE);
+    Paint_NewImage(BlackImage, width, height, 0, WHITE);
 
     Log.info("%s [%d]: show image for array\r\n", __FILE__, __LINE__);
     Paint_SelectImage(BlackImage);

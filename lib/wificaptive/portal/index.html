@@ -338,12 +338,33 @@
       hideAlert();
       var ssid = document.getElementById('ssid').value;
       var pswd = document.getElementById('password').value;
+      var server = document.getElementById('server').value;
       if (!ssid) {
         displayAlert('Please enter your Wi-Fi name', "warning");
         return;
       }
 
-      var body = { ssid: ssid, pswd: pswd };
+      // if custom server form-group is visible, validate the url
+      let customServerVisible = document.getElementById('custom_server_form_group').style.display != 'none';
+      if (customServerVisible && server) {
+        try {
+          new URL(server);
+          // does it start with http:// or https://?
+          if (!server.startsWith('http://') && !server.startsWith('https://')) {
+            throw new Error();
+          }
+        } catch (_) {
+          displayAlert('Please enter a valid URL for your custom server', "warning");
+          return;
+        }
+      }
+
+      // strip trailing slashes
+      server = server.trim();
+      server = server.replace(/\/+$/, '');
+
+      var body = { ssid: ssid, pswd: pswd, server: server };
+
       showLoader();
       fetch('/connect', {
         method: 'POST',
@@ -365,6 +386,19 @@
 
     function confirmSoftReset() {
       document.getElementById('confirmationModal').style.display = 'block';
+    }
+
+    function confirmCustomServer() {
+      document.getElementById('customServerWarningModal').style.display = 'block';
+    }
+
+    function showCustomServerInput() {
+      document.getElementById('custom_server_form_group').style.display = 'flex';
+      closeCustomServerModal();
+    }
+
+    function closeCustomServerModal() {
+      document.getElementById('customServerWarningModal').style.display = 'none';
     }
 
     function softReset() {
@@ -559,16 +593,20 @@
       <input type="password" id="password" name="password" pattern=".{8,}" placeholder="Enter your Wi-Fi password">
       <i id="toggler" class="bi bi-eye" onclick="togglePassword()"></i>
     </div>
+    <div class="form-group" id="custom_server_form_group" style="display: none;">
+      <label for="server">API Server</label>
+      <input type="url" id="server" name="server" placeholder="Enter your custom server without a trailing / (e.g. https://trmnl.app)">
+    </div>
     <div class="form-group">
       <div class="alert alert-primary" id="message" role="alert" style="display: none;"></div>
     </div>
     <span>
       <button id="btnConnect" class="button button-success" onclick="connect()">Connect</button>
       <button id="btnRefresh" class="button button-primary" onclick="refresh()">Refresh</button>
-
     </span>
     <span style="margin-top: 20px;">
       <button id="btnRefresh" class="button button-secondary" onclick="confirmSoftReset()">Soft Reset</button>
+      <button id="btnCustomServer" class="button button-primary" onclick="confirmCustomServer()">Custom Server</button>
     </span>
     <div class="form-group" style="margin-top: 10px;">
       <div class="alert alert-primary" id="info-message" role="alert" style="display: none;"></div>
@@ -589,6 +627,18 @@
       </div>
     </div>
   </div>
+  <!-- Confirmation Modal -->
+  <div id="customServerWarningModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeCustomServerModal()">&times;</span>
+      <p>This button allows you to specify a custom API server (also known as BYOS) for your device.
+         Most users don't want this, and will use the official server with their TRMNL. 
+         Are you sure you want to have a custom server specified?</p>
+      <div class="modal-footer">
+        <button class="button button-success" onclick="showCustomServerInput()">Yes</button>
+        <button class="button button-primary" onclick="closeCustomServerModal()">No</button>
+      </div>
+    </div>
+  </div>
 </body>
-
 </html>

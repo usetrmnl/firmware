@@ -8,12 +8,23 @@ bool submitLogToApi(LogApiInput &input, const char *api_url)
 {
   String payload = "{\"log\":{\"logs_array\":[" + String(input.log_buffer) + "]}}";
 
-  WiFiClientSecure *client = new WiFiClientSecure;
+  WiFiClientSecure *secureClient = new WiFiClientSecure;
+  WiFiClient *insecureClient = new WiFiClient;
+
+  secureClient->setInsecure();
+
+  bool isHttps = true;
+  if (String(api_url).indexOf("https://") == -1)
+  {
+    isHttps = false;
+  }
+
+  // define client depending on the isHttps variable
+  WiFiClient *client = isHttps ? secureClient : insecureClient;
+
   bool result = false;
   if (client)
   {
-    client->setInsecure();
-
     {
       // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
       HTTPClient https;
@@ -22,7 +33,7 @@ bool submitLogToApi(LogApiInput &input, const char *api_url)
       char new_url[200];
       strcpy(new_url, api_url);
       strcat(new_url, "/api/log");
-      
+
       if (https.begin(*client, new_url))
       { // HTTPS
         Log_info("[HTTPS] POST...");

@@ -35,6 +35,18 @@ void display_init(void);
 void display_reset(void);
 
 /**
+ * @brief Function to read the display height
+ * @return uint16_t - height of display in pixels
+ */
+uint16_t display_height();
+
+/**
+ * @brief Function to read the display width
+ * @return uint16_t - width of display in pixels
+ */
+uint16_t display_width();
+
+/**
  * @brief Function to show the image on the display
  * @param image_buffer pointer to the uint8_t image buffer
  * @param reverse shows if the color scheme is reverse 
