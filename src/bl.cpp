@@ -28,13 +28,13 @@
 
 bool pref_clear = false;
 
-const uint32_t trmnl_display_width = 800;
-const uint32_t trmnl_display_height = 480;
-const uint32_t bmp_header_size = 62;
+const int trmnl_display_width = 800;
+const int trmnl_display_height = 480;
+const int bmp_header_size = 62;
 
 // should be 48062
 // bmp padding is multiple of 4 bytes
-uint32_t default_bitmap_size = (onebit_bmp_stride(trmnl_display_width) * trmnl_display_height) + bmp_header_size;
+int default_bitmap_size = (onebit_bmp_stride(trmnl_display_width) * trmnl_display_height) + bmp_header_size;
 uint8_t buffer[48062];    // image buffer
 
 // should be 48480
