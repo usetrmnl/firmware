@@ -34,15 +34,15 @@ const uint32_t bmp_header_size = 62;
 
 // should be 48062
 // bmp padding is multiple of 4 bytes
-constexpr uint32_t default_bitmap_size = (onebit_bmp_stride(trmnl_display_width) * trmnl_display_height) + bmp_header_size;
-uint8_t buffer[default_bitmap_size];    // image buffer
+uint32_t default_bitmap_size = (onebit_bmp_stride(trmnl_display_width) * trmnl_display_height) + bmp_header_size;
+uint8_t buffer[48062];    // image buffer
 
 // should be 48480
-constexpr uint32_t default_raw_png_size = (onebit_png_stride(trmnl_display_width) + 1) * trmnl_display_height; 
+uint32_t default_raw_png_size = (onebit_png_stride(trmnl_display_width) + 1) * trmnl_display_height; 
 //payload also serves as decompression buffer, hence the different size
 // png padding is one byte
 // at 800 pixels, both strides are the same but this is not always the case
-uint8_t payload[default_raw_png_size];    // fred: separate payload from image buffer
+uint8_t payload[48480];    // fred: separate payload from image buffer
 
 char filename[1024];      // image URL
 char binUrl[1024];        // update URL
@@ -964,7 +964,7 @@ static https_request_err_e downloadAndShow()
             {
               bool image_reverse = false;
               // do we need to reparse ?
-              bitmap_err_e res = onebit_trmnl_decode_mem_bmp1((char*)buffer, (char*)payload, (int)default_bitmap_size, trmnl_display_width, trmnl_display_height);
+              bitmap_err_e res = onebit_trmnl_decode_mem_bmp1(buffer, payload, (int)default_bitmap_size, trmnl_display_width, trmnl_display_height);
               String error = "";
               switch (res)
               {
@@ -1005,7 +1005,7 @@ static https_request_err_e downloadAndShow()
             if (result)
             {
               bool image_reverse = false;
-              bitmap_err_e res = onebit_trmnl_decode_mem_bmp1((char*)buffer, (char*)payload, default_bitmap_size, trmnl_display_width, trmnl_display_height);
+              bitmap_err_e res = onebit_trmnl_decode_mem_bmp1(buffer, payload, default_bitmap_size, trmnl_display_width, trmnl_display_height);
               String error = "";
               switch (res)
               {
@@ -1160,7 +1160,7 @@ static https_request_err_e downloadAndShow()
 // Fred
       bool image_reverse = false;
      // bmp_err_e res = parseBMPHeader(buffer, image_reverse);
-       bitmap_err_e res = onebit_decode_to_trmnl((char*)buffer, (char*)payload, payloadSize, trmnl_display_width, trmnl_display_height);
+       bitmap_err_e res = onebit_decode_to_trmnl(buffer, payload, payloadSize, trmnl_display_width, trmnl_display_height);
       Serial.println();
       String error = "";
       switch (res)
