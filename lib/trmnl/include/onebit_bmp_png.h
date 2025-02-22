@@ -76,7 +76,7 @@ bitmap_err_e onebit_trmnl_decode_mem_png1(uint8_t *buffer, uint8_t *data,
   int compressed_data_size = 0;
   uint8_t *compressed_data = nullptr;
   int compressed_data_pos = 0;
-
+  bool single_idat = true;
   do {
     int chunk_length = readMemBig32(ptr);
     ptr += 4;
@@ -87,25 +87,36 @@ bitmap_err_e onebit_trmnl_decode_mem_png1(uint8_t *buffer, uint8_t *data,
       ptr += 4;
       height = readMemBig32(ptr);
       ptr += 4; // we will invert later
-      if (width != expectedWidth || height != expectedHeight) return PNG_BAD_SIZE;
-      int bits_per_pixel = *ptr++; // 
-      if (bits_per_pixel != 1) return PNG_COLOR_SCHEME_FAILED;
-      int color_type = *ptr++;     // 0 grayscale
+      if (width != expectedWidth || height != expectedHeight)
+        return PNG_BAD_SIZE;
+      int bits_per_pixel = *ptr++; //
+      if (bits_per_pixel != 1)
+        return PNG_COLOR_SCHEME_FAILED;
+      int color_type = *ptr++; // 0 grayscale
       int compression = *ptr++;
       int filter_method = *ptr++;
       int interlacing = *ptr++;
     } else if (match_known(ptr, chunk_IDAT, 4)) {
+      single_idat = (compressed_data == nullptr) &&
+                    match_known(save_ptr + chunk_length + 4, chunk_IDAT, 4);
       ptr += 4;
       compressed_data_size += chunk_length;
-      if (compressed_data == nullptr) {
-        // TODO check if miniz allows to decode as we read instead of reading
-        // the whole compressed contents
-        compressed_data = (uint8_t *)malloc(compressed_data_size);
+      if (single_idat == false) {
+        if (compressed_data == nullptr) {
+          // TODO check if miniz allows to decode as we read instead of reading
+          // the whole compressed contents
+          compressed_data = (uint8_t *)malloc(compressed_data_size);
+        } else {
+          // when we have a single idat chunk we can decode from memory to payload without allocating temporary memory 
+          // TODO use streming decompression to have 0 allocation here and maybe direct to dst
+          // maybe even inverting y at he same time !
+          compressed_data =
+              (uint8_t *)realloc(compressed_data, compressed_data_size);
+        }
+        memcpy(compressed_data + compressed_data_pos, ptr, chunk_length);
       } else {
-        compressed_data =
-            (uint8_t *)realloc(compressed_data, compressed_data_size);
+        compressed_data = ptr;
       }
-      memcpy(compressed_data + compressed_data_pos, ptr, chunk_length);
       compressed_data_pos += chunk_length;
     } else if (match_known(ptr, chunk_IEND, 4)) {
       ptr += 4;
@@ -120,24 +131,21 @@ bitmap_err_e onebit_trmnl_decode_mem_png1(uint8_t *buffer, uint8_t *data,
   unsigned long srclen = compressed_data_size;
   unsigned long dstlen = (pngstride + 1) * height;
 
-  // we use payload for destination decompression (allocated a bit larger than buffer)
-  // then copy to buffer
-  // that makes more allocations that necessary but it should be fine on the esp32
-  // we have
-  // - dynamically allocated compressed_data (usually much more smaller than 48000)
+  // we use payload for destination decompression (allocated a bit larger than
+  // buffer) then copy to buffer that makes more allocations that necessary but
+  // it should be fine on the esp32 we have
+  // - dynamically allocated compressed_data only when mktipe idt chunks (usually much more smaller than
+  // 48000)
   //   - buffer (100 * 480 + 62) that will hold the final 1 bit BMP
   //   - payload (101 * 480) (data) that holds the decompressed data
-  int status = uncompress2((unsigned uint8_t *)data, &dstlen,
-                           (const unsigned uint8_t *)compressed_data, &srclen);
-  free(compressed_data);
+  int status = uncompress2((unsigned char *)data, &dstlen,
+                           (const unsigned char *)compressed_data, &srclen);
+  if (single_idat == false) free(compressed_data);
   // we now copy to buffer and invert
   for (int y = 0; y < height; ++y) {
     memcpy(buffer + (height - y - 1) * bmp_stride,
            data + (y * (pngstride + 1)) + 1, pngstride);
   }
-#if defined(DEBUG_IDAT)
-  onebit_write_file_bmp1("pngdecoded.bmp", width, height, data);
-#endif
   return PNG_NO_ERR;
 }
 
