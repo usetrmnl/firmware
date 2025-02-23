@@ -109,7 +109,7 @@ void bl_init(void)
   Serial.begin(115200);
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
   Log_info("BL init success");
-  Log_info("Firware version %d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
+  Log_info("Firmware version %d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
   pins_init();
 
   wakeup_reason = esp_sleep_get_wakeup_cause();

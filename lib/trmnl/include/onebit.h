@@ -576,7 +576,6 @@ uint8_t *onebit_read_mem_png1(uint8_t *data_mem, int data_length,
   uint8_t *data = nullptr;
   uint8_t *compressed_data = nullptr;
   int compressed_data_pos = 0;
-
   do {
     int chunk_length = readMemBig32(ptr);
     ptr += 4;

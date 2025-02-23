@@ -1,3 +1,4 @@
+#include "miniz.h"
 #include "onebit.h"
 
 enum bitmap_err_e {
@@ -5,6 +6,7 @@ enum bitmap_err_e {
   PNG_NO_ERR,
   BMP_NOT_BMP,
   PNG_NOT_PNG,
+  PNG_INFLATE_ERROR,
   BMP_BAD_SIZE,
   BMP_COLOR_SCHEME_FAILED,
   BMP_INVALID_OFFSET,
@@ -60,6 +62,8 @@ bitmap_err_e onebit_trmnl_decode_mem_bmp1(uint8_t *buffer, uint8_t *data,
   return BMP_NO_ERR;
 }
 
+// buffer and data are preallocated to ther expected sizes
+// no more allocation
 bitmap_err_e onebit_trmnl_decode_mem_png1(uint8_t *buffer, uint8_t *data,
                                           int data_length, int expectedWidth,
                                           int expectedHeight) {
@@ -76,7 +80,11 @@ bitmap_err_e onebit_trmnl_decode_mem_png1(uint8_t *buffer, uint8_t *data,
   int compressed_data_size = 0;
   uint8_t *compressed_data = nullptr;
   int compressed_data_pos = 0;
-  bool single_idat = true;
+  int bmp_stride = 0;
+  int png_stride = 0;
+  z_stream stream;
+  memset(&stream, 0, sizeof(stream));
+  int miniz_status = 0;
   do {
     int chunk_length = readMemBig32(ptr);
     ptr += 4;
@@ -89,6 +97,11 @@ bitmap_err_e onebit_trmnl_decode_mem_png1(uint8_t *buffer, uint8_t *data,
       ptr += 4; // we will invert later
       if (width != expectedWidth || height != expectedHeight)
         return PNG_BAD_SIZE;
+      bmp_stride = onebit_bmp_stride(width);
+      png_stride = onebit_png_stride(width);
+      stream.next_out = data;
+      stream.avail_out = data_length;
+      mz_inflateInit(&stream);
       int bits_per_pixel = *ptr++; //
       if (bits_per_pixel != 1)
         return PNG_COLOR_SCHEME_FAILED;
@@ -97,27 +110,14 @@ bitmap_err_e onebit_trmnl_decode_mem_png1(uint8_t *buffer, uint8_t *data,
       int filter_method = *ptr++;
       int interlacing = *ptr++;
     } else if (match_known(ptr, chunk_IDAT, 4)) {
-      single_idat = (compressed_data == nullptr) &&
-                    match_known(save_ptr + chunk_length + 4, chunk_IDAT, 4);
-      ptr += 4;
-      compressed_data_size += chunk_length;
-      if (single_idat == false) {
-        if (compressed_data == nullptr) {
-          // TODO check if miniz allows to decode as we read instead of reading
-          // the whole compressed contents
-          compressed_data = (uint8_t *)malloc(compressed_data_size);
-        } else {
-          // when we have a single idat chunk we can decode from memory to payload without allocating temporary memory 
-          // TODO use streming decompression to have 0 allocation here and maybe direct to dst
-          // maybe even inverting y at he same time !
-          compressed_data =
-              (uint8_t *)realloc(compressed_data, compressed_data_size);
-        }
-        memcpy(compressed_data + compressed_data_pos, ptr, chunk_length);
-      } else {
-        compressed_data = ptr;
+      // setup miniz, inflate whole chunk
+      stream.next_in =  ptr + 4;
+      stream.avail_in = chunk_length;
+      miniz_status = mz_inflate(&stream, Z_NO_FLUSH);
+      if (miniz_status != MZ_OK) {
+        fprintf(stderr, "Error %s\n", mz_error(miniz_status));
+        return PNG_INFLATE_ERROR;
       }
-      compressed_data_pos += chunk_length;
     } else if (match_known(ptr, chunk_IEND, 4)) {
       ptr += 4;
       reading_chunks = false;
@@ -126,25 +126,17 @@ bitmap_err_e onebit_trmnl_decode_mem_png1(uint8_t *buffer, uint8_t *data,
     unsigned int crc = readMemBig32(ptr);
     ptr += 4;
   } while (reading_chunks);
-  int bmp_stride = onebit_bmp_stride(width);
-  int pngstride = onebit_png_stride(width);
-  unsigned long srclen = compressed_data_size;
-  unsigned long dstlen = (pngstride + 1) * height;
-
-  // we use payload for destination decompression (allocated a bit larger than
-  // buffer) then copy to buffer that makes more allocations that necessary but
-  // it should be fine on the esp32 we have
-  // - dynamically allocated compressed_data only when mktipe idt chunks (usually much more smaller than
-  // 48000)
-  //   - buffer (100 * 480 + 62) that will hold the final 1 bit BMP
-  //   - payload (101 * 480) (data) that holds the decompressed data
-  int status = uncompress2((unsigned char *)data, &dstlen,
-                           (const unsigned char *)compressed_data, &srclen);
-  if (single_idat == false) free(compressed_data);
-  // we now copy to buffer and invert
+  // done reading
+  miniz_status = mz_inflateEnd(&stream);
+  if (miniz_status != MZ_OK) {
+  fprintf(stderr, "Error %s\n", mz_error(miniz_status));
+  return PNG_INFLATE_ERROR;
+  }
+  
+  // we now copy to buffer (with different potential strides) and invert
   for (int y = 0; y < height; ++y) {
     memcpy(buffer + (height - y - 1) * bmp_stride,
-           data + (y * (pngstride + 1)) + 1, pngstride);
+           data + (y * (png_stride + 1 )) + 1, png_stride);
   }
   return PNG_NO_ERR;
 }
