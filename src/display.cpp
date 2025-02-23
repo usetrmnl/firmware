@@ -90,7 +90,7 @@ uint16_t display_width()
 
 #ifdef EPDIY
 void convert_1bit_to_4bit(const uint8_t *fb_1bit, uint8_t *fb_4bit, int width, int height) {
-    int byte_width = width / 8;  // Each byte in 1-bit framebuffer stores 8 pixels
+    int byte_width = ((width + 31) / 32) * 4;  // Each byte in 1-bit framebuffer stores 8 pixels
     int row_size_out = width / 2; // Each row in the 4-bit framebuffer (2 pixels per byte)
 
     for (int y = 0; y < height; y++) {
@@ -149,7 +149,7 @@ void display_show_image(uint8_t *image_buffer, bool reverse)
 
     epd_copy_to_framebuffer(dragon_area, image_buffer_4bpp, epd_hl_get_framebuffer(&hl));
 
-    enum EpdDrawError _err = epd_hl_update_screen(&hl, MODE_DU, temperature);
+    enum EpdDrawError _err = epd_hl_update_screen(&hl, MODE_EPDIY_WHITE_TO_GL16, temperature);
     Log.info("%s [%d]: Paint_NewImage %s\r\n", __FILE__, __LINE__, _err);
     delete[] image_buffer_4bpp;
     epd_poweroff();
