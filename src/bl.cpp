@@ -29,8 +29,8 @@
 bool pref_clear = false;
 
 #ifdef EPDIY
-// todo dynamically configureable from env
-uint8_t buffer[78654];    // image buffer
+// image buffer (62 bytes for metadata
+uint8_t buffer[((uint32_t) EPDIY_WIDTH * EPDIY_HEIGHT / 8) + 62];
 #else
 uint8_t buffer[48062];    // image buffer
 #endif

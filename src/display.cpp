@@ -26,7 +26,7 @@ void display_init(void)
 {
     Log.info("%s [%d]: dev module start\r\n", __FILE__, __LINE__);
     #ifdef EPDIY
-    epd_init(&epd_board_v7, &ED060XC3, EPD_LUT_64K);
+    epd_init(&epd_board_v7, &EPDIY_TYPE, EPD_LUT_64K);
     epd_set_vcom(2550);
     #else
     DEV_Module_Init();
@@ -69,7 +69,7 @@ void display_reset(void)
 uint16_t display_height()
 {
     #ifdef EPDIY
-    return 758;
+    return EPDIY_HEIGHT;
     #else
     return EPD_7IN5_V2_HEIGHT;
     #endif
@@ -82,7 +82,7 @@ uint16_t display_height()
 uint16_t display_width()
 {
     #ifdef EPDIY
-    return 1024;
+    return EPDIY_WIDTH;
     #else
     return EPD_7IN5_V2_WIDTH;
     #endif
