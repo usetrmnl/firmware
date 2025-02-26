@@ -1659,7 +1659,11 @@ static float readBatteryVoltage(void)
     adc += analogReadMilliVolts(PIN_BATTERY);
   }
 
+#ifdef EPDIY
+  int32_t sensorValue = (adc / 128) * 1.402;
+#else
   int32_t sensorValue = (adc / 128) * 2;
+#endif
 
   float voltage = sensorValue / 1000.0;
   return voltage;
