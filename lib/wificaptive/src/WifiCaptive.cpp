@@ -103,7 +103,7 @@ void WifiCaptive::setUpWebserver(AsyncWebServer &server, const IPAddress &localI
 
             WiFi.scanDelete();
 			Serial.println(json);
-            
+
 			if (WiFi.scanComplete() == -2){
 				WiFi.scanNetworks(true);
 			}
@@ -518,41 +518,55 @@ bool WifiCaptive::autoConnect()
         WiFi.setSleep(0);
         WiFi.setMinSecurity(WIFI_AUTH_OPEN);
         WiFi.mode(WIFI_STA);
-        connect(_lastUsed.ssid, _lastUsed.pswd);
 
-        // Check if connected
-        if (WiFi.status() == WL_CONNECTED)
-        {
-            Log.info("Connected to %s\r\n", _lastUsed.ssid.c_str());
-            return true;
+        for (int attempt = 0; attempt < WIFI_CONNECTION_ATTEMPTS; attempt++) {
+            Log.info("Attempt %d to connect to %s\r\n", attempt + 1, _lastUsed.ssid.c_str());
+            connect(_lastUsed.ssid, _lastUsed.pswd);
+
+            // Check if connected
+            if (WiFi.status() == WL_CONNECTED)
+            {
+                Log.info("Connected to %s\r\n", _lastUsed.ssid.c_str());
+                return true;
+            }
+            WiFi.disconnect();
+            delay(500);
         }
-        WiFi.disconnect();
     }
 
+    Log.info("Last used network unavailable, scanning for known networks...\r\n");
     std::vector<Network> scanResults = getScannedUniqueNetworks(true);
     std::vector<WifiCaptive::WifiCredentials> sortedNetworks = matchNetworks(scanResults, _savedWifis);
     // if no networks found, try to connect to saved wifis
     if (sortedNetworks.size() == 0)
     {
-        Log.info("No matched networks...\r\n");
+        Log.info("No matched networks found in scan, trying all saved networks...\r\n");
         sortedNetworks = std::vector<WifiCredentials>(_savedWifis, _savedWifis + WIFI_MAX_SAVED_CREDS);
     }
 
     WiFi.mode(WIFI_STA);
     for (auto &network : sortedNetworks)
     {
-        if (network.ssid == "")
+        if (network.ssid == "" || (network.ssid == _lastUsed.ssid && network.pswd == _lastUsed.pswd))
         {
             continue;
         }
 
-        connect(network.ssid, network.pswd);
+        Log.info("Trying to connect to saved network %s...\r\n", network.ssid.c_str());
 
-        // Check if connected
-        if (WiFi.status() == WL_CONNECTED)
-        {
-            saveLastUsed(network.ssid, network.pswd);
-            return true;
+        for (int attempt = 0; attempt < WIFI_CONNECTION_ATTEMPTS; attempt++) {
+            Log.info("Attempt %d to connect to %s\r\n", attempt + 1, network.ssid.c_str());
+            connect(network.ssid, network.pswd);
+
+            // Check if connected
+            if (WiFi.status() == WL_CONNECTED)
+            {
+                Log.info("Connected to %s\r\n", network.ssid.c_str());
+                saveLastUsed(network.ssid, network.pswd);
+                return true;
+            }
+            WiFi.disconnect();
+            delay(500);
         }
     }
 
