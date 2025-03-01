@@ -85,7 +85,7 @@ class AsyncJsonResponse: public AsyncAbstractResponse {
 #ifdef ARDUINOJSON_5_COMPATIBILITY
     DynamicJsonBuffer _jsonBuffer;
 #else
-    DynamicJsonDocument _jsonBuffer;
+    JsonDocument _jsonBuffer;
 #endif
 
     JsonVariant _root;
@@ -221,7 +221,7 @@ public:
         JsonVariant json = jsonBuffer.parse((uint8_t*)(request->_tempObject));
         if (json.success()) {
 #else
-        DynamicJsonDocument jsonBuffer(this->maxJsonBufferSize);
+        JsonDocument jsonBuffer(this->maxJsonBufferSize);
         DeserializationError error = deserializeJson(jsonBuffer, (uint8_t*)(request->_tempObject));
         if(!error) {
           JsonVariant json = jsonBuffer.as<JsonVariant>();
