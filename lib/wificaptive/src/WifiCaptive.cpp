@@ -362,7 +362,6 @@ void WifiCaptive::saveWifiCredentials(String ssid, String pass)
     preferences.end();
 }
 
-
 void WifiCaptive::saveLastUsed(String ssid, String pass)
 {
     _lastUsed.ssid = ssid;
