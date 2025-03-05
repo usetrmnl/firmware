@@ -321,14 +321,11 @@ void WifiCaptive::readWifiCredentials()
 {
     Preferences preferences;
     preferences.begin("wificaptive", true);
-    size_t len = preferences.getBytesLength(WIFI_SSID_KEY(0));
     for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
         _savedWifis[i].ssid = preferences.getString(WIFI_SSID_KEY(i), "");
         _savedWifis[i].pswd = preferences.getString(WIFI_PSWD_KEY(i), "");
     }
-    _lastUsed.ssid = preferences.getString(WIFI_LAST_USED_SSID_KEY, "");
-    _lastUsed.pswd = preferences.getString(WIFI_LAST_USED_PSWD_KEY, "");
     preferences.end();
 }
 
@@ -336,16 +333,22 @@ void WifiCaptive::saveWifiCredentials(String ssid, String pass)
 {
     Log.info("Saving wifi credentials: %s\r\n", ssid.c_str());
 
-    for (u16_t i = WIFI_MAX_SAVED_CREDS - 1; i >= 1; i--)
+    // Check if the credentials already exist
+    for (u16_t i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
-        _savedWifis[i].ssid = _savedWifis[i - 1].ssid;
-        _savedWifis[i].pswd = _savedWifis[i - 1].pswd;
+        if (_savedWifis[i].ssid == ssid && _savedWifis[i].pswd == pass)
+        {
+            return; // Avoid saving duplicate networks
+        }
     }
 
-    _savedWifis[0].ssid = ssid;
-    _savedWifis[0].pswd = pass;
-    _lastUsed.ssid = ssid;
-    _lastUsed.pswd = pass;
+    for (u16_t i = WIFI_MAX_SAVED_CREDS - 1; i > 0; i--)
+    {
+        _savedWifis[i] = _savedWifis[i - 1];
+    }
+
+    _savedWifis[0] = {ssid, pass};
+    _lastUsed = {ssid, pass};
 
     Preferences preferences;
     preferences.begin("wificaptive", false);
@@ -358,6 +361,7 @@ void WifiCaptive::saveWifiCredentials(String ssid, String pass)
     preferences.putString(WIFI_LAST_USED_PSWD_KEY, _lastUsed.pswd);
     preferences.end();
 }
+
 
 void WifiCaptive::saveLastUsed(String ssid, String pass)
 {
