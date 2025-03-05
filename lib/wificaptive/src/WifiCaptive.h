@@ -31,8 +31,6 @@
 
 #define WIFI_SSID_KEY(i) ("wifi_" + String(i) + "_ssid").c_str()
 #define WIFI_PSWD_KEY(i) ("wifi_" + String(i) + "_pswd").c_str()
-#define WIFI_LAST_USED_SSID_KEY "wifi_ssid"
-#define WIFI_LAST_USED_PSWD_KEY "wifi_pswd"
 
 class WifiCaptive
 {
@@ -59,14 +57,13 @@ private:
     std::function<void()> _resetcallback;
 
     WifiCredentials _savedWifis[WIFI_MAX_SAVED_CREDS];
-    WifiCredentials _lastUsed;
 
     void setUpDNSServer(DNSServer &dnsServer, const IPAddress &localIP);
     void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP);
     uint8_t connect(String ssid, String pass);
     uint8_t waitForConnectResult(uint32_t timeout);
     uint8_t waitForConnectResult();
-    void readWifiCredentials();
+    void readWifiCredentials(int index);
     void saveWifiCredentials(String ssid, String pass);
     void saveLastUsed(String ssid, String pass);
     void saveApiServer(String url);

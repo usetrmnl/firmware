@@ -245,15 +245,12 @@ void WifiCaptive::resetSettings()
         preferences.remove(WIFI_SSID_KEY(i));
         preferences.remove(WIFI_PSWD_KEY(i));
     }
-    preferences.remove(WIFI_LAST_USED_SSID_KEY);
-    preferences.remove(WIFI_LAST_USED_PSWD_KEY);
     preferences.end();
 
     for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
         _savedWifis[i] = {"", ""};
     }
-    _lastUsed = {"", ""};
 
     WiFi.disconnect(true, true);
 }
@@ -317,15 +314,24 @@ bool WifiCaptive::isSaved()
     return _savedWifis[0].ssid != "";
 }
 
-void WifiCaptive::readWifiCredentials()
+void WifiCaptive::readWifiCredentials(int index = -1)
 {
     Preferences preferences;
     preferences.begin("wificaptive", true);
-    for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
-    {
-        _savedWifis[i].ssid = preferences.getString(WIFI_SSID_KEY(i), "");
-        _savedWifis[i].pswd = preferences.getString(WIFI_PSWD_KEY(i), "");
+
+    if (index >= 0 && index < WIFI_MAX_SAVED_CREDS) {
+        // Read only the specified index
+        _savedWifis[index].ssid = preferences.getString(WIFI_SSID_KEY(index), "");
+        _savedWifis[index].pswd = preferences.getString(WIFI_PSWD_KEY(index), "");
+    } else {
+        // Read all credentials (original behavior)
+        for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
+        {
+            _savedWifis[i].ssid = preferences.getString(WIFI_SSID_KEY(i), "");
+            _savedWifis[i].pswd = preferences.getString(WIFI_PSWD_KEY(i), "");
+        }
     }
+
     preferences.end();
 }
 
@@ -348,7 +354,6 @@ void WifiCaptive::saveWifiCredentials(String ssid, String pass)
     }
 
     _savedWifis[0] = {ssid, pass};
-    _lastUsed = {ssid, pass};
 
     Preferences preferences;
     preferences.begin("wificaptive", false);
@@ -357,20 +362,6 @@ void WifiCaptive::saveWifiCredentials(String ssid, String pass)
         preferences.putString(WIFI_SSID_KEY(i), _savedWifis[i].ssid);
         preferences.putString(WIFI_PSWD_KEY(i), _savedWifis[i].pswd);
     }
-    preferences.putString(WIFI_LAST_USED_SSID_KEY, _lastUsed.ssid);
-    preferences.putString(WIFI_LAST_USED_PSWD_KEY, _lastUsed.pswd);
-    preferences.end();
-}
-
-void WifiCaptive::saveLastUsed(String ssid, String pass)
-{
-    _lastUsed.ssid = ssid;
-    _lastUsed.pswd = pass;
-
-    Preferences preferences;
-    preferences.begin("wificaptive", false);
-    preferences.putString(WIFI_LAST_USED_SSID_KEY, ssid);
-    preferences.putString(WIFI_LAST_USED_PSWD_KEY, pass);
     preferences.end();
 }
 
@@ -515,21 +506,21 @@ bool WifiCaptive::autoConnect()
     Log.info("Trying to autoconnect to wifi...\r\n");
     readWifiCredentials();
 
-    if (_lastUsed.ssid != "")
+    if (_savedWifis[0].ssid != "")
     {
-        Log.info("Trying to connect to last used %s...\r\n", _lastUsed.ssid.c_str());
+        Log.info("Trying to connect to last used %s...\r\n", _savedWifis[0].ssid.c_str());
         WiFi.setSleep(0);
         WiFi.setMinSecurity(WIFI_AUTH_OPEN);
         WiFi.mode(WIFI_STA);
 
         for (int attempt = 0; attempt < WIFI_CONNECTION_ATTEMPTS; attempt++) {
-            Log.info("Attempt %d to connect to %s\r\n", attempt + 1, _lastUsed.ssid.c_str());
-            connect(_lastUsed.ssid, _lastUsed.pswd);
+            Log.info("Attempt %d to connect to %s\r\n", attempt + 1, _savedWifis[0].ssid.c_str());
+            connect(_savedWifis[0].ssid, _savedWifis[0].pswd);
 
             // Check if connected
             if (WiFi.status() == WL_CONNECTED)
             {
-                Log.info("Connected to %s\r\n", _lastUsed.ssid.c_str());
+                Log.info("Connected to %s\r\n", _savedWifis[0].ssid.c_str());
                 return true;
             }
             WiFi.disconnect();
@@ -550,7 +541,7 @@ bool WifiCaptive::autoConnect()
     WiFi.mode(WIFI_STA);
     for (auto &network : sortedNetworks)
     {
-        if (network.ssid == "" || (network.ssid == _lastUsed.ssid && network.pswd == _lastUsed.pswd))
+        if (network.ssid == "" || (network.ssid == _savedWifis[0].ssid && network.pswd == _savedWifis[0].pswd))
         {
             continue;
         }
