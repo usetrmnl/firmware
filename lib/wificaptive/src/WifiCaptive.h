@@ -63,7 +63,7 @@ private:
     uint8_t connect(String ssid, String pass);
     uint8_t waitForConnectResult(uint32_t timeout);
     uint8_t waitForConnectResult();
-    void readWifiCredentials(int index);
+    void readWifiCredentials(int index = -1);
     void saveWifiCredentials(String ssid, String pass);
     void saveLastUsed(String ssid, String pass);
     void saveApiServer(String url);

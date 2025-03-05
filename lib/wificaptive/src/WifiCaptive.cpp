@@ -314,7 +314,7 @@ bool WifiCaptive::isSaved()
     return _savedWifis[0].ssid != "";
 }
 
-void WifiCaptive::readWifiCredentials(int index = -1)
+void WifiCaptive::readWifiCredentials(int index)
 {
     Preferences preferences;
     preferences.begin("wificaptive", true);
@@ -556,7 +556,6 @@ bool WifiCaptive::autoConnect()
             if (WiFi.status() == WL_CONNECTED)
             {
                 Log.info("Connected to %s\r\n", network.ssid.c_str());
-                saveLastUsed(network.ssid, network.pswd);
                 return true;
             }
             WiFi.disconnect();
