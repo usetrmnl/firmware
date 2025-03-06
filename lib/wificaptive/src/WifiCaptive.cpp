@@ -314,22 +314,15 @@ bool WifiCaptive::isSaved()
     return _savedWifis[0].ssid != "";
 }
 
-void WifiCaptive::readWifiCredentials(int index)
+void WifiCaptive::readWifiCredentials()
 {
     Preferences preferences;
     preferences.begin("wificaptive", true);
 
-    if (index >= 0 && index < WIFI_MAX_SAVED_CREDS) {
-        // Read only the specified index
-        _savedWifis[index].ssid = preferences.getString(WIFI_SSID_KEY(index), "");
-        _savedWifis[index].pswd = preferences.getString(WIFI_PSWD_KEY(index), "");
-    } else {
-        // Read all credentials (original behavior)
-        for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
-        {
-            _savedWifis[i].ssid = preferences.getString(WIFI_SSID_KEY(i), "");
-            _savedWifis[i].pswd = preferences.getString(WIFI_PSWD_KEY(i), "");
-        }
+    for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
+    {
+        _savedWifis[i].ssid = preferences.getString(WIFI_SSID_KEY(i), "");
+        _savedWifis[i].pswd = preferences.getString(WIFI_PSWD_KEY(i), "");
     }
 
     preferences.end();
