@@ -6,12 +6,16 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <unistd.h>
 
 extern "C" {
 #include "miniz.h"
 }
-
+#include <chrono>
+using namespace std::chrono;
+#include <iostream>
 #include <stdlib.h>
+using namespace std;
 
 // clang -g -I. -Iminiz-3.0.2 onebit_image_demo.cpp miniz-3.0.2/miniz.c puff.c
 // -o onebit_image_dem
@@ -34,17 +38,14 @@ const int bmp_signature_length = 2;
 uint8_t bmp_signature[bmp_signature_length] = {'B', 'M'};
 
 const int png_signature_length = 8;
-uint8_t png_signature[png_signature_length] = {137, 80, 78, 71,
-                                                     13,  10, 26, 10};
+uint8_t png_signature[png_signature_length] = {137, 80, 78, 71, 13, 10, 26, 10};
 
-uint8_t *onebit_read_mem_bmp1(uint8_t *data, int data_length,
-                                    int *w, int *h, int *stride);
-uint8_t *onebit_read_mem_png1(uint8_t *data, int data_length,
-                                    int *w, int *h, int *stride);
-uint8_t *onebit_write_mem_bmp1(int w, int h, const uint8_t *data,
-                                     int *size);
-uint8_t *onebit_write_mem_png1(int w, int h, const uint8_t *data,
-                                     int *size);
+uint8_t *onebit_read_mem_bmp1(uint8_t *data, int data_length, int *w, int *h,
+                              int *stride);
+uint8_t *onebit_read_mem_png1(uint8_t *data, int data_length, int *w, int *h,
+                              int *stride);
+uint8_t *onebit_write_mem_bmp1(int w, int h, const uint8_t *data, int *size);
+uint8_t *onebit_write_mem_png1(int w, int h, const uint8_t *data, int *size);
 
 uint8_t *onebit_read_file_bmp1(const char *filename, int *w, int *h);
 uint8_t *onebit_read_file_png1(const char *filename, int *w, int *h);
@@ -220,17 +221,13 @@ uint32_t readBig32(FILE *fp) {
          ((uint32_t)fgetc(fp) << 8) | fgetc(fp);
 }
 
-void writeN(FILE *fp, const uint8_t *data, int n) {
-  fwrite(data, 1, n, fp);
-}
+void writeN(FILE *fp, const uint8_t *data, int n) { fwrite(data, 1, n, fp); }
 void writeNMem(uint8_t *dataout, const uint8_t *datain, int n) {
   memcpy(dataout, datain, n);
 }
 
 void write1(FILE *fp, uint8_t value) { fputc(value, fp); }
-void write1Mem(uint8_t *dataout, uint8_t value) {
-  dataout[0] = value;
-}
+void write1Mem(uint8_t *dataout, uint8_t value) { dataout[0] = value; }
 
 void skipN(FILE *fp, int n) {
   for (int i = 0; i < n; ++n)
@@ -251,9 +248,7 @@ inline void skip4(FILE *fp) {
   fgetc(fp);
 }
 
-int readN(FILE *fp, uint8_t *data, int n) {
-  return fread(data, 1, n, fp);
-}
+int readN(FILE *fp, uint8_t *data, int n) { return fread(data, 1, n, fp); }
 
 uint8_t read1(FILE *fp) { return fgetc(fp); }
 
@@ -300,8 +295,12 @@ typedef struct BGRA {
 } BGRA;
 
 // TODO: check data size
-uint8_t *onebit_read_mem_bmp1(uint8_t *data, int data_length,
-                                    int *w, int *h, int *stride) {
+uint8_t *onebit_read_mem_bmp1(uint8_t *data, int data_length, int *w, int *h,
+                              int *stride) {
+#if defined(BENCH)
+  auto start = high_resolution_clock::now();
+#endif
+
   if (data_length < 62)
     return data;
   uint8_t *ptr = data;
@@ -337,6 +336,11 @@ uint8_t *onebit_read_mem_bmp1(uint8_t *data, int data_length,
 
   uint8_t *dataout = (uint8_t *)malloc(abs(height) * (*stride));
   memcpy(dataout, ptr, *stride * abs(height));
+#if defined(BENCH)
+  auto stop = high_resolution_clock::now();
+  auto duration = duration_cast<microseconds>(stop - start);
+  cout << "onebit_read_mem_bmp1 microseconds:  " << duration.count() << endl;
+#endif
   return dataout;
 }
 
@@ -396,6 +400,9 @@ const int full_chunk_IHDR_length = 25;
 
 uint8_t chunk_IHDR[4] = {'I', 'H', 'D', 'R'};
 uint8_t chunk_IDAT[4] = {'I', 'D', 'A', 'T'};
+uint8_t chunk_tExt[4] = {'t', 'E', 'X', 't'};
+uint8_t chunk_tIME[4] = {'t', 'I', 'M', 'E'};
+uint8_t chunk_zTXt[4] = {'z', 'T', 'X', 't'};
 uint8_t chunk_IEND[4] = {'I', 'E', 'N', 'D'};
 
 const int full_chunk_IEND_length = 12;
@@ -413,14 +420,24 @@ void writeToFile(const char *filename, uint8_t *data, int size) {
   fclose(fp);
 }
 
-uint8_t *onebit_write_mem_png1(int w, int h, const uint8_t *data,
-                                     int *size) {
+void onebit_png_to_bmp(uint8_t *bmpdata, uint8_t *data, int width, int height) {
+  int bmp_stride = onebit_bmp_stride(width);
+  int png_stride = onebit_png_stride(width);
+  if (bmpdata == nullptr)
+    bmpdata = (uint8_t *)malloc(bmp_stride * height);
+  // invert
+  for (int y = 0; y < height; ++y) {
+    memcpy(bmpdata + ((height - y - 1) * bmp_stride),
+           data + (y * (png_stride + 1)) + 1, png_stride);
+  }
+}
+
+uint8_t *onebit_write_mem_png1(int w, int h, const uint8_t *data, int *size) {
   int ihdr_contents_size = 13;
   int chunk_overhead = 12; // count 4 chunktypr 4 crc 4
   int ihdr_size = ihdr_contents_size +
                   chunk_overhead; // size + chunk name * chunkdata + crc = 25
-  uint8_t *signature_ihdr =
-      (uint8_t *)malloc(png_signature_length + ihdr_size);
+  uint8_t *signature_ihdr = (uint8_t *)malloc(png_signature_length + ihdr_size);
 
   // first compress to get final size
   int bmpstride = onebit_bmp_stride(w);
@@ -551,7 +568,7 @@ int onebit_write_file_png1(const char *filename, int w, int h,
   // iend
   writeN(fp, full_chunk_IEND, full_chunk_IEND_length);
 
-#if defined(DEBUG_IDAT)
+#if defined(DEBUG_CHUNKS)
   FILE *rawdata = fopen("rawdata.zs", "wb");
   fwrite(rawdata, 1, cdata_len, rawdata);
   fclose(rawdata);
@@ -561,8 +578,12 @@ int onebit_write_file_png1(const char *filename, int w, int h,
   return 1;
 }
 
-uint8_t *onebit_read_mem_png1(uint8_t *data_mem, int data_length,
-                                    int *w, int *h, int *stride) {
+uint8_t *onebit_read_mem_png1(uint8_t *data_mem, int data_length, int *w,
+                              int *h, int *stride) {
+
+#if defined(BENCH)
+  auto start = high_resolution_clock::now();
+#endif
   int width = 0;
   int height = 0;
   uint8_t *ptr = data_mem;
@@ -572,78 +593,130 @@ uint8_t *onebit_read_mem_png1(uint8_t *data_mem, int data_length,
   ptr += png_signature_length;
   // read chunks
   bool reading_chunks = true;
+  int idatchunk_index = 0;
+  int status;
+  z_stream stream;
+  memset(&stream, 0, sizeof(stream));
   int compressed_data_size = 0;
   uint8_t *data = nullptr;
   uint8_t *compressed_data = nullptr;
+  uint8_t *png_uncompressed = nullptr;
+  int png_uncompressed_size = 0;
   int compressed_data_pos = 0;
+  int bmp_stride = 0;
+  int png_stride = 0;
   do {
     int chunk_length = readMemBig32(ptr);
     ptr += 4;
     uint8_t *save_ptr = ptr;
     if (match_known(ptr, chunk_IHDR, 4)) {
       ptr += 4;
+#if defined(DEBUG_CHUNKS)
+      fprintf(stdout, "IHDR\n");
+#endif
       width = readMemBig32(ptr);
       ptr += 4;
       height = readMemBig32(ptr);
       ptr += 4; // we will invert later
-
+      // we  have with and height and can init miniz (and allocate uncompressed
+      // buffer) we only need one , and allocat final buffer
+      bmp_stride = onebit_bmp_stride(width);
+      png_stride = onebit_png_stride(width);
+      png_uncompressed_size = (png_stride + 1) * height;
+      png_uncompressed = (uint8_t *)malloc(png_uncompressed_size);
+      stream.next_out = png_uncompressed;
+      stream.avail_out = png_uncompressed_size;
+      mz_inflateInit(&stream);
       int bits_per_pixel = *ptr++; // 1
       int color_type = *ptr++;     // 0 grayscale
       int compression = *ptr++;
       int filter_method = *ptr++;
       int interlacing = *ptr++;
     } else if (match_known(ptr, chunk_IDAT, 4)) {
-      ptr += 4;
-      compressed_data_size += chunk_length;
-      if (compressed_data == nullptr) {
-        // TODO check if miniz allows to decode as we read instead of reading
-        // the whole compressed contents
-        compressed_data = (uint8_t *)malloc(compressed_data_size);
-      } else {
-        compressed_data =
-            (uint8_t *)realloc(compressed_data, compressed_data_size);
-      }
-      memcpy(compressed_data + compressed_data_pos, ptr, chunk_length);
-      compressed_data_pos += chunk_length;
-    } else if (match_known(ptr, chunk_IEND, 4)) {
-      ptr += 4;
-      reading_chunks = false;
-    }
-    ptr = save_ptr + chunk_length + 4;
-    unsigned int crc = readMemBig32(ptr);
-    ptr += 4;
-  } while (reading_chunks);
-  int tmp_stride = onebit_bmp_stride(width);
-  *stride = tmp_stride;
-  *w = width;
-  *h = height;
-  int pngstride = onebit_png_stride(width);
-  unsigned long srclen = compressed_data_size;
-  unsigned long dstlen = (pngstride + 1) * height;
-  // we allocate for final data. the real size + one columnn for the filter
-  // to prevent doing two allocations and copying from decompressed to final
-  // size this wastes some memory. uncompressing to final data might be possible
-  // with a streaming API for deflate, but we currently retrieve the full
-  // uncompressed data... we have to layout the data "in-place",
-  uint8_t *tmp_data = (uint8_t *)malloc(srclen);
-  int status = uncompress2(tmp_data, &dstlen, compressed_data, &srclen);
-  free(compressed_data);
-#if 1
-  data = (uint8_t *)malloc(tmp_stride * height);
-  // invert
-  for (int y = 0; y < height; ++y) {
-    memcpy(data + (height - y - 1) * tmp_stride,
-           tmp_data + (y * (pngstride + 1)) + 1, pngstride);
-  }
-  free(tmp_data);
-#else
-// TODO
+      stream.next_in = ptr + 4;
+      stream.avail_in = chunk_length;
+      status = mz_inflate(&stream, MZ_PARTIAL_FLUSH);
+
+#if defined(DEBUG_CHUNKS)
+      FILE *rawdata = fopen("rawdata.zst", "wb");
+      fwrite(ptr + 4, 1, chunk_length, rawdata);
+      fclose(rawdata);
+      fprintf(stderr, "avail in %u\n", stream.avail_in);
+      fprintf(stderr, "avail out %u\n", stream.avail_out);
 #endif
-#if defined(DEBUG_IDAT)
-  onebit_write_file_bmp1("pngdecoded.bmp", width, height, data);
+      if (stream.avail_out == 0 && status != MZ_STREAM_END)
+        mz_inflate(&stream, MZ_FULL_FLUSH);
+
+#if defined(DEBUG_CHUNKS)
+      fprintf(stderr, "idat chunk %d: ", idatchunk_index);
+
+      if (status == MZ_STREAM_END)
+        fprintf(stderr, "status end\n");
+      else if (status == MZ_OK)
+        fprintf(stderr, "status ok\n");
+      else
+        fprintf(stderr, "status %s\n", mz_error(status));
+#endif
+      idatchunk_index++;
+    } else if (match_known(ptr, chunk_tIME, 4)) {
+      ptr += 4;
+#if defined(DEBUG_CHUNKS)
+      uint16_t year = readMemLittle16(ptr);
+      ptr += 2;
+      uint8_t month = *ptr++;
+      uint8_t day = *ptr++;
+      uint8_t hour = *ptr++;
+      uint8_t minute = *ptr++;
+      uint8_t second = *ptr++;
+      fprintf(stdout, "tIME chunk %d %d %d - %d %d %d\n", year, month, day,
+              hour, minute, second);
+#endif
+    } else if (match_known(ptr, chunk_tExt, 4)) {
+      ptr += 4;
+#if defined(DEBUG_CHUNKS)
+      fprintf(stdout, "tExt %s\n", ptr);
+#endif
+    } else if (match_known(ptr, chunk_zTXt, 4)) {
+    ptr += 4;
+#if defined(DEBUG_CHUNKS)
+    fprintf(stdout, "zTXt %d\n", chunk_length);
+#endif
+  }
+  else if (match_known(ptr, chunk_IEND, 4)) {
+    ptr += 4;
+    reading_chunks = false;
+#if defined(DEBUG_CHUNKS)
+    fprintf(stdout, "IEND\n");
+#endif
+  }
+  ptr = save_ptr + chunk_length + 4;
+  unsigned int crc = readMemBig32(ptr);
+  ptr += 4;
+}
+while (reading_chunks)
+  ;
+status = mz_inflateEnd(&stream);
+#if defined(DEBUG_CHUNKS)
+if (status == MZ_STREAM_END)
+  fprintf(stderr, "final status end\n");
+else if (status == MZ_OK)
+  fprintf(stderr, "final status ok\n");
+else
+  fprintf(stderr, "final status %s\n", mz_error(status));
 #endif
 
-  return data;
+*stride = bmp_stride;
+*w = width;
+*h = height;
+data = (uint8_t *)malloc(bmp_stride * height);
+onebit_png_to_bmp(data, png_uncompressed, width, height);
+free(png_uncompressed);
+#if defined(BENCH)
+auto stop = high_resolution_clock::now();
+auto duration = duration_cast<microseconds>(stop - start);
+cout << "onebit_read_mem_png1 microseconds:  " << duration.count() << endl;
+#endif
+return data;
 }
 
 uint8_t *onebit_read_file_png1(const char *filename, int *w, int *h) {
@@ -708,22 +781,20 @@ uint8_t *onebit_read_file_png1(const char *filename, int *w, int *h) {
   } while (reading_chunks);
   fclose(fp);
   unsigned long srclen = compressed_data_size;
-  int pngstride = onebit_png_stride(width);
-  unsigned long dstlen = (pngstride + 1) * height;
+  int bmp_stride = onebit_bmp_stride(width);
+  int png_stride = onebit_png_stride(width);
+  unsigned long dstlen = (png_stride + 1) * height;
   // these two allocations can be reduced to the largest one,
   // the returned data would have height "wasted" bytes ate the end
   // second pass would move data to correct location "in place"
   uint8_t *tmp_data = (uint8_t *)malloc(dstlen);
   int status = uncompress2(tmp_data, &dstlen, compressed_data, &srclen);
   free(compressed_data);
-  data = (uint8_t *)malloc(stride * height);
-  // invert
-  for (int y = 0; y < height; ++y) {
-    memcpy(data + ((height - y - 1) * stride),
-           tmp_data + (y * (pngstride + 1)) + 1, pngstride);
-  }
+  data = (uint8_t *)malloc(bmp_stride * height);
+  // copy and invert
+  onebit_png_to_bmp(data, tmp_data, width, height);
   free(tmp_data);
-#if defined(DEBUG_IDAT)
+#if defined(DEBUG_CHUNKS)
   onebit_write_file_bmp1("pngdecoded.bmp", width, height, data);
 #endif
   return data;
@@ -733,8 +804,7 @@ uint8_t *onebit_read_file_png1(const char *filename, int *w, int *h) {
 uint8_t black[4] = {0x00, 0x00, 0x00, 0x00};
 uint8_t white[4] = {0xff, 0xff, 0xff, 0x00};
 
-uint8_t *onebit_write_mem_bmp1(int w, int h, const uint8_t *data,
-                                     int *size) {
+uint8_t *onebit_write_mem_bmp1(int w, int h, const uint8_t *data, int *size) {
   *size = 0;
   int ncolors = 2;
   unsigned int stride = onebit_bmp_stride(w);

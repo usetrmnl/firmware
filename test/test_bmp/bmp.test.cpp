@@ -4,8 +4,9 @@
 #include <unity.h>
 #include <vector>
 
-constexpr int bitmap_size = (onebit_bmp_stride(800) * 480) + 62;
-char bitmap[bitmap_size];
+
+int bitmap_size = (onebit_bmp_stride(800) * 480) + 62;
+char bitmap[48062];
 
 char* readBMPFile(const char *filename) {
   try {
@@ -36,7 +37,7 @@ void test_parseBMPHeader_BMP_NO_ERR(void) {
   char* bmp_data = readBMPFile("./test.bmp");
   bool image_reverse = false;
 
-  bitmap_err_e result = onebit_trmnl_decode_mem_bmp1(bitmap, bmp_data,
+  bitmap_err_e result = onebit_trmnl_decode_mem_bmp1((uint8_t*)bitmap, (uint8_t*)bmp_data,
                                                      bitmap_size, 800, 480);
   TEST_ASSERT_EQUAL(BMP_NO_ERR, result);
   TEST_ASSERT_EQUAL(false, image_reverse);
@@ -56,7 +57,7 @@ void test_parseBMPHeader_BMP_NO_ERR_reversed(void) {
   bmp_data[60] = 0;
   bmp_data[61] = 0;
 
-  bitmap_err_e result = onebit_trmnl_decode_mem_bmp1(bitmap, bmp_data,
+  bitmap_err_e result = onebit_trmnl_decode_mem_bmp1((uint8_t*)bitmap, (uint8_t*)bmp_data,
                                                      bitmap_size, 800, 480);
   TEST_ASSERT_EQUAL(BMP_NO_ERR, result);
   TEST_ASSERT_EQUAL(true, image_reverse);
@@ -68,7 +69,7 @@ void test_parseBMPHeader_NOT_BMP(void) {
   bool image_reverse = false;
 
   bmp_data[0] = 'A';
-  bitmap_err_e result = onebit_trmnl_decode_mem_bmp1(bitmap, bmp_data,
+  bitmap_err_e result = onebit_trmnl_decode_mem_bmp1((uint8_t*)bitmap, (uint8_t*)bmp_data,
                                                      bitmap_size, 800, 480);
   TEST_ASSERT_EQUAL(BMP_NOT_BMP, result);
   free(bmp_data);
@@ -80,7 +81,7 @@ void test_parseBMPHeader_BMP_BAD_SIZE(void) {
 
   bmp_data[18] = 123;
 
-  bitmap_err_e result = onebit_trmnl_decode_mem_bmp1(bitmap, bmp_data,
+  bitmap_err_e result = onebit_trmnl_decode_mem_bmp1((uint8_t*)bitmap, (uint8_t*)bmp_data,
                                                      bitmap_size, 800, 480);
   TEST_ASSERT_EQUAL(BMP_BAD_SIZE, result);
   free(bmp_data);
@@ -92,7 +93,7 @@ void test_parseBMPHeader_BMP_COLOR_SCHEME_FAILED(void) {
 
   bmp_data[54] = 123;
 
-  bitmap_err_e result = onebit_trmnl_decode_mem_bmp1(bitmap, bmp_data,
+  bitmap_err_e result = onebit_trmnl_decode_mem_bmp1((uint8_t*)bitmap, (uint8_t*)bmp_data,
                                                      bitmap_size, 800, 480);
   TEST_ASSERT_EQUAL(BMP_COLOR_SCHEME_FAILED, result);
   free(bmp_data);
@@ -104,7 +105,7 @@ void test_parseBMPHeader_BMP_INVALID_OFFSET(void) {
 
   bmp_data[10] = 5;
 
-  bitmap_err_e result = onebit_trmnl_decode_mem_bmp1(bitmap, bmp_data,
+  bitmap_err_e result = onebit_trmnl_decode_mem_bmp1((uint8_t*)bitmap, (uint8_t*)bmp_data,
                                                      bitmap_size, 800, 480);
   TEST_ASSERT_EQUAL(BMP_INVALID_OFFSET, result);
   free(bmp_data);
