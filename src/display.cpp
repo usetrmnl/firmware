@@ -25,21 +25,21 @@ EpdiyHighlevelState hl;
 void display_init(void)
 {
     Log.info("%s [%d]: dev module start\r\n", __FILE__, __LINE__);
-    #ifdef EPDIY
+#ifdef EPDIY
     epd_init(&epd_board_v7, &EPDIY_TYPE, EPD_LUT_64K);
     epd_set_vcom(2550);
-    #else
+#else
     DEV_Module_Init();
-    #endif
+#endif
     Log.info("%s [%d]: dev module end\r\n", __FILE__, __LINE__);
 
 
     Log.info("%s [%d]: screen hw start\r\n", __FILE__, __LINE__);
-    #ifdef EPDIY
+#ifdef EPDIY
     hl = epd_hl_init(EPD_BUILTIN_WAVEFORM);
-    #else
+#else
     EPD_7IN5_V2_Init_New();
-    #endif
+#endif
     Log.info("%s [%d]: screen hw end\r\n", __FILE__, __LINE__);
 }
 
@@ -51,13 +51,13 @@ void display_init(void)
 void display_reset(void)
 {
     Log.info("%s [%d]: e-Paper Clear start\r\n", __FILE__, __LINE__);
-    #ifdef EPDIY
+#ifdef EPDIY
     int temperature = 25;
     epd_poweron();
     epd_fullclear(&hl, temperature);
-    #else
+#else
     EPD_7IN5_V2_Clear();
-    #endif
+#endif
     Log.info("%s [%d]:  e-Paper Clear end\r\n", __FILE__, __LINE__);
     // DEV_Delay_ms(500);
 }
@@ -68,11 +68,11 @@ void display_reset(void)
  */
 uint16_t display_height()
 {
-    #ifdef EPDIY
+#ifdef EPDIY
     return EPDIY_HEIGHT;
-    #else
+#else
     return EPD_7IN5_V2_HEIGHT;
-    #endif
+#endif
 }
 
 /**
@@ -81,11 +81,11 @@ uint16_t display_height()
  */
 uint16_t display_width()
 {
-    #ifdef EPDIY
+#ifdef EPDIY
     return EPDIY_WIDTH;
-    #else
+#else
     return EPD_7IN5_V2_WIDTH;
-    #endif
+#endif
 }
 
 #ifdef EPDIY
@@ -138,7 +138,7 @@ void display_show_image(uint8_t *image_buffer, bool reverse)
     Log.info("%s [%d]: Image width: %d, height: %d!\r\n", __FILE__, __LINE__, width, height);
     Log.info("%s [%d]: Data offset: %d!\r\n", __FILE__, __LINE__, dataOffset);
 
-    EpdRect dragon_area = { .x = (width_d - width) / 2, .y = (height_d - height) / 2, .width = width, .height = height };
+    EpdRect paint_area = { .x = (width_d - width) / 2, .y = (height_d - height) / 2, .width = width, .height = height };
     uint8_t *image_buffer_4bpp = new uint8_t[width * height / 2];
     convert_1bit_to_4bit(image_buffer + dataOffset, image_buffer_4bpp, width, height);
 
@@ -147,7 +147,7 @@ void display_show_image(uint8_t *image_buffer, bool reverse)
     epd_poweron();
     epd_fullclear(&hl, temperature);
 
-    epd_copy_to_framebuffer(dragon_area, image_buffer_4bpp, epd_hl_get_framebuffer(&hl));
+    epd_copy_to_framebuffer(paint_area, image_buffer_4bpp, epd_hl_get_framebuffer(&hl));
 
     enum EpdDrawError _err = epd_hl_update_screen(&hl, MODE_EPDIY_WHITE_TO_GL16, temperature);
     Log.info("%s [%d]: Paint_NewImage %s\r\n", __FILE__, __LINE__, _err);
@@ -202,8 +202,8 @@ void display_show_image(uint8_t *image_buffer, bool reverse)
  */
 void display_show_msg(uint8_t *image_buffer, MSG message_type)
 {
-    #ifdef EPDIY
-    #else
+#ifdef EPDIY
+#else
     auto width = display_width();
     auto height = display_height();
     UBYTE *BlackImage;
@@ -336,7 +336,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
     free(BlackImage);
     BlackImage = NULL;
-    #endif
+#endif
 }
 
 /**
@@ -433,9 +433,9 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 void display_sleep(void)
 {
     Log.info("%s [%d]: Goto Sleep...\r\n", __FILE__, __LINE__);
-    #ifdef EPDIY
+#ifdef EPDIY
      epd_poweroff();
-    #else
+#else
     EPD_7IN5B_V2_Sleep();
-    #endif
+#endif
 }
