@@ -118,12 +118,12 @@ void convert_1bit_to_4bit(const uint8_t *fb_1bit, uint8_t *fb_4bit, int width, i
  */
 void display_show_image(uint8_t *image_buffer, bool reverse)
 {
-    uint16_t width_d = display_width();
-    uint16_t height_d = display_height();
+    uint16_t width = display_width();
+    uint16_t height = display_height();
 
 #ifdef EPDIY
-    uint32_t width = *(uint32_t *)&image_buffer[18];
-    uint32_t height = *(uint32_t *)&image_buffer[22];
+    uint32_t width_b = *(uint32_t *)&image_buffer[18];
+    uint32_t height_b = *(uint32_t *)&image_buffer[22];
     uint32_t dataOffset = *(uint32_t *)&image_buffer[10];
 
     // set to default value if header is faulty
@@ -135,14 +135,14 @@ void display_show_image(uint8_t *image_buffer, bool reverse)
     if(dataOffset == 0) {
       dataOffset = 62;
     }
-    Log.info("%s [%d]: Image width: %d, height: %d!\r\n", __FILE__, __LINE__, width, height);
+    Log.info("%s [%d]: Image width: %d, height: %d!\r\n", __FILE__, __LINE__, width_b, height_b);
     Log.info("%s [%d]: Data offset: %d!\r\n", __FILE__, __LINE__, dataOffset);
 
-    EpdRect paint_area = { .x = (width_d - width) / 2, .y = (height_d - height) / 2, .width = width, .height = height };
-    uint8_t *image_buffer_4bpp = new uint8_t[width * height / 2];
-    convert_1bit_to_4bit(image_buffer + dataOffset, image_buffer_4bpp, width, height);
+    EpdRect paint_area = { .x = (width - width_b) / 2, .y = (height - height_b) / 2, .width = width_b, .height = height_b };
+    uint8_t *image_buffer_4bpp = new uint8_t[width_b * height_b / 2];
+    convert_1bit_to_4bit(image_buffer + dataOffset, image_buffer_4bpp, width_b, height_b);
 
-    int temperature = 22;
+    uint8_t temperature = 22;
 
     epd_poweron();
     epd_fullclear(&hl, temperature);
