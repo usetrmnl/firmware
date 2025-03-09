@@ -4,114 +4,97 @@ created for the [TRMNL](https://usetrmnl.com) e-ink display.
 
 ## **Algorithm block scheme**
 
-```graphviz
-digraph flowchart {
-    rankdir=TB;
+```mermaid
+graph TB
+
+    Start(["Start"])
+    Init("Init peripherals")
+    Start --> Init
+
+    IsLongRst{"Reset button 
+      pressed > 300 ms?"}
+    Init --> IsLongRst
+
+    ClearWifi("Wi-Fi credentials clear")
+    IsLongRst -->|"Yes"| ClearWifi
+    DisplayInit("Display init")
+    IsLongRst -->|"No"| DisplayInit
+    ClearWifi --> DisplayInit
+    WakeReason{"Wake by
+      user or timer?"}
+    DisplayInit --> WakeReason
+
+    ClearDisplay("Display clear")
+    WakeReason -->|"User"| ClearDisplay
+    IsWiFiSetup{"Wi-Fi saved?"}
+    WakeReason -->|"Timer"| IsWiFiSetup
+    ClearDisplay --> IsWiFiSetup
+    NeedConfig("Show set-up message")
+    IsWiFiSetup -->|"No"| NeedConfig
+
+    %% Config Wifi
+    RunSetup("Start config portal")
+    NeedConfig --> RunSetup
+    IsReset1{"Device
+      reset?"}
+    RunSetup -->|"Yes"| IsReset1
+    WipeConfig1("API key, friendly ID and WiFi clear")
+    IsReset1 -->|"Yes"| WipeConfig1
+    Reboot1(["Reboot"])
+    WipeConfig1 --> Reboot1
+    IsWifiConnect{"WiFi
+      connected?"}
+    IsReset1 -->|"No"| IsWifiConnect
+
+    %% Main Body
+    TryConnect{"WiFi connected
+      (5tries)?"}
+    IsWiFiSetup -->|"Yes"| TryConnect
+
+    ConnectError("Show connection error")
+    IsWifiConnect -->|"No"| ConnectError
+    TryConnect -->|"No"| ConnectError
+    Sleep1(["Sleep"])
+    ConnectError --> Sleep1
+    ClockSync("Check synchronization")
+    IsWifiConnect -->|"Yes"| ClockSync
+    TryConnect -->|"Yes"| ClockSync
+    IsApiSetup{"API key and
+      friendly ID exist?"}
+    ClockSync --> IsApiSetup
+
+    %% Setup
+    CallSetup("Ping /api/setup")
+    IsApiSetup -->|"No"| CallSetup
+    IsSetupSuccess{"Setup
+      success?"}
+    CallSetup --> IsSetupSuccess
+    SetupError("Show setup error")
+    IsSetupSuccess --> SetupError
+    Sleep2(["Sleep"])
+    SetupError --> Sleep2
     
-    node [fontname="Arial" fontsize=12];
-    edge [fontname="Arial" fontsize=10];
-
-    Start [shape=oval label="Start"];
-    Init [shape=box label="Init peripherals"];
-    Start -> Init;
+    %% Check update
+    PingServer{"Ping server,
+      success?"}
+    IsApiSetup -->|"Yes"| PingServer
+    IsSetupSuccess -->|"Yes"| PingServer
+    PingError("Show server error")
+    PingServer -->|"No"| PingError
+    Sleep3(["Sleep"])
+    PingError --> Sleep3
     
-    IsLongRst [shape=diamond label="Reset button\npressed > 300 ms?"];
-    Init -> IsLongRst;
-   
-    ClearWifi [shape=box label="Wi-Fi credentials clear"];
-    IsLongRst -> ClearWifi [label="Yes"];
-
-    DisplayInit [shape=box label="Display init"];
-    IsLongRst -> DisplayInit [label="No"];
-    ClearWifi -> DisplayInit;
-
-    WakeReason [shape=diamond label="Wake by\nuser or timer?"];
-    DisplayInit -> WakeReason;
-    
-    ClearDisplay [shape=box label="Display clear"];
-    WakeReason -> ClearDisplay [label="User"];
-
-    IsWiFiSetup [shape=diamond label="Wi-Fi saved?"];
-    WakeReason -> IsWiFiSetup [label="Timer"];
-    ClearDisplay -> IsWiFiSetup;
-
-    NeedConfig [shape=box label="Show set-up message"];
-    IsWiFiSetup -> NeedConfig [label="No"];
-
-    /* Config Wifi */
-    RunSetup [shape=box label="Start config portal"];
-    NeedConfig -> RunSetup;
-
-    IsReset1 [shape=diamond label="Device reset?"];
-    RunSetup -> IsReset1 [label="Yes"];
-
-    WipeConfig1 [shape=box label="API key, friendly ID and WiFi clear"];
-    IsReset1 -> WipeConfig1 [label="Yes"];
-
-    Reboot1 [shape=oval label="Reboot"];
-    WipeConfig1 -> Reboot1;
-
-    IsWifiConnect [shape=diamond label="WiFi connected?"];
-    IsReset1 -> IsWifiConnect [label="No"];
-
-    /* Main Body */
-
-    TryConnect [shape=diamond label="WiFi connected (5tries)?"];
-    IsWiFiSetup -> TryConnect [label="Yes" constraint=false];
-
-    { rank=same; IsWiFiSetup; IsWifiConnect; TryConnect; }
-    
-    ConnectError [shape=box label="Show connection error"];
-    IsWifiConnect -> ConnectError [label="No"];
-    TryConnect -> ConnectError [label="No"];
-
-    Sleep1 [shape=oval label="Sleep"];
-    ConnectError -> Sleep1;
-
-    ClockSync [shape=box label="Check synchronization"];
-    IsWifiConnect -> ClockSync [label="Yes"];
-    TryConnect -> ClockSync [label="Yes"];
-
-    IsApiSetup [shape=diamond label="API key and friendly ID exist?"];
-    ClockSync -> IsApiSetup;
-
-    /* Setup */
-    CallSetup [shape=box label="Ping /api/setup"];
-    IsApiSetup -> CallSetup [label="No"];
-
-    IsSetupSuccess [shape=diamond label="Setup success?"];
-    CallSetup -> IsSetupSuccess;
-
-    SetupError [shape=box label="Show setup error"];
-    IsSetupSuccess -> SetupError [label = "No"];
-
-    Sleep2 [shape=oval label="Sleep"];
-    SetupError -> Sleep2;
-
-    /* Check update */
-    PingServer [shape=diamond label="Ping server, success?"];
-    IsApiSetup -> PingServer [label="Yes"];
-    IsSetupSuccess -> PingServer [label="Yes"];
-
-    PingError [shape=box label="Show server error"];
-    PingServer -> PingError [label="No"];
-
-    Sleep3 [shape=oval label="Sleep"];
-    PingError -> Sleep3;
-
-    /* Act on update */
-    IsNeedReset [shape=diamond label="Need to reset the device?"];
-    PingServer -> IsNeedReset [label="Yes"];
-    IsNeedReset -> WipeConfig1 [label="Yes"];
-
-    IsNeedUpdate [shape=diamond label="Need to update?"]
-    IsNeedReset -> IsNeedUpdate [label="No"];
-    IsNeedUpdate -> Sleep3 [label="No"];
-
-    Update [shape=box label="Download and update"];
-    IsNeedUpdate -> Update [label="Yes"];
-    Update -> Sleep3;
-}
+    %% Act on update
+    IsNeedReset{"Need to reset
+     the device?"}
+    PingServer -->|"Yes"| IsNeedReset
+    IsNeedReset -->|"Yes"| WipeConfig1
+    IsNeedUpdate{"Need to update?"}
+    IsNeedReset -->|"No"| IsNeedUpdate
+    IsNeedUpdate -->|"No"| Sleep3
+    Update("Download and update")
+    IsNeedUpdate -->|"Yes"| Update
+    Update --> Sleep3
 ```
 
 ## **Web Server Endpoints**
