@@ -241,6 +241,7 @@ void WifiCaptive::resetSettings()
     Preferences preferences;
     preferences.begin("wificaptive", false);
     preferences.remove("api_url");
+    preferences.remove(WIFI_LAST_INDEX);
     for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
         preferences.remove(WIFI_SSID_KEY(i));
@@ -357,6 +358,54 @@ void WifiCaptive::saveWifiCredentials(String ssid, String pass)
         preferences.putString(WIFI_PSWD_KEY(i), _savedWifis[i].pswd);
     }
     preferences.end();
+}
+
+void WifiCaptive::saveLastUsedWifiIndex(int index)
+{
+    Preferences preferences;
+    preferences.begin("wificaptive", false);
+
+    // if index is out of bounds, set to 0
+    if (index < 0 || index >= WIFI_MAX_SAVED_CREDS)
+    {
+        index = 0;
+    }
+
+    // if index is greater than the total number of saved wifis, set to 0
+    if (index > 0)
+    {
+        readWifiCredentials();
+        if (_savedWifis[index].ssid == "")
+        {
+            index = 0;
+        }
+    }
+
+    preferences.putInt(WIFI_LAST_INDEX, index);
+}
+
+int WifiCaptive::readLastUsedWifiIndex()
+{
+    Preferences preferences;
+    preferences.begin("wificaptive", true);
+    int index = preferences.getInt(WIFI_LAST_INDEX, 0);
+    // if index is out of range, return 0
+    if (index < 0 || index >= WIFI_MAX_SAVED_CREDS)
+    {
+        index = 0;
+    }
+
+    // if index is greater than the total number of saved wifis, set to 0
+    if (index > 0)
+    {
+        readWifiCredentials();
+        if (_savedWifis[index].ssid == "")
+        {
+            index = 0;
+        }
+    }
+    preferences.end();
+    return index;
 }
 
 void WifiCaptive::saveApiServer(String url)
@@ -520,22 +569,25 @@ bool WifiCaptive::autoConnect()
     Log.info("Trying to autoconnect to wifi...\r\n");
     readWifiCredentials();
 
-    if (_savedWifis[0].ssid != "")
+    // if last used network is available, try to connect to it
+    int last_used_index = readLastUsedWifiIndex();
+
+    if (_savedWifis[last_used_index].ssid != "")
     {
-        Log.info("Trying to connect to last used %s...\r\n", _savedWifis[0].ssid.c_str());
+        Log.info("Trying to connect to last used %s...\r\n", _savedWifis[last_used_index].ssid.c_str());
         WiFi.setSleep(0);
         WiFi.setMinSecurity(WIFI_AUTH_OPEN);
         WiFi.mode(WIFI_STA);
 
         for (int attempt = 0; attempt < WIFI_CONNECTION_ATTEMPTS; attempt++)
         {
-            Log.info("Attempt %d to connect to %s\r\n", attempt + 1, _savedWifis[0].ssid.c_str());
-            connect(_savedWifis[0].ssid, _savedWifis[0].pswd);
+            Log.info("Attempt %d to connect to %s\r\n", attempt + 1, _savedWifis[last_used_index].ssid.c_str());
+            connect(_savedWifis[last_used_index].ssid, _savedWifis[last_used_index].pswd);
 
             // Check if connected
             if (WiFi.status() == WL_CONNECTED)
             {
-                Log.info("Connected to %s\r\n", _savedWifis[0].ssid.c_str());
+                Log.info("Connected to %s\r\n", _savedWifis[last_used_index].ssid.c_str());
                 return true;
             }
             WiFi.disconnect();
@@ -572,6 +624,15 @@ bool WifiCaptive::autoConnect()
             if (WiFi.status() == WL_CONNECTED)
             {
                 Log.info("Connected to %s\r\n", network.ssid.c_str());
+                // success! save the index of the last used network
+                for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
+                {
+                    if (_savedWifis[i].ssid == network.ssid)
+                    {
+                        saveLastUsedWifiIndex(i);
+                        break;
+                    }
+                }
                 return true;
             }
             WiFi.disconnect();

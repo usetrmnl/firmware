@@ -32,6 +32,8 @@
 #define WIFI_SSID_KEY(i) ("wifi_" + String(i) + "_ssid").c_str()
 #define WIFI_PSWD_KEY(i) ("wifi_" + String(i) + "_pswd").c_str()
 
+#define WIFI_LAST_INDEX "wifi_last_index"
+
 class WifiCaptive
 {
 private:
@@ -65,7 +67,8 @@ private:
     uint8_t waitForConnectResult();
     void readWifiCredentials();
     void saveWifiCredentials(String ssid, String pass);
-    void saveLastUsed(String ssid, String pass);
+    void saveLastUsedWifiIndex(int index);
+    int readLastUsedWifiIndex();
     void saveApiServer(String url);
     std::vector<WifiCredentials> matchNetworks(std::vector<Network> &scanResults, WifiCaptive::WifiCredentials wifiCredentials[]);
     std::vector<Network> getScannedUniqueNetworks(bool runScan);
