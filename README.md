@@ -4,7 +4,98 @@ created for the [TRMNL](https://usetrmnl.com) e-ink display.
 
 ## **Algorithm block scheme**
 
-![Image Alt text](/pics/algorithm.png "Algorithm block scheme")
+```mermaid
+graph TB
+
+    Start(["Start"])
+    Init("Init peripherals")
+    Start --> Init
+
+    IsLongRst{"Reset button 
+      pressed > 300 ms?"}
+    Init --> IsLongRst
+
+    ClearWifi("Wi-Fi credentials clear")
+    IsLongRst -->|"Yes"| ClearWifi
+    DisplayInit("Display init")
+    IsLongRst -->|"No"| DisplayInit
+    ClearWifi --> DisplayInit
+    WakeReason{"Wake by
+      user or timer?"}
+    DisplayInit --> WakeReason
+
+    ClearDisplay("Display clear")
+    WakeReason -->|"User"| ClearDisplay
+    IsWiFiSetup{"Wi-Fi saved?"}
+    WakeReason -->|"Timer"| IsWiFiSetup
+    ClearDisplay --> IsWiFiSetup
+    NeedConfig("Show set-up message")
+    IsWiFiSetup -->|"No"| NeedConfig
+
+    %% Config Wifi
+    RunSetup("Start config portal")
+    NeedConfig --> RunSetup
+    IsReset1{"Device
+      reset?"}
+    RunSetup -->|"Yes"| IsReset1
+    WipeConfig1("API key, friendly ID and WiFi clear")
+    IsReset1 -->|"Yes"| WipeConfig1
+    Reboot1(["Reboot"])
+    WipeConfig1 --> Reboot1
+    IsWifiConnect{"WiFi
+      connected?"}
+    IsReset1 -->|"No"| IsWifiConnect
+
+    %% Main Body
+    TryConnect{"WiFi connected
+      (5tries)?"}
+    IsWiFiSetup -->|"Yes"| TryConnect
+
+    ConnectError("Show connection error")
+    IsWifiConnect -->|"No"| ConnectError
+    TryConnect -->|"No"| ConnectError
+    Sleep1(["Sleep"])
+    ConnectError --> Sleep1
+    ClockSync("Check synchronization")
+    IsWifiConnect -->|"Yes"| ClockSync
+    TryConnect -->|"Yes"| ClockSync
+    IsApiSetup{"API key and
+      friendly ID exist?"}
+    ClockSync --> IsApiSetup
+
+    %% Setup
+    CallSetup("Ping /api/setup")
+    IsApiSetup -->|"No"| CallSetup
+    IsSetupSuccess{"Setup
+      success?"}
+    CallSetup --> IsSetupSuccess
+    SetupError("Show setup error")
+    IsSetupSuccess --> SetupError
+    Sleep2(["Sleep"])
+    SetupError --> Sleep2
+    
+    %% Check update
+    PingServer{"Ping server,
+      success?"}
+    IsApiSetup -->|"Yes"| PingServer
+    IsSetupSuccess -->|"Yes"| PingServer
+    PingError("Show server error")
+    PingServer -->|"No"| PingError
+    Sleep3(["Sleep"])
+    PingError --> Sleep3
+    
+    %% Act on update
+    IsNeedReset{"Need to reset
+     the device?"}
+    PingServer -->|"Yes"| IsNeedReset
+    IsNeedReset -->|"Yes"| WipeConfig1
+    IsNeedUpdate{"Need to update?"}
+    IsNeedReset -->|"No"| IsNeedUpdate
+    IsNeedUpdate -->|"No"| Sleep3
+    Update("Download and update")
+    IsNeedUpdate -->|"Yes"| Update
+    Update --> Sleep3
+```
 
 ## **Web Server Endpoints**
 
