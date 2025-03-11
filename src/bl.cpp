@@ -28,7 +28,12 @@
 
 bool pref_clear = false;
 
+#ifdef EPDIY
+// image buffer (62 bytes for metadata
+uint8_t buffer[((uint32_t) EPDIY_WIDTH * EPDIY_HEIGHT / 8) + 62];
+#else
 uint8_t buffer[48062];    // image buffer
+#endif
 char filename[1024];      // image URL
 char binUrl[1024];        // update URL
 char log_array[1024];     // log
@@ -1087,6 +1092,7 @@ static https_request_err_e downloadAndShow()
       Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
 
       uint32_t counter = 0;
+#ifndef EPDIY
       if (https.getSize() != DISPLAY_BMP_IMAGE_SIZE)
       {
         Log.error("%s [%d]: Receiving failed. Bad file size\r\n", __FILE__, __LINE__);
@@ -1095,6 +1101,8 @@ static https_request_err_e downloadAndShow()
 
         return HTTPS_REQUEST_FAILED;
       }
+#endif
+      uint32_t content_size = https.getSize();
       WiFiClient *stream = https.getStreamPtr();
       Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
       Log.info("%s [%d]: Stream timeout: %d\r\n", __FILE__, __LINE__, stream->getTimeout());
@@ -1112,7 +1120,7 @@ static https_request_err_e downloadAndShow()
       int iteration_counter = 0;
 
       Log.info("%s [%d]: Starting a download at: %d\r\n", __FILE__, __LINE__, getTime());
-      while (counter != DISPLAY_BMP_IMAGE_SIZE && millis() - download_start < 10000)
+      while (counter != content_size && millis() - download_start < 10000)
       {
         if (stream->available())
         {
@@ -1125,7 +1133,7 @@ static https_request_err_e downloadAndShow()
       }
       Log.info("%s [%d]: Ending a download at: %d, in %d iterations\r\n", __FILE__, __LINE__, getTime(), iteration_counter);
 
-      if (counter != DISPLAY_BMP_IMAGE_SIZE)
+      if (counter != content_size)
       {
 
         Log.error("%s [%d]: Receiving failed. Readed: %d\r\n", __FILE__, __LINE__, counter);
@@ -1599,8 +1607,10 @@ static void goToSleep(void)
   preferences.putUInt(PREFERENCES_LAST_SLEEP_TIME, getTime());
   preferences.end();
   esp_sleep_enable_timer_wakeup(time_to_sleep * SLEEP_uS_TO_S_FACTOR);
+#ifndef EPDIY
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT,
                                     ESP_GPIO_WAKEUP_GPIO_LOW);
+#endif
   esp_deep_sleep_start();
 }
 
@@ -1649,7 +1659,11 @@ static float readBatteryVoltage(void)
     adc += analogReadMilliVolts(PIN_BATTERY);
   }
 
+#ifdef EPDIY
+  int32_t sensorValue = (adc / 128) * 1.402;
+#else
   int32_t sensorValue = (adc / 128) * 2;
+#endif
 
   float voltage = sensorValue / 1000.0;
   return voltage;

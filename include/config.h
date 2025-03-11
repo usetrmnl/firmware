@@ -48,7 +48,12 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 
 #define PIN_RESET 9
 #define PIN_INTERRUPT 2
+
+#ifdef EPDIY
+#define PIN_BATTERY 1
+#else
 #define PIN_BATTERY 3
+#endif
 
 #define BUTTON_HOLD_TIME 5000
 

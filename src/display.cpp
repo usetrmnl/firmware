@@ -3,10 +3,19 @@
 #include <display.h>
 #include <ArduinoLog.h>
 #include "DEV_Config.h"
-#include "EPD.h"
+
 #include "GUI_Paint.h"
 #include <config.h>
 #include <ImageData.h>
+
+#ifdef EPDIY
+#include "epd_highlevel.h"
+#include "epdiy.h"
+
+EpdiyHighlevelState hl;
+#else
+#include "EPD.h"
+#endif
 
 /**
  * @brief Function to init the display
@@ -16,11 +25,21 @@
 void display_init(void)
 {
     Log.info("%s [%d]: dev module start\r\n", __FILE__, __LINE__);
+#ifdef EPDIY
+    epd_init(&epd_board_v7, &EPDIY_TYPE, EPD_LUT_64K);
+    epd_set_vcom(2550);
+#else
     DEV_Module_Init();
+#endif
     Log.info("%s [%d]: dev module end\r\n", __FILE__, __LINE__);
 
+
     Log.info("%s [%d]: screen hw start\r\n", __FILE__, __LINE__);
+#ifdef EPDIY
+    hl = epd_hl_init(EPD_BUILTIN_WAVEFORM);
+#else
     EPD_7IN5_V2_Init_New();
+#endif
     Log.info("%s [%d]: screen hw end\r\n", __FILE__, __LINE__);
 }
 
@@ -32,7 +51,13 @@ void display_init(void)
 void display_reset(void)
 {
     Log.info("%s [%d]: e-Paper Clear start\r\n", __FILE__, __LINE__);
+#ifdef EPDIY
+    int temperature = 25;
+    epd_poweron();
+    epd_fullclear(&hl, temperature);
+#else
     EPD_7IN5_V2_Clear();
+#endif
     Log.info("%s [%d]:  e-Paper Clear end\r\n", __FILE__, __LINE__);
     // DEV_Delay_ms(500);
 }
@@ -43,7 +68,11 @@ void display_reset(void)
  */
 uint16_t display_height()
 {
+#ifdef EPDIY
+    return EPDIY_HEIGHT;
+#else
     return EPD_7IN5_V2_HEIGHT;
+#endif
 }
 
 /**
@@ -52,8 +81,34 @@ uint16_t display_height()
  */
 uint16_t display_width()
 {
+#ifdef EPDIY
+    return EPDIY_WIDTH;
+#else
     return EPD_7IN5_V2_WIDTH;
+#endif
 }
+
+#ifdef EPDIY
+void convert_1bit_to_4bit(const uint8_t *fb_1bit, uint8_t *fb_4bit, int width, int height) {
+    int byte_width = ((width + 31) / 32) * 4;  // Each byte in 1-bit framebuffer stores 8 pixels
+    int row_size_out = width / 2; // Each row in the 4-bit framebuffer (2 pixels per byte)
+
+    for (int y = 0; y < height; y++) {
+        int out_row_index = (height - 1 - y) * row_size_out; // Flip Y-axis
+
+        for (int x = 0; x < width; x += 2) {
+            int byte_index = (y * byte_width) + (x / 8);
+            int bit_index1 = 7 - (x % 8);
+            int bit_index2 = 7 - ((x + 1) % 8);
+
+            uint8_t pixel1 = (fb_1bit[byte_index] >> bit_index1) & 1;
+            uint8_t pixel2 = (fb_1bit[byte_index] >> bit_index2) & 1;
+
+            fb_4bit[out_row_index++] = (pixel1 ? 0x0F : 0x00) << 4 | (pixel2 ? 0x0F : 0x00);
+        }
+    }
+}
+#endif
 
 /**
  * @brief Function to show the image on the display
@@ -63,13 +118,47 @@ uint16_t display_width()
  */
 void display_show_image(uint8_t *image_buffer, bool reverse)
 {
-    auto width = display_width();
-    auto height = display_height();
+    uint16_t width = display_width();
+    uint16_t height = display_height();
+
+#ifdef EPDIY
+    uint32_t width_b = *(uint32_t *)&image_buffer[18];
+    uint32_t height_b = *(uint32_t *)&image_buffer[22];
+    uint32_t dataOffset = *(uint32_t *)&image_buffer[10];
+
+    // set to default value if header is faulty
+    if(width == 0 || height == 0) {
+      width = 800;
+      height = 480;
+    }
+
+    if(dataOffset == 0) {
+      dataOffset = 62;
+    }
+    Log.info("%s [%d]: Image width: %d, height: %d!\r\n", __FILE__, __LINE__, width_b, height_b);
+    Log.info("%s [%d]: Data offset: %d!\r\n", __FILE__, __LINE__, dataOffset);
+
+    EpdRect paint_area = { .x = (width - width_b) / 2, .y = (height - height_b) / 2, .width = width_b, .height = height_b };
+    uint8_t *image_buffer_4bpp = new uint8_t[width_b * height_b / 2];
+    convert_1bit_to_4bit(image_buffer + dataOffset, image_buffer_4bpp, width_b, height_b);
+
+    uint8_t temperature = 22;
+
+    epd_poweron();
+    epd_fullclear(&hl, temperature);
+
+    epd_copy_to_framebuffer(paint_area, image_buffer_4bpp, epd_hl_get_framebuffer(&hl));
+
+    enum EpdDrawError _err = epd_hl_update_screen(&hl, MODE_EPDIY_WHITE_TO_GL16, temperature);
+    Log.info("%s [%d]: Paint_NewImage %s\r\n", __FILE__, __LINE__, _err);
+    delete[] image_buffer_4bpp;
+    epd_poweroff();
+#else
     //  Create a new image cache
     UBYTE *BlackImage;
     /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
-    
+
     Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
     Log.error("%s [%d]: free alloc heap - %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
     if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
@@ -81,7 +170,7 @@ void display_show_image(uint8_t *image_buffer, bool reverse)
     // if (reverse)
     //     Paint_NewImage(BlackImage, EPD_7IN5_V2_WIDTH, EPD_7IN5_V2_HEIGHT, 0, BLACK);
     // else
-    
+
     Paint_NewImage(BlackImage, width, height, 0, WHITE);
 
     Log.info("%s [%d]: show image for array\r\n", __FILE__, __LINE__);
@@ -97,10 +186,12 @@ void display_show_image(uint8_t *image_buffer, bool reverse)
     }
     Paint_DrawBitMap(image_buffer + 62);
     EPD_7IN5_V2_Display(BlackImage);
-    Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
 
     free(BlackImage);
     BlackImage = NULL;
+#endif
+    Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
+
 }
 
 /**
@@ -111,6 +202,8 @@ void display_show_image(uint8_t *image_buffer, bool reverse)
  */
 void display_show_msg(uint8_t *image_buffer, MSG message_type)
 {
+#ifdef EPDIY
+#else
     auto width = display_width();
     auto height = display_height();
     UBYTE *BlackImage;
@@ -243,6 +336,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
     free(BlackImage);
     BlackImage = NULL;
+#endif
 }
 
 /**
@@ -257,6 +351,8 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
  */
 void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
 {
+#ifdef EPDIY
+#else
     if (message_type == WIFI_CONNECT)
     {
         Log.info("%s [%d]: Display set to white\r\n", __FILE__, __LINE__);
@@ -326,6 +422,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
     free(BlackImage);
     BlackImage = NULL;
+#endif
 }
 
 /**
@@ -336,5 +433,9 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 void display_sleep(void)
 {
     Log.info("%s [%d]: Goto Sleep...\r\n", __FILE__, __LINE__);
+#ifdef EPDIY
+     epd_poweroff();
+#else
     EPD_7IN5B_V2_Sleep();
+#endif
 }
