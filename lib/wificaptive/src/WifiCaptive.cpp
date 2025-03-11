@@ -73,6 +73,7 @@ void WifiCaptive::setUpWebserver(AsyncWebServer &server, const IPAddress &localI
 			return request->send(202);
 		} else {
 			// Data structure to store the highest RSSI for each SSID
+            // Warning: DO NOT USE true on this function in an async context! 
 			std::vector<Network> uniqueNetworks = getScannedUniqueNetworks(false);
             std::vector<Network> combinedNetworks = combineNetworks(uniqueNetworks, _savedWifis);
 
@@ -375,7 +376,7 @@ std::vector<WifiCaptive::Network> WifiCaptive::getScannedUniqueNetworks(bool run
     int n = WiFi.scanComplete();
     if (runScan == true)
     {
-        WiFi.scanNetworks(true);
+        WiFi.scanNetworks(false);
         delay(100);
         int n = WiFi.scanComplete();
         while (n == WIFI_SCAN_RUNNING || n == WIFI_SCAN_FAILED)
@@ -387,14 +388,28 @@ std::vector<WifiCaptive::Network> WifiCaptive::getScannedUniqueNetworks(bool run
             }
             else if (n == WIFI_SCAN_FAILED)
             {
-                WiFi.scanNetworks(true);
-                delay(100);
+                // There is a race coniditon that can occur, particularly if you use the async flag of WiFi.scanNetworks(true),
+                // where you can race before the data is parsed. scanComplete will be -2, we'll see that and fail out, but then a few microseconds later it actually
+                // fills in. This fixes that, in case we ever move back to the async version of scanNetworks, but as long as it's sync above it'll work
+                // first shot always.
+                Log.verboseln("Supposedly failed to finish scan, let's wait 10 seconds before checking again");
+                delay(10000);
+                n = WiFi.scanComplete();
+                if (n > 0)
+                {
+                    Log.verboseln("Scan actually did complete, we have %d networks, breaking loop.", n);
+                    // it didn't actually fail, we just raced before the scan was done filling in data
+                    break;
+                }
+                WiFi.scanNetworks(false);
+                delay(500);
                 n = WiFi.scanComplete();
             }
         }
     }
 
     n = WiFi.scanComplete();
+    Log.verboseln("Scanning networks, final scan result: %d", n);
 
     // Process each found network
     for (int i = 0; i < n; ++i)
@@ -423,6 +438,12 @@ std::vector<WifiCaptive::Network> WifiCaptive::getScannedUniqueNetworks(bool run
                 uniqueNetworks.push_back({ssid, rssi, open});
             }
         }
+    }
+
+    Log.infoln("Unique networks found: %d", uniqueNetworks.size());
+    for (auto &network : uniqueNetworks)
+    {
+        Log.infoln("SSID: %s, RSSI: %d, Open: %d", network.ssid.c_str(), network.rssi, network.open);
     }
 
     return uniqueNetworks;
@@ -506,7 +527,8 @@ bool WifiCaptive::autoConnect()
         WiFi.setMinSecurity(WIFI_AUTH_OPEN);
         WiFi.mode(WIFI_STA);
 
-        for (int attempt = 0; attempt < WIFI_CONNECTION_ATTEMPTS; attempt++) {
+        for (int attempt = 0; attempt < WIFI_CONNECTION_ATTEMPTS; attempt++)
+        {
             Log.info("Attempt %d to connect to %s\r\n", attempt + 1, _savedWifis[0].ssid.c_str());
             connect(_savedWifis[0].ssid, _savedWifis[0].pswd);
 
@@ -541,7 +563,8 @@ bool WifiCaptive::autoConnect()
 
         Log.info("Trying to connect to saved network %s...\r\n", network.ssid.c_str());
 
-        for (int attempt = 0; attempt < WIFI_CONNECTION_ATTEMPTS; attempt++) {
+        for (int attempt = 0; attempt < WIFI_CONNECTION_ATTEMPTS; attempt++)
+        {
             Log.info("Attempt %d to connect to %s\r\n", attempt + 1, network.ssid.c_str());
             connect(network.ssid, network.pswd);
 
@@ -552,7 +575,7 @@ bool WifiCaptive::autoConnect()
                 return true;
             }
             WiFi.disconnect();
-            delay(500);
+            delay(2000);
         }
     }
 
