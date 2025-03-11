@@ -1049,6 +1049,11 @@ static https_request_err_e downloadAndShow()
     {
       status = false;
 
+      String currentEtag = preferences.getString(PREFERENCES_ETAG, "");
+      if (currentEtag.length() > 0) {
+        https.addHeader("If-None-Match", currentEtag);
+      }
+
       Log.info("%s [%d]: [HTTPS] Request to %s\r\n", __FILE__, __LINE__, filename);
       if (!https.begin(*client, filename)) // HTTPS
       {
@@ -1076,6 +1081,19 @@ static https_request_err_e downloadAndShow()
       // HTTP header has been send and Server response header has been handled
       Log.error("%s [%d]: [HTTPS] GET... code: %d\r\n", __FILE__, __LINE__, httpCode);
       Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
+
+      if (httpCode == HTTP_CODE_NOT_MODIFIED)
+      {
+        Log.info("%s [%d]: Not modified. No need to download\r\n", __FILE__, __LINE__);
+        return HTTPS_SUCCES;
+      }
+    
+      if (https.hasHeader("ETag")) {
+        String etag = https.header("ETag");
+        Log.info("%s [%d]: ETag: %s\r\n", __FILE__, __LINE__, etag.c_str());
+        preferences.putString(PREFERENCES_ETAG, etag);
+      }
+      
       // file found at server
       if (httpCode != HTTP_CODE_OK && httpCode != HTTP_CODE_MOVED_PERMANENTLY)
       {
