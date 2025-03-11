@@ -357,6 +357,7 @@ void WifiCaptive::saveWifiCredentials(String ssid, String pass)
         preferences.putString(WIFI_SSID_KEY(i), _savedWifis[i].ssid);
         preferences.putString(WIFI_PSWD_KEY(i), _savedWifis[i].pswd);
     }
+    preferences.putInt(WIFI_LAST_INDEX, 0);
     preferences.end();
 }
 
