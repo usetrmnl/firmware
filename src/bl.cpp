@@ -500,6 +500,10 @@ static https_request_err_e downloadAndShow()
   { // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
 
     HTTPClient https;
+
+    // Set a more generous timeout than the default of 5000.
+    https.setTimeout(15000);
+
     Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
     Log.info("%s [%d]: [HTTPS] begin /api/display/ ...\r\n", __FILE__, __LINE__);
     char new_url[200];
