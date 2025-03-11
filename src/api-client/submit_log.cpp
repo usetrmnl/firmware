@@ -38,6 +38,7 @@ bool submitLogToApi(LogApiInput &input, const char *api_url)
       { // HTTPS
         Log_info("[HTTPS] POST...");
 
+        https.addHeader("ID", WiFi.macAddress());
         https.addHeader("Accept", "application/json");
         https.addHeader("Access-Token", input.api_key);
         https.addHeader("Content-Type", "application/json");
