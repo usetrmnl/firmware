@@ -73,6 +73,7 @@ void WifiCaptive::setUpWebserver(AsyncWebServer &server, const IPAddress &localI
 			return request->send(202);
 		} else {
 			// Data structure to store the highest RSSI for each SSID
+            // Warning: DO NOT USE true on this function in an async context! 
 			std::vector<Network> uniqueNetworks = getScannedUniqueNetworks(false);
             std::vector<Network> combinedNetworks = combineNetworks(uniqueNetworks, _savedWifis);
 
@@ -103,7 +104,7 @@ void WifiCaptive::setUpWebserver(AsyncWebServer &server, const IPAddress &localI
 
             WiFi.scanDelete();
 			Serial.println(json);
-            
+
 			if (WiFi.scanComplete() == -2){
 				WiFi.scanNetworks(true);
 			}
@@ -240,20 +241,18 @@ void WifiCaptive::resetSettings()
     Preferences preferences;
     preferences.begin("wificaptive", false);
     preferences.remove("api_url");
+    preferences.remove(WIFI_LAST_INDEX);
     for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
         preferences.remove(WIFI_SSID_KEY(i));
         preferences.remove(WIFI_PSWD_KEY(i));
     }
-    preferences.remove(WIFI_LAST_USED_SSID_KEY);
-    preferences.remove(WIFI_LAST_USED_PSWD_KEY);
     preferences.end();
 
     for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
         _savedWifis[i] = {"", ""};
     }
-    _lastUsed = {"", ""};
 
     WiFi.disconnect(true, true);
 }
@@ -321,14 +320,13 @@ void WifiCaptive::readWifiCredentials()
 {
     Preferences preferences;
     preferences.begin("wificaptive", true);
-    size_t len = preferences.getBytesLength(WIFI_SSID_KEY(0));
+
     for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
         _savedWifis[i].ssid = preferences.getString(WIFI_SSID_KEY(i), "");
         _savedWifis[i].pswd = preferences.getString(WIFI_PSWD_KEY(i), "");
     }
-    _lastUsed.ssid = preferences.getString(WIFI_LAST_USED_SSID_KEY, "");
-    _lastUsed.pswd = preferences.getString(WIFI_LAST_USED_PSWD_KEY, "");
+
     preferences.end();
 }
 
@@ -336,16 +334,21 @@ void WifiCaptive::saveWifiCredentials(String ssid, String pass)
 {
     Log.info("Saving wifi credentials: %s\r\n", ssid.c_str());
 
-    for (u16_t i = WIFI_MAX_SAVED_CREDS - 1; i >= 1; i--)
+    // Check if the credentials already exist
+    for (u16_t i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
     {
-        _savedWifis[i].ssid = _savedWifis[i - 1].ssid;
-        _savedWifis[i].pswd = _savedWifis[i - 1].pswd;
+        if (_savedWifis[i].ssid == ssid && _savedWifis[i].pswd == pass)
+        {
+            return; // Avoid saving duplicate networks
+        }
     }
 
-    _savedWifis[0].ssid = ssid;
-    _savedWifis[0].pswd = pass;
-    _lastUsed.ssid = ssid;
-    _lastUsed.pswd = pass;
+    for (u16_t i = WIFI_MAX_SAVED_CREDS - 1; i > 0; i--)
+    {
+        _savedWifis[i] = _savedWifis[i - 1];
+    }
+
+    _savedWifis[0] = {ssid, pass};
 
     Preferences preferences;
     preferences.begin("wificaptive", false);
@@ -354,21 +357,56 @@ void WifiCaptive::saveWifiCredentials(String ssid, String pass)
         preferences.putString(WIFI_SSID_KEY(i), _savedWifis[i].ssid);
         preferences.putString(WIFI_PSWD_KEY(i), _savedWifis[i].pswd);
     }
-    preferences.putString(WIFI_LAST_USED_SSID_KEY, _lastUsed.ssid);
-    preferences.putString(WIFI_LAST_USED_PSWD_KEY, _lastUsed.pswd);
+    preferences.putInt(WIFI_LAST_INDEX, 0);
     preferences.end();
 }
 
-void WifiCaptive::saveLastUsed(String ssid, String pass)
+void WifiCaptive::saveLastUsedWifiIndex(int index)
 {
-    _lastUsed.ssid = ssid;
-    _lastUsed.pswd = pass;
-
     Preferences preferences;
     preferences.begin("wificaptive", false);
-    preferences.putString(WIFI_LAST_USED_SSID_KEY, ssid);
-    preferences.putString(WIFI_LAST_USED_PSWD_KEY, pass);
+
+    // if index is out of bounds, set to 0
+    if (index < 0 || index >= WIFI_MAX_SAVED_CREDS)
+    {
+        index = 0;
+    }
+
+    // if index is greater than the total number of saved wifis, set to 0
+    if (index > 0)
+    {
+        readWifiCredentials();
+        if (_savedWifis[index].ssid == "")
+        {
+            index = 0;
+        }
+    }
+
+    preferences.putInt(WIFI_LAST_INDEX, index);
+}
+
+int WifiCaptive::readLastUsedWifiIndex()
+{
+    Preferences preferences;
+    preferences.begin("wificaptive", true);
+    int index = preferences.getInt(WIFI_LAST_INDEX, 0);
+    // if index is out of range, return 0
+    if (index < 0 || index >= WIFI_MAX_SAVED_CREDS)
+    {
+        index = 0;
+    }
+
+    // if index is greater than the total number of saved wifis, set to 0
+    if (index > 0)
+    {
+        readWifiCredentials();
+        if (_savedWifis[index].ssid == "")
+        {
+            index = 0;
+        }
+    }
     preferences.end();
+    return index;
 }
 
 void WifiCaptive::saveApiServer(String url)
@@ -388,7 +426,7 @@ std::vector<WifiCaptive::Network> WifiCaptive::getScannedUniqueNetworks(bool run
     int n = WiFi.scanComplete();
     if (runScan == true)
     {
-        WiFi.scanNetworks(true);
+        WiFi.scanNetworks(false);
         delay(100);
         int n = WiFi.scanComplete();
         while (n == WIFI_SCAN_RUNNING || n == WIFI_SCAN_FAILED)
@@ -400,14 +438,28 @@ std::vector<WifiCaptive::Network> WifiCaptive::getScannedUniqueNetworks(bool run
             }
             else if (n == WIFI_SCAN_FAILED)
             {
-                WiFi.scanNetworks(true);
-                delay(100);
+                // There is a race coniditon that can occur, particularly if you use the async flag of WiFi.scanNetworks(true),
+                // where you can race before the data is parsed. scanComplete will be -2, we'll see that and fail out, but then a few microseconds later it actually
+                // fills in. This fixes that, in case we ever move back to the async version of scanNetworks, but as long as it's sync above it'll work
+                // first shot always.
+                Log.verboseln("Supposedly failed to finish scan, let's wait 10 seconds before checking again");
+                delay(10000);
+                n = WiFi.scanComplete();
+                if (n > 0)
+                {
+                    Log.verboseln("Scan actually did complete, we have %d networks, breaking loop.", n);
+                    // it didn't actually fail, we just raced before the scan was done filling in data
+                    break;
+                }
+                WiFi.scanNetworks(false);
+                delay(500);
                 n = WiFi.scanComplete();
             }
         }
     }
 
     n = WiFi.scanComplete();
+    Log.verboseln("Scanning networks, final scan result: %d", n);
 
     // Process each found network
     for (int i = 0; i < n; ++i)
@@ -436,6 +488,12 @@ std::vector<WifiCaptive::Network> WifiCaptive::getScannedUniqueNetworks(bool run
                 uniqueNetworks.push_back({ssid, rssi, open});
             }
         }
+    }
+
+    Log.infoln("Unique networks found: %d", uniqueNetworks.size());
+    for (auto &network : uniqueNetworks)
+    {
+        Log.infoln("SSID: %s, RSSI: %d, Open: %d", network.ssid.c_str(), network.rssi, network.open);
     }
 
     return uniqueNetworks;
@@ -512,47 +570,74 @@ bool WifiCaptive::autoConnect()
     Log.info("Trying to autoconnect to wifi...\r\n");
     readWifiCredentials();
 
-    if (_lastUsed.ssid != "")
+    // if last used network is available, try to connect to it
+    int last_used_index = readLastUsedWifiIndex();
+
+    if (_savedWifis[last_used_index].ssid != "")
     {
-        Log.info("Trying to connect to last used %s...\r\n", _lastUsed.ssid.c_str());
+        Log.info("Trying to connect to last used %s...\r\n", _savedWifis[last_used_index].ssid.c_str());
         WiFi.setSleep(0);
         WiFi.setMinSecurity(WIFI_AUTH_OPEN);
         WiFi.mode(WIFI_STA);
-        connect(_lastUsed.ssid, _lastUsed.pswd);
 
-        // Check if connected
-        if (WiFi.status() == WL_CONNECTED)
+        for (int attempt = 0; attempt < WIFI_CONNECTION_ATTEMPTS; attempt++)
         {
-            Log.info("Connected to %s\r\n", _lastUsed.ssid.c_str());
-            return true;
+            Log.info("Attempt %d to connect to %s\r\n", attempt + 1, _savedWifis[last_used_index].ssid.c_str());
+            connect(_savedWifis[last_used_index].ssid, _savedWifis[last_used_index].pswd);
+
+            // Check if connected
+            if (WiFi.status() == WL_CONNECTED)
+            {
+                Log.info("Connected to %s\r\n", _savedWifis[last_used_index].ssid.c_str());
+                return true;
+            }
+            WiFi.disconnect();
+            delay(500);
         }
-        WiFi.disconnect();
     }
 
+    Log.info("Last used network unavailable, scanning for known networks...\r\n");
     std::vector<Network> scanResults = getScannedUniqueNetworks(true);
     std::vector<WifiCaptive::WifiCredentials> sortedNetworks = matchNetworks(scanResults, _savedWifis);
     // if no networks found, try to connect to saved wifis
     if (sortedNetworks.size() == 0)
     {
-        Log.info("No matched networks...\r\n");
+        Log.info("No matched networks found in scan, trying all saved networks...\r\n");
         sortedNetworks = std::vector<WifiCredentials>(_savedWifis, _savedWifis + WIFI_MAX_SAVED_CREDS);
     }
 
     WiFi.mode(WIFI_STA);
     for (auto &network : sortedNetworks)
     {
-        if (network.ssid == "")
+        if (network.ssid == "" || (network.ssid == _savedWifis[0].ssid && network.pswd == _savedWifis[0].pswd))
         {
             continue;
         }
 
-        connect(network.ssid, network.pswd);
+        Log.info("Trying to connect to saved network %s...\r\n", network.ssid.c_str());
 
-        // Check if connected
-        if (WiFi.status() == WL_CONNECTED)
+        for (int attempt = 0; attempt < WIFI_CONNECTION_ATTEMPTS; attempt++)
         {
-            saveLastUsed(network.ssid, network.pswd);
-            return true;
+            Log.info("Attempt %d to connect to %s\r\n", attempt + 1, network.ssid.c_str());
+            connect(network.ssid, network.pswd);
+
+            // Check if connected
+            if (WiFi.status() == WL_CONNECTED)
+            {
+                Log.info("Connected to %s\r\n", network.ssid.c_str());
+                // success! save the index of the last used network
+                for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
+                {
+                    if (_savedWifis[i].ssid == network.ssid)
+                    {
+                        saveLastUsedWifiIndex(i);
+                        break;
+                    }
+                }
+                return true;
+            }
+            WiFi.disconnect();
+            delay(2000);
         }
     }
 
