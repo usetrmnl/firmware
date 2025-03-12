@@ -501,9 +501,6 @@ static https_request_err_e downloadAndShow()
 
     HTTPClient https;
 
-    // Set a more generous timeout than the default of 5000.
-    https.setTimeout(15000);
-
     Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
     Log.info("%s [%d]: [HTTPS] begin /api/display/ ...\r\n", __FILE__, __LINE__);
     char new_url[200];
@@ -1052,6 +1049,21 @@ static https_request_err_e downloadAndShow()
     if (status && !update_firmware && !reset_firmware)
     {
       status = false;
+
+      // The timeout will be zero if no value was returned, and in that case we just use the default timeout.
+      // Otherwise, we set the requested timeout.
+      uint32_t requestedTimeout = apiResponse.image_url_timeout;
+      if (requestedTimeout > 0) {
+        if (requestedTimeout > UINT16_MAX) {
+          // To avoid surprising behaviour if the server returned a timeout of more than 65 seconds
+          // we will send a log message back to the server and truncate the timeout to the maximum.
+          submit_log("Requested image URL timeout too large (%d ms). Using maximum of %d ms.", requestedTimeout, UINT16_MAX);
+          https.setTimeout(UINT16_MAX);
+        } 
+        else {
+          https.setTimeout(uint16_t(requestedTimeout));
+        }
+      }
 
       Log.info("%s [%d]: [HTTPS] Request to %s\r\n", __FILE__, __LINE__, filename);
       if (!https.begin(*client, filename)) // HTTPS

@@ -19,6 +19,7 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload)
   return ApiDisplayResponse{
       .status = doc["status"],
       .image_url = doc["image_url"] | "",
+      .image_url_timeout = doc["image_url_timeout"],
       .filename = doc["filename"] | "",
       .update_firmware = doc["update_firmware"],
       .firmware_url = doc["firmware_url"] | "",
