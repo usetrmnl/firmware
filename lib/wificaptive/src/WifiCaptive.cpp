@@ -42,14 +42,14 @@ void WifiCaptive::setUpWebserver(AsyncWebServer &server, const IPAddress &localI
     // Serve index.html
     server.on("/", HTTP_ANY, [&](AsyncWebServerRequest *request)
               {
-		AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html", INDEX_HTML, INDEX_HTML_LEN);
+		AsyncWebServerResponse *response = request->beginResponse(200, "text/html", INDEX_HTML, INDEX_HTML_LEN);
 		response->addHeader("Content-Encoding", "gzip");
     	request->send(response); });
 
     // Servce logo.svg
     server.on("/logo.svg", HTTP_ANY, [&](AsyncWebServerRequest *request)
               {
-		AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html", LOGO_SVG, LOGO_SVG_LEN);
+		AsyncWebServerResponse *response = request->beginResponse(200, "text/html", LOGO_SVG, LOGO_SVG_LEN);
 		response->addHeader("Content-Encoding", "gzip");
 		response->addHeader("Content-Type", "image/svg+xml");
     	request->send(response); });
