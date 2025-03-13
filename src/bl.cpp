@@ -1257,6 +1257,10 @@ static void getDeviceCredentials()
       char new_url[200];
       strcpy(new_url, preferences.getString(PREFERENCES_API_URL, API_BASE_URL).c_str());
       strcat(new_url, "/api/setup/");
+
+      char fw_version[30];
+      sprintf(fw_version, "%d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
+
       if (https.begin(*client, new_url))
       { // HTTPS
         Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
@@ -1264,6 +1268,7 @@ static void getDeviceCredentials()
         // start connection and send HTTP header
 
         https.addHeader("ID", WiFi.macAddress());
+        https.addHeader("FW-Version", fw_version);
         Log.info("%s [%d]: Device MAC address: %s\r\n", __FILE__, __LINE__, WiFi.macAddress().c_str());
 
         int httpCode = https.GET();
