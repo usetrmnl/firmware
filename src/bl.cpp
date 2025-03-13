@@ -3,6 +3,7 @@
 #include <types.h>
 #include <ArduinoLog.h>
 #include <WifiCaptive.h>
+#include <WifiBLE.h>
 #include <pins.h>
 #include <config.h>
 #include <HTTPClient.h>
@@ -129,7 +130,10 @@ void bl_init(void)
     {
     case LongPress:
       Log_info("WiFi reset");
-      WifiCaptivePortal.resetSettings();
+      // Using BLE WiFi provisioning instead of captive portal
+      WifiBLEProvisioning.resetSettings();
+      // Commented out old captive portal code:
+      // WifiCaptivePortal.resetSettings();
       break;
     case DoubleClick:
       double_click = true;
@@ -168,7 +172,10 @@ void bl_init(void)
       case SF_ADD_WIFI:
       {
         Log.info("%s [%d]: Add WiFi function...\r\n", __FILE__, __LINE__);
-        WifiCaptivePortal.startPortal();
+        // Using BLE WiFi provisioning instead of captive portal
+        WifiBLEProvisioning.start();
+        // Commented out old captive portal code:
+        // WifiCaptivePortal.startPortal();
       }
       break;
       case SF_RESTART_PLAYLIST:
@@ -214,11 +221,11 @@ void bl_init(void)
   filesystem_init();
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
-  if (WifiCaptivePortal.isSaved())
+  if (WifiBLEProvisioning.isSaved())
   {
     // WiFi saved, connection
     Log.info("%s [%d]: WiFi saved\r\n", __FILE__, __LINE__);
-    int connection_res = WifiCaptivePortal.autoConnect();
+    int connection_res = WifiBLEProvisioning.autoConnect();
 
     Log.info("%s [%d]: Connection result: %d, WiFI Status: %d\r\n", __FILE__, __LINE__, connection_res, WiFi.status());
 
@@ -247,7 +254,7 @@ void bl_init(void)
   }
   else
   {
-    // WiFi credentials are not saved - start captive portal
+    // WiFi credentials are not saved - start BLE provisioning
     Log.info("%s [%d]: WiFi NOT saved\r\n", __FILE__, __LINE__);
 
     char fw_version[20];
@@ -259,8 +266,13 @@ void bl_init(void)
     Log.info("%s [%d]: FW version %s\r\n", __FILE__, __LINE__, fw_version);
 
     showMessageWithLogo(WIFI_CONNECT, "", false, fw.c_str(), "");
-    WifiCaptivePortal.setResetSettingsCallback(resetDeviceCredentials);
-    res = WifiCaptivePortal.startPortal();
+    WifiBLEProvisioning.setResetSettingsCallback(resetDeviceCredentials);
+    bool res = WifiBLEProvisioning.start();
+
+    // Commented out old captive portal code:
+    // WifiCaptivePortal.setResetSettingsCallback(resetDeviceCredentials);
+    // res = WifiCaptivePortal.startPortal();
+
     if (!res)
     {
       Log.error("%s [%d]: Failed to connect or hit timeout\r\n", __FILE__, __LINE__);
@@ -1491,7 +1503,9 @@ static void resetDeviceCredentials(void)
 {
   Log.info("%s [%d]: The device will be reset now...\r\n", __FILE__, __LINE__);
   Log.info("%s [%d]: WiFi reseting...\r\n", __FILE__, __LINE__);
-  WifiCaptivePortal.resetSettings();
+  WifiBLEProvisioning.resetSettings();
+  // Commented out old captive portal code:
+  // WifiCaptivePortal.resetSettings();
   need_to_refresh_display = 1;
   bool res = preferences.clear();
   if (res)
