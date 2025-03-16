@@ -493,3 +493,17 @@ Inside the Flash Tool click the “STOP” button.
 ![Image Alt text](/pics/stop.jpg "stop")
 
 Next turn off (toggle DOWN) and unplug the PCB. you are now ready to flash another device - see Step 1.
+
+## **Hacking guide**
+
+If you would like to run local tests, you'll need to have g++/gcc installed (f.e., as part of MinGW) in PATH:
+
+- Get MinGW online installer from https://github.com/niXman/mingw-builds-binaries/
+- Add path to `bin` from installed folder (f.e. `c:\mingw64\bin`) to your PATH
+- Restart Visual Studio Code
+
+Now you can switch from "env:esp32..." to "esp:native" clicking at the bottom of the studio (point 1):
+
+![](pics/vscode-footer.png)
+
+And then run platformio tests by clicking test button (point 2).
