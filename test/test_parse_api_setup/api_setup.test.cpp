@@ -63,6 +63,14 @@ void test_parseResponse_apiSetup_deserializationError(void)
   assert_response_equal(expected, parseResponse_apiSetup(input));
 }
 
+void setUp(void) {
+  // set stuff up here
+}
+
+void tearDown(void) {
+  // clean stuff up here
+}
+
 void process()
 {
   UNITY_BEGIN();

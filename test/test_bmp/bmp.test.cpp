@@ -103,6 +103,14 @@ void test_parseBMPHeader_BMP_INVALID_OFFSET(void)
   TEST_ASSERT_EQUAL(BMP_INVALID_OFFSET, parseBMPHeader(bmp_data.data(), image_reverse));
 }
 
+void setUp(void) {
+  // set stuff up here
+}
+
+void tearDown(void) {
+  // clean stuff up here
+}
+
 void process()
 {
   UNITY_BEGIN();
