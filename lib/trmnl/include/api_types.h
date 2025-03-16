@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include "special_function.h"
+#include "clock_settings.h"
 
 enum class ApiSetupOutcome
 {
@@ -39,4 +40,5 @@ struct ApiDisplayResponse
   bool reset_firmware;
   SPECIAL_FUNCTION special_function;
   String action;
+  clock_settings_t clock_settings;
 };
