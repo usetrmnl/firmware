@@ -1,20 +1,20 @@
 #include "WifiBLE.h"
 
 WifiBLE::~WifiBLE() {
-    stop();
+    stopBLEProvisioning();
 }
 
-WifiBLE::Error WifiBLE::start(const char* deviceName, const char* authCode) {
-    if (_isProvisioning) return ALREADY_RUNNING;
+bool WifiBLE::startBLEProvisioning() {
+    if (_isProvisioning) return false;
 
     Serial.println("Starting BLE WiFi provisioning...");
 
-    NimBLEDevice::init(deviceName);
+    NimBLEDevice::init(BLE_DEVICE_NAME);
 
     _server = NimBLEDevice::createServer();
     if (!_server) {
         Log.error("Failed to create BLE server");
-        return SERVER_FAILED;
+        return false;
     }
 
     _server->setCallbacks(this);
@@ -23,7 +23,7 @@ WifiBLE::Error WifiBLE::start(const char* deviceName, const char* authCode) {
     if (!_service) {
         Log.error("Failed to create BLE service");
         cleanupBLEResources();
-        return SERVICE_FAILED;
+        return false;
     }
 
     _dataChar = _service->createCharacteristic(
@@ -34,7 +34,7 @@ WifiBLE::Error WifiBLE::start(const char* deviceName, const char* authCode) {
     if (!_dataChar) {
         Log.error("Failed to create ssid/pass data characteristic");
         cleanupBLEResources();
-        return CHARACTERISTIC_FAILED;
+        return false;
     }
 
     _dataChar->setCallbacks(this);
@@ -52,34 +52,54 @@ WifiBLE::Error WifiBLE::start(const char* deviceName, const char* authCode) {
     // Block until credentials are received or timeout occurs
     unsigned long startTime = millis();
     const unsigned long timeout = 300000; // 5 minutes timeout
+    const unsigned long progressInterval = 30000; // Report progress every 30 seconds
+    unsigned long lastProgress = startTime;
+
+    Log.info("Waiting for BLE credentials (timeout: %d seconds)...", timeout/1000);
 
     while (!_credentialsReceived) {
+        // Progress reporting
+        if (millis() - lastProgress > progressInterval) {
+            lastProgress = millis();
+            unsigned long elapsed = (millis() - startTime) / 1000;
+            unsigned long remaining = (timeout - (millis() - startTime)) / 1000;
+            Log.info("Still waiting for BLE credentials... (%lu seconds elapsed, %lu remaining)",
+                     elapsed, remaining);
+        }
+
         // Check for timeout
         if (millis() - startTime > timeout) {
-            Log.info("BLE provisioning timed out");
-            stop();
-            return TIMEOUT;
+            Log.error("BLE provisioning timed out after %d seconds", timeout/1000);
+            stopBLEProvisioning();
+            return false;
         }
 
         // Handle reconnection logic if device disconnects
         if (!_deviceConnected) {
             delay(500);
             NimBLEDevice::startAdvertising();
-            Log.info("Restarting advertising");
+
+            if (_previouslyConnected) {
+                Log.info("Device disconnected, restarting advertising");
+            } else {
+                Log.info("No device connected yet, advertising BLE service");
+            }
         }
 
         delay(100);
     }
 
+    Log.info("BLE credentials received successfully");
+
     // Credentials received, wait briefly to ensure notifications are sent
     delay(1000);
 
-    stop();
+    stopBLEProvisioning();
 
-    return OK;
+    return true;
 }
 
-void WifiBLE::stop() {
+void WifiBLE::stopBLEProvisioning() {
     if (!_isProvisioning) return;
 
     Log.info("Stopping BLE WiFi provisioning...");
@@ -146,7 +166,7 @@ void WifiBLE::onWrite(BLECharacteristic* characteristic) {
     if (uuid.equals(BLEUUID(CREDENTIALS_UUID))) {
         String receivedData = characteristic->getValue();
         if (receivedData.length() > 0) {
-            Log.info("Recieved Wifi Credentials [%s]\n", receivedData.c_str());
+            Log.info("Received Wifi Credentials [%s]\n", receivedData.c_str());
 
             // Process the received credentials
             processCredentials(receivedData);
@@ -164,7 +184,7 @@ void WifiBLE::onWrite(BLECharacteristic* characteristic) {
 void WifiBLE::processCredentials(const String& data) {
     size_t separator = data.indexOf(";");
     if (separator == -1) {
-        Log.info("Invalid credentials format recieved\n");
+        Log.info("Invalid credentials format received\n");
         Log.info(data.c_str());
         return;
     }

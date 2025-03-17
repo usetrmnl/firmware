@@ -130,9 +130,7 @@ void bl_init(void)
     {
     case LongPress:
       Log_info("WiFi reset");
-      // Using BLE WiFi provisioning instead of captive portal
       WifiBLEProvisioning.resetSettings();
-      // Commented out old captive portal code:
       // WifiCaptivePortal.resetSettings();
       break;
     case DoubleClick:
@@ -172,9 +170,7 @@ void bl_init(void)
       case SF_ADD_WIFI:
       {
         Log.info("%s [%d]: Add WiFi function...\r\n", __FILE__, __LINE__);
-        // Using BLE WiFi provisioning instead of captive portal
-        WifiBLEProvisioning.start();
-        // Commented out old captive portal code:
+        WifiBLEProvisioning.startBLEProvisioning();
         // WifiCaptivePortal.startPortal();
       }
       break;
@@ -267,9 +263,8 @@ void bl_init(void)
 
     showMessageWithLogo(WIFI_CONNECT, "", false, fw.c_str(), "");
     WifiBLEProvisioning.setResetSettingsCallback(resetDeviceCredentials);
-    bool res = WifiBLEProvisioning.start();
+    bool res = WifiBLEProvisioning.startBLEProvisioning();
 
-    // Commented out old captive portal code:
     // WifiCaptivePortal.setResetSettingsCallback(resetDeviceCredentials);
     // res = WifiCaptivePortal.startPortal();
 
@@ -1504,7 +1499,6 @@ static void resetDeviceCredentials(void)
   Log.info("%s [%d]: The device will be reset now...\r\n", __FILE__, __LINE__);
   Log.info("%s [%d]: WiFi reseting...\r\n", __FILE__, __LINE__);
   WifiBLEProvisioning.resetSettings();
-  // Commented out old captive portal code:
   // WifiCaptivePortal.resetSettings();
   need_to_refresh_display = 1;
   bool res = preferences.clear();

@@ -14,21 +14,13 @@
 
 class WifiBLE : public BLECharacteristicCallbacks, public BLEServerCallbacks, public Wifi {
     public:
-    enum Error {
-        OK = 0,
-        ALREADY_RUNNING,
-        SERVER_FAILED,
-        SERVICE_FAILED,
-        CHARACTERISTIC_FAILED,
-        TIMEOUT
-    };
 
     WifiBLE() : _isProvisioning(false), _deviceConnected(false),
                 _previouslyConnected(false), _credentialsReceived(false) {}
     ~WifiBLE();
 
-    Error start(const char* deviceName = BLE_DEVICE_NAME, const char* authCode = nullptr);
-    void stop();
+    bool startBLEProvisioning();
+    void stopBLEProvisioning();
 
 private:
     // Device state
