@@ -15,6 +15,7 @@ bool submitLogToApi(LogApiInput &input, const char *api_url)
   std::unique_ptr<WiFiClientSecure> secureClient(new WiFiClientSecure());
   std::unique_ptr<WiFiClient> baseClient(new WiFiClient());
 
+  secureClient->setInsecure();
   WiFiClient *client;
   
   if (isHttps)
