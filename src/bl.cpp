@@ -207,7 +207,12 @@ void bl_init(void)
     need_to_refresh_display = 1;
     preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
     Log.info("%s [%d]: Display TRMNL logo end\r\n", __FILE__, __LINE__);
+
+    // We're displaying the logo on the screen, so we reset the
+    // two preferences specifying the previous filename and the previous ETag
+    // to ensure we refresh this time to remove the logo.
     preferences.putString(PREFERENCES_FILENAME_KEY, "");
+    preferences.putString(PREFERENCES_ETAG_KEY, "");
   }
 
   // Mount SPIFFS
@@ -1073,8 +1078,20 @@ static https_request_err_e downloadAndShow()
 
         return HTTPS_UNABLE_TO_CONNECT;
       }
+
+      // If we have an ETag, add it to the request.
+      String currentEtag = preferences.getString(PREFERENCES_ETAG_KEY, "");
+      if (currentEtag.length() > 0) {
+        https.addHeader("If-None-Match", currentEtag);
+      }
+
       Log.info("%s [%d]: [HTTPS] GET..\r\n", __FILE__, __LINE__);
       Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
+      
+      // Ensure we look for the ETag header in the response.
+      const char* headerKeys[] = {"ETag", "Content-Type"};
+      https.collectHeaders(headerKeys, 2);
+
       // start connection and send HTTP header
       int httpCode = https.GET();
 
@@ -1091,6 +1108,23 @@ static https_request_err_e downloadAndShow()
       // HTTP header has been send and Server response header has been handled
       Log.error("%s [%d]: [HTTPS] GET... code: %d\r\n", __FILE__, __LINE__, httpCode);
       Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
+
+      if (httpCode == HTTP_CODE_NOT_MODIFIED)
+      {
+        // The server used the ETag to determine that the content hasn't changed
+        // for this device and so returned a 304 Not Modified response.
+        // We don't need to update the screen.
+        Log.info("%s [%d]: Not modified. No need to download\r\n", __FILE__, __LINE__);
+        return HTTPS_SUCCES;
+      }
+    
+      if (https.hasHeader("ETag")) {
+        // The server sent back an ETag header. Save it to include in the next request.
+        String etag = https.header("ETag");
+        Log.info("%s [%d]: ETag: %s\r\n", __FILE__, __LINE__, etag.c_str());
+        preferences.putString(PREFERENCES_ETAG_KEY, etag);
+      }
+      
       // file found at server
       if (httpCode != HTTP_CODE_OK && httpCode != HTTP_CODE_MOVED_PERMANENTLY)
       {
