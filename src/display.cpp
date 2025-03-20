@@ -251,7 +251,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
  * @param message_type type of message that will show on the screen
  * @param friendly_id device friendly ID
  * @param id shows if ID exists
- * @param fw_version version of the firmaware
+ * @param fw_version version of the firmware
  * @param message additional message
  * @return none
  */
