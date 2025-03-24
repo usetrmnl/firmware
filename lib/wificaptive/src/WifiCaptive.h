@@ -21,7 +21,7 @@
 // Local IP URL
 #define LocalIPURL "http://4.3.2.1"
 
-class WifiCaptive : public Wifi
+class WifiCaptive : public WifiCommon
 {
 private:
 

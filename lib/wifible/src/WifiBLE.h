@@ -12,7 +12,7 @@
 
 #define BLE_DEVICE_NAME     "TRMNL_WIFI_SETUP"
 
-class WifiBLE : public BLECharacteristicCallbacks, public BLEServerCallbacks, public Wifi {
+class WifiBLE : public BLECharacteristicCallbacks, public BLEServerCallbacks, public WifiCommon {
     public:
 
     WifiBLE() : _isProvisioning(false), _deviceConnected(false),

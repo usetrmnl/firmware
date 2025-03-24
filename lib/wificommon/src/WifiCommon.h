@@ -1,5 +1,5 @@
-#ifndef WIFI_H
-#define WIFI_H
+#ifndef WIFI_COMMON_H
+#define WIFI_COMMON_H
 
 #include <esp_wifi.h>          //Used for mpdu_rx_disable android workaround
 #include "Preferences.h"
@@ -23,7 +23,7 @@
 #define WIFI_SSID_KEY(i) ("wifi_" + String(i) + "_ssid").c_str()
 #define WIFI_PSWD_KEY(i) ("wifi_" + String(i) + "_pswd").c_str()
 
-class Wifi {
+class WifiCommon {
 public:
     struct WifiCredentials
     {

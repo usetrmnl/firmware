@@ -1,6 +1,6 @@
 #include "WifiCommon.h"
 
-void Wifi::resetSettings()
+void WifiCommon::resetSettings()
 {
     Preferences preferences;
     preferences.begin("wificaptive", false);
@@ -21,14 +21,14 @@ void Wifi::resetSettings()
     WiFi.disconnect(true, true);
 }
 
-bool Wifi::isSaved()
+bool WifiCommon::isSaved()
 {
     readWifiCredentials();
     return _savedWifis[0].ssid != "";
 }
 
 
-bool Wifi::autoConnect()
+bool WifiCommon::autoConnect()
 {
     Log.info("Trying to autoconnect to wifi...\r\n");
     readWifiCredentials();
@@ -108,12 +108,12 @@ bool Wifi::autoConnect()
     return false;
 }
 
-void Wifi::setResetSettingsCallback(std::function<void()> func)
+void WifiCommon::setResetSettingsCallback(std::function<void()> func)
 {
     _resetcallback = func;
 }
 
-uint8_t Wifi::connect(String ssid, String pass)
+uint8_t WifiCommon::connect(String ssid, String pass)
 {
     uint8_t connRes = (uint8_t)WL_NO_SSID_AVAIL;
 
@@ -132,7 +132,7 @@ uint8_t Wifi::connect(String ssid, String pass)
  * @param  uint16_t timeout  in seconds
  * @return uint8_t  WL Status
  */
-uint8_t Wifi::waitForConnectResult(uint32_t timeout)
+uint8_t WifiCommon::waitForConnectResult(uint32_t timeout)
 {
     if (timeout == 0)
     {
@@ -156,12 +156,12 @@ uint8_t Wifi::waitForConnectResult(uint32_t timeout)
     return status;
 }
 
-uint8_t Wifi::waitForConnectResult()
+uint8_t WifiCommon::waitForConnectResult()
 {
     return waitForConnectResult(CONNECTION_TIMEOUT);
 }
 
-void Wifi::readWifiCredentials()
+void WifiCommon::readWifiCredentials()
 {
     Preferences preferences;
     preferences.begin("wificaptive", true);
@@ -176,7 +176,7 @@ void Wifi::readWifiCredentials()
 }
 
 
-void Wifi::saveWifiCredentials(String ssid, String pass)
+void WifiCommon::saveWifiCredentials(String ssid, String pass)
 {
     Log.info("Saving wifi credentials: %s\r\n", ssid.c_str());
 
@@ -208,7 +208,7 @@ void Wifi::saveWifiCredentials(String ssid, String pass)
 }
 
 
-void Wifi::saveLastUsedWifiIndex(int index)
+void WifiCommon::saveLastUsedWifiIndex(int index)
 {
     Preferences preferences;
     preferences.begin("wificaptive", false);
@@ -232,7 +232,7 @@ void Wifi::saveLastUsedWifiIndex(int index)
     preferences.putInt(WIFI_LAST_INDEX, index);
 }
 
-int Wifi::readLastUsedWifiIndex()
+int WifiCommon::readLastUsedWifiIndex()
 {
     Preferences preferences;
     preferences.begin("wificaptive", true);
@@ -256,7 +256,7 @@ int Wifi::readLastUsedWifiIndex()
     return index;
 }
 
-void Wifi::saveApiServer(String url)
+void WifiCommon::saveApiServer(String url)
 {
     // if not URL is provided, don't save a preference and fall back to API_BASE_URL in config.h
     if (url == "")
@@ -267,7 +267,7 @@ void Wifi::saveApiServer(String url)
     preferences.end();
 }
 
-std::vector<Wifi::Network> Wifi::getScannedUniqueNetworks(bool runScan)
+std::vector<WifiCommon::Network> WifiCommon::getScannedUniqueNetworks(bool runScan)
 {
     std::vector<Network> uniqueNetworks;
     int n = WiFi.scanComplete();
@@ -346,9 +346,9 @@ std::vector<Wifi::Network> Wifi::getScannedUniqueNetworks(bool runScan)
     return uniqueNetworks;
 }
 
-std::vector<Wifi::WifiCredentials> Wifi::matchNetworks(
-    std::vector<Wifi::Network> &scanResults,
-    Wifi::WifiCredentials savedWifis[])
+std::vector<WifiCommon::WifiCredentials> WifiCommon::matchNetworks(
+    std::vector<WifiCommon::Network> &scanResults,
+    WifiCommon::WifiCredentials savedWifis[])
 {
     // sort scan results by RSSI
     std::sort(scanResults.begin(), scanResults.end(), [](const Network &a, const Network &b)
@@ -369,9 +369,9 @@ std::vector<Wifi::WifiCredentials> Wifi::matchNetworks(
     return sortedWifis;
 }
 
-std::vector<Wifi::Network> Wifi::combineNetworks(
-    std::vector<Wifi::Network> &scanResults,
-    Wifi::WifiCredentials savedWifis[])
+std::vector<WifiCommon::Network> WifiCommon::combineNetworks(
+    std::vector<WifiCommon::Network> &scanResults,
+    WifiCommon::WifiCredentials savedWifis[])
 {
     std::vector<Network> combinedNetworks;
     for (auto &network : scanResults)
