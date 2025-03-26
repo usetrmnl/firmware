@@ -56,6 +56,63 @@ uint16_t display_width()
 }
 
 /**
+ * @brief Helper function to display string centered in a given box.
+ * @param Xstart left boundary of the box
+ * @param Ystart top boundary of the box
+ * @param Xend right boundary of the box
+ * @param Yend bottom boundary of the box
+ * @param string pointer to ascii-z string to display
+ * @param font pointer to font for drawing
+ * @param ColorFg color of the text
+ * @param ColorBg color of the background
+ * @return none
+ * 
+ * The text drawn is not respected to the constraints: if the text bigger than the box, it'll be drawn outside of it.
+ * On a positive side, that means it is okay to provide Xstart==Xend so they act as Xmiddle, coordinate of the center.
+ */
+void Paint_DrawString_EN_Centered(uint16_t Xstart, uint16_t Ystart, uint16_t Xend, uint16_t Yend, char* string, sFONT* font, uint16_t ColorFg, uint16_t ColorBg)
+{
+    uint16_t Xmiddle = (Xstart + Xend) / 2;
+    uint16_t Ymiddle = (Ystart + Yend) / 2;
+    uint16_t halflen = strlen(string) * font->Width / 2;
+    uint16_t halfheight = font->Height / 2;
+    if (halflen > Xmiddle) halflen = Xmiddle; // cap at the left border
+    if (halfheight > Ymiddle) halfheight = Ymiddle;
+    Paint_DrawString_EN(Xmiddle - halflen, Ymiddle - halfheight, string, font, ColorFg, ColorBg);
+}
+
+static char clock_buffer[100];
+/**
+ * @brief Function to display clock according to settings.
+ * @param settings pointer to the clock settings.
+ * @return bool Is the clock drawing enabled.
+ */
+bool display_show_clock(const clock_settings_t *settings)
+{
+    if (settings->Xstart != settings->Xend && settings->Ystart != settings->Yend && settings->FontSize > 0)
+    {
+        Paint_ClearWindows(settings->Xstart, settings->Ystart, settings->Xend, settings->Yend, settings->ColorBg);
+        time_t now;
+        struct tm * timeinfo;
+        time(&now);
+        timeinfo = localtime(&now);
+        size_t res = strftime(clock_buffer, sizeof(clock_buffer), settings->Format, timeinfo);
+        if (res < sizeof(clock_buffer))
+        {
+            sFONT* font = nullptr;
+            if (settings->FontSize >= 24) font = &Font24;
+            else if (settings->FontSize >= 20) font = &Font20;
+            else if (settings->FontSize >= 16) font = &Font16;
+            else if (settings->FontSize >= 12) font = &Font12;
+            else font = &Font8;
+            Paint_DrawString_EN_Centered(settings->Xstart, settings->Ystart, settings->Xend, settings->Yend, clock_buffer, font, settings->ColorFg, settings->ColorBg);
+        }
+        return true;
+    }
+    return false;
+}
+
+/**
  * @brief Function to show the image on the display
  * @param image_buffer pointer to the uint8_t image buffer
  * @param reverse shows if the color scheme is reverse

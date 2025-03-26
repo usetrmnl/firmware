@@ -4,6 +4,22 @@
 #include <trmnl_log.h>
 #include <special_function.h>
 
+clock_settings_t parseResponse_apiDisplay_clockSettings(JsonObject doc)
+{
+  clock_settings_t settings{
+    .Xstart = doc["Xstart"],
+    .Xend = doc["Xend"],
+    .Ystart = doc["Ystart"],
+    .Yend = doc["Yend"],
+    .ColorFg = doc["ColorFg"],
+    .ColorBg = doc["ColorBg"],
+    .FontSize = doc["FontSize"],
+  };
+  String format = doc["Format"] | "";
+  format.toCharArray(settings.Format, sizeof(settings.Format), 0);
+  return std::move(settings);
+}
+
 ApiDisplayResponse parseResponse_apiDisplay(String &payload)
 {
   JsonDocument doc;
@@ -27,5 +43,6 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload)
       .reset_firmware = doc["reset_firmware"],
       .special_function = parseSpecialFunction(special_function_str),
       .action = doc["action"] | "",
+      .clock_settings = parseResponse_apiDisplay_clockSettings(doc["clock_settings"]),
       };
 }
