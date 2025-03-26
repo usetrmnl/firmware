@@ -67,6 +67,14 @@ void test_parseResponse_apiDisplay_treats_unknown_sf_as_none(void)
   TEST_ASSERT_EQUAL(parsed.special_function, SPECIAL_FUNCTION::SF_NONE);
 }
 
+void setUp(void) {
+  // set stuff up here
+}
+
+void tearDown(void) {
+  // clean stuff up here
+}
+
 void process()
 {
   UNITY_BEGIN();

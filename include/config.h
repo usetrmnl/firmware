@@ -3,7 +3,7 @@
 
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 4
-#define FW_PATCH_VERSION 6
+#define FW_PATCH_VERSION 8
 
 #define LOG_MAX_NOTES_NUMBER 5
 
@@ -16,7 +16,7 @@
 #define PREFERENCES_LOG_KEY "log_"
 #define PREFERENCES_LOG_BUFFER_HEAD_KEY "log_head"
 #define PREFERENCES_LOG_ID_KEY "log_id"
-#define PREFERENCES_DEVICE_REGISTRED_KEY "plugin"
+#define PREFERENCES_DEVICE_REGISTERED_KEY "plugin"
 #define PREFERENCES_SF_KEY "sf"
 #define PREFERENCES_FILENAME_KEY "filename"
 #define PREFERENCES_LAST_SLEEP_TIME "last_sleep"

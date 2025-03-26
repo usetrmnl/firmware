@@ -1,4 +1,3 @@
-
 #include <ArduinoJson.h>
 #include "api_response_parsing.h"
 #include <trmnl_log.h>
@@ -14,7 +13,7 @@ ApiSetupResponse parseResponse_apiSetup(String &payload)
     return {.outcome = ApiSetupOutcome::DeserializationError};
   }
 
-  if (doc["status"] != 200)
+  if (doc["status"].as<int>() != 200)
   {
     Log_info("status FAIL.");
 
