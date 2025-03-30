@@ -32,6 +32,8 @@
 #define SLEEP_TIME_WHILE_NOT_CONNECTED 5       /* Time ESP32 will go to sleep (in seconds) */
 #define SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED 5 /* Time ESP32 will go to sleep (in seconds) */
 
+#define MS_TO_S_FACTOR 1000                    /* Conversion factor for milliseconds to seconds */
+
 enum API_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the API (in seconds)
 {
     API_FIRST_RETRY = 5,
