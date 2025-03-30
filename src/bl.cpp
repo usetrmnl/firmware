@@ -1055,7 +1055,7 @@ static https_request_err_e downloadAndShow()
       if (requestedTimeout > 0) {
         // Convert from seconds to milliseconds.
         // A uint32_t should be large enough not to worry about overflow for any reasonable timeout.
-        requestedTimeout *= 1000;
+        requestedTimeout *= MS_TO_S_FACTOR;
         if (requestedTimeout > UINT16_MAX) {
           // To avoid surprising behaviour if the server returned a timeout of more than 65 seconds
           // we will send a log message back to the server and truncate the timeout to the maximum.
