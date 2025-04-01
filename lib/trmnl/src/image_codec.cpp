@@ -1,5 +1,8 @@
-#include <bmp.h>
+#include <image_codec.h>
 #include <trmnl_log.h>
+#include <PNGdec.h>
+#include <esp_mac.h>
+#include <SPIFFS.h>
 
 /**
  * @brief Function to parse .bmp file header
@@ -7,16 +10,52 @@
  * @param reserved variable address to store parsed color schematic
  * @return bmp_err_e error code
  */
-bmp_err_e parseBMPHeader(uint8_t *data, bool &reversed)
+
+
+image_err_e decodePNG(uint8_t* buffer, uint8_t* &decoded_buffer){
+    PNG* png = new PNG();
+
+    if(!png) return PNG_MALLOC_FAILED;
+
+    int rc = png->openRAM(buffer, 48000, nullptr);
+
+    if(rc == PNG_INVALID_FILE)
+    {
+        delete png;
+        return IMAGE_WRONG_FORMAT;
+    }
+
+    if(!(decoded_buffer = (uint8_t *)malloc(48000)))
+    {
+      Log.error("PNG MALLOC FAILED\n");
+      delete png;
+      return PNG_MALLOC_FAILED;
+    }
+    png->setBuffer(decoded_buffer);
+    
+    uint32_t width = png->getWidth();
+    uint32_t height = png->getHeight();
+    uint32_t bpp = png->getBpp();
+
+    if (width != 800 || height != 480 || bpp != 1){
+        Log.error("PNG_BAD_SIZE\n");
+        delete png;
+        return IMAGE_BAD_SIZE;
+    }
+
+    if(!(png->decode(nullptr, 0))){
+      Log.error("PNG_SUCCESS\n");
+      delete png;
+      return IMAGE_NO_ERR;
+    }
+    Log.error("PNG_DECODE_ERR\n");
+    delete png;
+    return PNG_DECODE_ERR;
+}
+
+
+image_err_e parseBMPHeader(uint8_t *data, bool &reversed)
 {
-
-  // Check if the file is a BMP image
-  if (data[0] != 'B' || data[1] != 'M')
-  {
-    Log.fatal("%s [%d]: It is not a BMP file\r\n", __FILE__, __LINE__);
-    return BMP_NOT_BMP;
-  }
-
   // Get width and height from the header
   uint32_t width = *(uint32_t *)&data[18];
   uint32_t height = *(uint32_t *)&data[22];
@@ -26,7 +65,7 @@ bmp_err_e parseBMPHeader(uint8_t *data, bool &reversed)
   uint32_t colorTableEntries = *(uint32_t *)&data[46];
 
   if (width != 800 || height != 480 || bitsPerPixel != 1 || imageDataSize != 48000 || colorTableEntries != 2)
-    return BMP_BAD_SIZE;
+    return IMAGE_BAD_SIZE;
   // Get the offset of the pixel data
   uint32_t dataOffset = *(uint32_t *)&data[10];
 
@@ -61,7 +100,7 @@ bmp_err_e parseBMPHeader(uint8_t *data, bool &reversed)
       Log.info("%s [%d]: Color scheme demaged\r\n", __FILE__, __LINE__);
       return BMP_COLOR_SCHEME_FAILED;
     }
-    return BMP_NO_ERR;
+    return IMAGE_NO_ERR;
   }
   else
   {

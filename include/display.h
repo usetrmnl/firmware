@@ -52,7 +52,7 @@ uint16_t display_width();
  * @param reverse shows if the color scheme is reverse 
  * @return none
  */
-void display_show_image(uint8_t * image_buffer, bool reverse);
+void display_show_image(uint8_t * image_buffer, bool reverse, bool isPNG);
 
 /**
  * @brief Function to show the image with message on the display
