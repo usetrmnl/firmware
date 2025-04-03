@@ -73,7 +73,7 @@ bool filesystem_read_from_file(const char *name, uint8_t *out_buffer, size_t siz
 size_t filesystem_write_to_file(const char *name, uint8_t *in_buffer, size_t size)
 {
     uint32_t SPIFFS_freeBytes = (SPIFFS.totalBytes() - SPIFFS.usedBytes());
-    Log.info("%s [%d]: SPIFFS freee space - %d\r\n", __FILE__, __LINE__, SPIFFS_freeBytes);
+    Log.info("%s [%d]: SPIFFS freee space - %d, total -%d\r\n", __FILE__, __LINE__, SPIFFS_freeBytes,SPIFFS.totalBytes());
     if (SPIFFS.exists(name))
     {
         Log.info("%s [%d]: file %s exists. Deleting...\r\n", __FILE__, __LINE__, name);
@@ -87,14 +87,9 @@ size_t filesystem_write_to_file(const char *name, uint8_t *in_buffer, size_t siz
         Log.info("%s [%d]: file %s not exists.\r\n", __FILE__, __LINE__, name);
     }
     delay(100);
-    Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
-    Log.error("%s [%d]: free alloc heap - %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
     File file = SPIFFS.open(name, FILE_WRITE);
     if (file)
     {
-        Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
-        Log.error("%s [%d]: free alloc heap - %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
-
         // Write the buffer in chunks
         size_t bytesWritten = 0;
         while (bytesWritten < size)
@@ -102,8 +97,6 @@ size_t filesystem_write_to_file(const char *name, uint8_t *in_buffer, size_t siz
 
             size_t diff = size - bytesWritten;
             size_t chunkSize = _min(4096, diff);
-            // Log.info("%s [%d]: chunksize - %d\r\n", __FILE__, __LINE__, chunkSize);
-            // delay(10);
             uint16_t res = file.write(in_buffer + bytesWritten, chunkSize);
             if (res != chunkSize)
             {
