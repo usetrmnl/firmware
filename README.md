@@ -26,8 +26,25 @@ graph TB
 
     ClearDisplay("Display clear")
     WakeReason -->|"User"| ClearDisplay
+
+    NeedShowTime{"Need to show time?"}
+    WakeReason -->|"Timer"| NeedShowTime
+
+    ClearTimeArea("Clear time area")
+    NeedShowTime -->|"No"| IsWiFiSetup
+    NeedShowTime -->|"Yes"| ClearTimeArea
+    DrawTime("Draw time")
+    ClearTimeArea --> DrawTime
+
+    TimeToCallServer{"Time to
+      call server?"}
+    DrawTime --> TimeToCallServer
+
+    Sleep0(["Sleep"])
+    TimeToCallServer -->|"Yes"| IsWiFiSetup
+    TimeToCallServer -->|"No"| Sleep0
+
     IsWiFiSetup{"Wi-Fi saved?"}
-    WakeReason -->|"Timer"| IsWiFiSetup
     ClearDisplay --> IsWiFiSetup
     NeedConfig("Show set-up message")
     IsWiFiSetup -->|"No"| NeedConfig

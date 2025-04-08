@@ -41,10 +41,12 @@ void GPIO_Config(void)
     pinMode(EPD_BUSY_PIN, INPUT);
     pinMode(EPD_RST_PIN, OUTPUT);
     pinMode(EPD_DC_PIN, OUTPUT);
-
+    pinMode(EPD_PWR_PIN, OUTPUT);
     pinMode(EPD_CS_PIN, OUTPUT);
 
+    digitalWrite(EPD_PWR_PIN, HIGH);
     digitalWrite(EPD_CS_PIN, HIGH);
+    //REG_WRITE(GPIO_OUT_W1TC_REG, 1 << EPD_CS_PIN);
 }
 /******************************************************************************
 function:	Module Initialize, the BCM2835 library and initialize the pins, SPI protocol
@@ -77,12 +79,24 @@ void DEV_SPI_WriteByte(UBYTE data)
     // SPI.beginTransaction(spi_settings);
     
     //digitalWrite(EPD_CS_PIN, GPIO_PIN_RESET);
-    REG_WRITE(GPIO_OUT_W1TC_REG, 1 << EPD_CS_PIN);
+    //REG_WRITE(GPIO_OUT_W1TC_REG, 1 << EPD_CS_PIN);
 
     display_spi->transfer(data);
 
     //digitalWrite(EPD_CS_PIN, GPIO_PIN_SET);
-    REG_WRITE(GPIO_OUT_W1TS_REG, 1 << EPD_CS_PIN);
+    //REG_WRITE(GPIO_OUT_W1TS_REG, 1 << EPD_CS_PIN);
 
     // SPI.endTransaction();
+}
+
+void DEV_SPI_Write_nByte(UBYTE *pData, UDOUBLE len)
+{
+    // display_spi->transferBytes(NULL, pData, len);
+    for (int i = 0; i < len; i++)
+        DEV_SPI_WriteByte(pData[i]);
+}
+
+void DEV_Module_Exit(void)
+{
+    digitalWrite(EPD_PWR_PIN, LOW);
 }
