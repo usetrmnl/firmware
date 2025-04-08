@@ -50,6 +50,8 @@
 #define EPD_RST_PIN  10
 #define EPD_DC_PIN   5
 #define EPD_BUSY_PIN 4
+#define EPD_PWR_PIN  21
+
 
 #define GPIO_PIN_SET   1
 #define GPIO_PIN_RESET 0
@@ -68,5 +70,7 @@
 /*------------------------------------------------------------------------------------------------------*/
 UBYTE DEV_Module_Init(void);
 void DEV_SPI_WriteByte(UBYTE data);
+void DEV_SPI_Write_nByte(UBYTE *pData, UDOUBLE len);
+void DEV_Module_Exit(void);
 
 #endif

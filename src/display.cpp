@@ -21,6 +21,7 @@ void display_init(void)
 
     Log.info("%s [%d]: screen hw start\r\n", __FILE__, __LINE__);
     EPD_7IN5_V2_Init_New();
+    //EPD_7IN5_V2_Init_Fast();
     Log.info("%s [%d]: screen hw end\r\n", __FILE__, __LINE__);
 }
 
@@ -89,6 +90,7 @@ static char clock_buffer[100];
  */
 bool display_show_clock(const clock_settings_t *settings)
 {
+    /*
     if (settings->Xstart != settings->Xend && settings->Ystart != settings->Yend && settings->FontSize > 0)
     {
         Paint_ClearWindows(settings->Xstart, settings->Ystart, settings->Xend, settings->Yend, settings->ColorBg);
@@ -105,10 +107,12 @@ bool display_show_clock(const clock_settings_t *settings)
             else if (settings->FontSize >= 16) font = &Font16;
             else if (settings->FontSize >= 12) font = &Font12;
             else font = &Font8;
-            Paint_DrawString_EN_Centered(settings->Xstart, settings->Ystart, settings->Xend, settings->Yend, clock_buffer, font, settings->ColorFg, settings->ColorBg);
+            //Paint_DrawString_EN_Centered(settings->Xstart, settings->Ystart, settings->Xend, settings->Yend, clock_buffer, font, settings->ColorFg, settings->ColorBg);
+            Log.info("%s [%d]: Paint_DrawString_EN_Centered(%d, %d, %d, %d, %s, %d, %d, %d)\r\n", __FILE__, __LINE__, settings->Xstart, settings->Ystart, settings->Xend, settings->Yend, clock_buffer, font, settings->ColorFg, settings->ColorBg);
         }
         return true;
     }
+    */
     return false;
 }
 
@@ -140,7 +144,9 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
 
     Log.info("%s [%d]: show image for array\r\n", __FILE__, __LINE__);
     Paint_SelectImage(BlackImage);
+    Log.info("%s [%d]: selected image\r\n", __FILE__, __LINE__);
     Paint_Clear(WHITE);
+    Log.info("%s [%d]: cleared\r\n", __FILE__, __LINE__);
     if (reverse)
     {
         Log.info("%s [%d]: inverse the image\r\n", __FILE__, __LINE__);
@@ -160,7 +166,10 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
         Paint_DrawBitMap(image_buffer + 62);
     }
     EPD_7IN5_V2_Display(BlackImage);
+    //EPD_7IN5_V2_DisplayNew(BlackImage);
     Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
+    //EPD_7IN5_V2_UploadOld(BlackImage);
+    //Log.info("%s [%d]: upload old\r\n", __FILE__, __LINE__);
 
     free(BlackImage);
     BlackImage = NULL;
@@ -303,7 +312,12 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     }
 
     EPD_7IN5_V2_Display(BlackImage);
+    //EPD_7IN5_V2_DisplayNew(BlackImage);
     Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
+
+    //EPD_7IN5_V2_UploadOld(BlackImage);
+    //Log.info("%s [%d]: upload old\r\n", __FILE__, __LINE__);
+
     free(BlackImage);
     BlackImage = NULL;
 }
@@ -399,5 +413,6 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 void display_sleep(void)
 {
     Log.info("%s [%d]: Goto Sleep...\r\n", __FILE__, __LINE__);
-    EPD_7IN5B_V2_Sleep();
+    EPD_7IN5_V2_Sleep();
+    DEV_Module_Exit();
 }
