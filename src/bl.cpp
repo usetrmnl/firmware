@@ -82,7 +82,8 @@ static void redrawClock(void);  // Draw the clock over the image if clock enable
 
 void wait_for_serial()
 {
-#ifdef WAIT_FOR_SERIAL
+//#ifdef WAIT_FOR_SERIAL
+#if 1
   for (int i = 10; i > 0 && !Serial; i--)
   {
     Log_info("## Waiting for serial.. %d", i);
@@ -98,7 +99,6 @@ void wait_for_serial()
  */
 void bl_init(void)
 {
-
   Serial.begin(115200);
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
   Log_info("BL init success");
@@ -106,6 +106,36 @@ void bl_init(void)
   pins_init();
 
   wakeup_reason = esp_sleep_get_wakeup_cause();
+
+#if 0
+  /* DEBUUUG */
+  wait_for_serial();
+
+  Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
+  display_init();
+  /* Clear screen to start off some state */
+  display_reset();
+
+  while (true)
+  {
+    /* Draw one image */
+    Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
+    display_show_image(storedLogoOrDefault(), false);
+    
+    delay(10000);
+
+    display_show_msg(storedLogoOrDefault(), WIFI_FAILED);
+    delay(10000);
+  }
+
+  display_sleep();
+  // esp_deep_sleep_start();
+  while(true) { delay(100); }
+
+  return;
+  /////////
+  /* DEBUUUG */
+#endif
 
   Log.info("%s [%d]: preferences start\r\n", __FILE__, __LINE__);
   bool res = preferences.begin("data", false);
@@ -982,24 +1012,41 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
 
       writeSpecialFunction(apiResponse.special_function);
 
-      const clock_settings_t new_clock_settings = apiResponse.clock_settings;
+      //const clock_settings_t new_clock_settings = apiResponse.clock_settings;
+      const clock_settings_t new_clock_settings{
+        .Xstart=700,
+        .Xend=800-1,
+        .Ystart=460,
+        .Yend=480-1,
+        .ColorFg=0,
+        .ColorBg=0xff,
+        .FontSize=14,
+        .Format="%Y-%m-%d %H:%M\0\0\0\0\0\0",
+      };
       clock_settings_t current_clock_settings;
-      if (preferences.getBytes(PREFERENCES_CLOCK_SETTINGS, &current_clock_settings, sizeof(current_clock_settings)) == sizeof(current_clock_settings))
-      {
-        if ((current_clock_settings.Xstart   != new_clock_settings.Xstart) ||
-            (current_clock_settings.Xend     != new_clock_settings.Xend) ||
-            (current_clock_settings.Ystart   != new_clock_settings.Ystart) ||
-            (current_clock_settings.Yend     != new_clock_settings.Yend) ||
-            (current_clock_settings.ColorFg  != new_clock_settings.ColorFg) ||
-            (current_clock_settings.ColorBg  != new_clock_settings.ColorBg) ||
-            (current_clock_settings.FontSize != new_clock_settings.FontSize) ||
-            (strcmp(current_clock_settings.Format, new_clock_settings.Format) != 0)) {
-          preferences.putBytes(PREFERENCES_CLOCK_SETTINGS, &new_clock_settings, sizeof(new_clock_settings));
-          // We'll try to update clock at next minute, even if we won't refresh screen now
-          time_t nexttime = time(nullptr);
-          nexttime = nexttime - (nexttime % 60) + 60;
-          preferences.putUInt(PREFERENCES_CLOCK_UPDATE, nexttime);
-        }
+      if ((preferences.getBytes(PREFERENCES_CLOCK_SETTINGS, &current_clock_settings, sizeof(current_clock_settings)) != sizeof(current_clock_settings)) ||
+          (current_clock_settings.Xstart   != new_clock_settings.Xstart) ||
+          (current_clock_settings.Xend     != new_clock_settings.Xend) ||
+          (current_clock_settings.Ystart   != new_clock_settings.Ystart) ||
+          (current_clock_settings.Yend     != new_clock_settings.Yend) ||
+          (current_clock_settings.ColorFg  != new_clock_settings.ColorFg) ||
+          (current_clock_settings.ColorBg  != new_clock_settings.ColorBg) ||
+          (current_clock_settings.FontSize != new_clock_settings.FontSize) ||
+          (strcmp(current_clock_settings.Format, new_clock_settings.Format) != 0)) {
+        preferences.putBytes(PREFERENCES_CLOCK_SETTINGS, &new_clock_settings, sizeof(new_clock_settings));
+        current_clock_settings = new_clock_settings;
+      }
+      if (current_clock_settings.Xstart != current_clock_settings.Xend &&
+          current_clock_settings.Ystart != current_clock_settings.Yend &&
+          current_clock_settings.FontSize > 0) {
+        // We'll try to update clock at next minute, even if we won't refresh screen now
+        time_t nexttime = time(nullptr);
+        nexttime = nexttime - (nexttime % 60) + 60;
+        preferences.putUInt(PREFERENCES_CLOCK_UPDATE, nexttime);
+        Log.info("%s [%d]: need to draw clock at %u\r\n", __FILE__, __LINE__, nexttime);
+      } else {
+        preferences.putUInt(PREFERENCES_CLOCK_UPDATE, 0);
+        Log.info("%s [%d]: NO need to draw clock\r\n", __FILE__, __LINE__);
       }
 
       if (update_firmware)
@@ -1871,11 +1918,12 @@ static void goToSleep(void)
     preferences.putUInt(PREFERENCES_CLOCK_UPDATE, next_time);
     next_event = next_time;
   }
+  Log.info("%s [%d]: next event - %u\r\n", __FILE__, __LINE__, next_event);
 
-  uint32_t next_update = preferences.getUInt(PREFERENCES_NEXT_UPDATE_TIME);
-  if (now > next_update) {
-    uint32_t time_to_sleep = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
-    next_update = now + next_update;
+  uint32_t next_update = preferences.getUInt(PREFERENCES_NEXT_UPDATE_TIME, 0);
+  uint32_t sleep_time = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+  if (now > next_update || next_update > now + sleep_time) {
+    next_update = now + sleep_time;
     preferences.putUInt(PREFERENCES_NEXT_UPDATE_TIME, next_update);
   }
 
@@ -1887,9 +1935,13 @@ static void goToSleep(void)
 
   uint32_t time_to_sleep = next_event - now;
 
-  Log.info("%s [%d]: time to sleep - %d\r\n", __FILE__, __LINE__, time_to_sleep);
+  Log.info("%s [%d]: now - %u\r\n", __FILE__, __LINE__, now);
+  Log.info("%s [%d]: next event - %u\r\n", __FILE__, __LINE__, next_event);
+  Log.info("%s [%d]: next update - %u\r\n", __FILE__, __LINE__, next_update);
+  Log.info("%s [%d]: time to sleep - %u\r\n", __FILE__, __LINE__, time_to_sleep);
   preferences.putUInt(PREFERENCES_LAST_SLEEP_TIME, now);
   preferences.end();
+  delay(5000);
   esp_sleep_enable_timer_wakeup((uint64_t)time_to_sleep * SLEEP_uS_TO_S_FACTOR);
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT,
                                     ESP_GPIO_WAKEUP_GPIO_LOW);
@@ -1944,7 +1996,8 @@ static float readBatteryVoltage(void)
   int32_t sensorValue = (adc / 128) * 2;
 
   float voltage = sensorValue / 1000.0;
-  return voltage;
+  //return voltage;
+  return 3.7;
 }
 
 /**
