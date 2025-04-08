@@ -3,7 +3,8 @@
 #include <display.h>
 #include <ArduinoLog.h>
 #include "DEV_Config.h"
-#include "EPD.h"
+#include "utility/EPD_7in5_V2.h"
+#include  "utility/Debug.h"
 #include "GUI_Paint.h"
 #include <config.h>
 #include <ImageData.h>
@@ -82,26 +83,23 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
     Paint_NewImage(BlackImage, width, height, 0, WHITE);
 
     Log.info("%s [%d]: show image for array\r\n", __FILE__, __LINE__);
-    Paint_SelectImage(BlackImage);
-    Paint_Clear(WHITE);
     if (reverse)
     {
         Log.info("%s [%d]: inverse the image\r\n", __FILE__, __LINE__);
-        for (size_t i = 0; i < DISPLAY_BMP_IMAGE_SIZE; i++)
+        for (size_t i = 0; i < Imagesize; i++)
         {
-            image_buffer[i] = ~image_buffer[i];
+            image_buffer[i + 62] = ~image_buffer[i + 62];
         }
     }
     if(isPNG == true)
     {
-        Log.info("Drawing PNG\n");
-        flip_image(image_buffer, width, height);
-        horizontal_mirror(image_buffer,width,height);
-        Paint_DrawBitMap(image_buffer);
+        Log.info("Drawing PNG\n");    
     }
     else{
+        flip_image(image_buffer, width, height);
         Paint_DrawBitMap(image_buffer + 62);
     }
+    memcpy(Paint.Image, image_buffer, Imagesize);
     EPD_7IN5_V2_Display(BlackImage);
     Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
 
@@ -342,5 +340,5 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 void display_sleep(void)
 {
     Log.info("%s [%d]: Goto Sleep...\r\n", __FILE__, __LINE__);
-    EPD_7IN5B_V2_Sleep();
+    EPD_7IN5_V2_Sleep();
 }
