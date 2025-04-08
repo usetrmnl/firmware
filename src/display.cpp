@@ -4,7 +4,7 @@
 #include <ArduinoLog.h>
 #include "DEV_Config.h"
 #include "utility/EPD_7in5_V2.h"
-#include  "utility/Debug.h"
+#include "utility/Debug.h"
 #include "GUI_Paint.h"
 #include <config.h>
 #include <ImageData.h>
@@ -132,9 +132,10 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     Paint_NewImage(BlackImage, width, height, 0, WHITE);
 
     Log.info("%s [%d]: show image for array\r\n", __FILE__, __LINE__);
-    Paint_SelectImage(BlackImage);
-    Paint_Clear(WHITE);
-    Paint_DrawBitMap(image_buffer + 62);
+         // what if it is PNG ?
+    // we could copy and swap at the same time...
+    flip_image(BlackImage, width, height);
+    memcpy(BlackImage, image_buffer + 62, Imagesize);
     switch (message_type)
     {
     case WIFI_CONNECT:
