@@ -1,5 +1,5 @@
 #include <unity.h>
-#include <image_codec.h>
+#include <bmp.h>
 #include <api_response_parsing.h>
 
 void assert_response_equal(ApiSetupResponse expected, ApiSetupResponse actual)
