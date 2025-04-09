@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include <PNG-flip.c>
+
 #include <display.h>
 #include <ArduinoLog.h>
 #include "DEV_Config.h"
@@ -61,7 +61,7 @@ uint16_t display_width()
  * @param reverse shows if the color scheme is reverse
  * @return none
  */
-void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
+void display_show_image(uint8_t *image_buffer, bool reverse)
 {
     auto width = display_width();
     auto height = display_height();
@@ -78,6 +78,9 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
         ESP.restart();
     }
     Log.info("%s [%d]: Paint_NewImage %d\r\n", __FILE__, __LINE__, reverse);
+    // if (reverse)
+    //     Paint_NewImage(BlackImage, EPD_7IN5_V2_WIDTH, EPD_7IN5_V2_HEIGHT, 0, BLACK);
+    // else
     
     Paint_NewImage(BlackImage, width, height, 0, WHITE);
 
@@ -92,16 +95,7 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
             image_buffer[i] = ~image_buffer[i];
         }
     }
-    if(isPNG == true)
-    {
-        Log.info("Drawing PNG\n");
-        flip_image(image_buffer, width, height);
-        horizontal_mirror(image_buffer,width,height);
-        Paint_DrawBitMap(image_buffer);
-    }
-    else{
-        Paint_DrawBitMap(image_buffer + 62);
-    }
+    Paint_DrawBitMap(image_buffer + 62);
     EPD_7IN5_V2_Display(BlackImage);
     Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
 

@@ -14,7 +14,7 @@
 #include <ImageData.h>
 #include <Preferences.h>
 #include <cstdint>
-#include <image_codec.h>
+#include <bmp.h>
 #include <Update.h>
 #include <math.h>
 #include <filesystem.h>
@@ -25,18 +25,15 @@
 #include <special_function.h>
 #include <api_response_parsing.h>
 #include "logging_parcers.h"
-#include <SPIFFS.h>
 
 bool pref_clear = false;
 
-uint8_t* buffer = nullptr;
-uint8_t *decodedPng = nullptr;
+uint8_t buffer[48062];    // image buffer
 char filename[1024];      // image URL
 char binUrl[1024];        // update URL
 char log_array[1024];     // log
 char message_buffer[128]; // message to show on the screen
 uint32_t time_since_sleep;
-image_err_e res = IMAGE_NO_ERR;
 
 bool status = false;          // need to download a new image
 bool update_firmware = false; // need to download a new firmware
@@ -206,12 +203,7 @@ void bl_init(void)
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
   {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
-    
-    buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
-    display_show_image(storedLogoOrDefault(), false, false);
-    free(buffer);
-    buffer = nullptr;
-
+    display_show_image(storedLogoOrDefault(), false);
     need_to_refresh_display = 1;
     preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
     Log.info("%s [%d]: Display TRMNL logo end\r\n", __FILE__, __LINE__);
@@ -608,7 +600,7 @@ static https_request_err_e downloadAndShow()
     String payload = https.getString();
     size_t size = https.getSize();
     Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, size);
-    Log.info("%s [%d]: Free heap size: %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
+    Log.info("%s [%d]: Free heap size: %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
     Log.info("%s [%d]: Payload - %s\r\n", __FILE__, __LINE__, payload.c_str());
 
     auto apiResponse = parseResponse_apiDisplay(payload);
@@ -946,37 +938,23 @@ static https_request_err_e downloadAndShow()
           String action = apiResponse.action;
           if (action.equals("rewind"))
           {
-            bool isPNG = false;
             status = false;
             result = HTTPS_SUCCESS;
             Log.info("%s [%d]: rewind success\r\n", __FILE__, __LINE__);
-            
-            bool image_reverse = false;
-            bool file_check_bmp = true;
-            image_err_e image_proccess_response = IMAGE_WRONG_FORMAT;
-            
             // showMessageWithLogo(BMP_FORMAT_ERROR);
-            String last_dot_file = filesystem_file_exists("/last.bmp") ? "/last.bmp" : "/last.png";
-            if(last_dot_file == "/last.bmp"){
-              Log.info("Rewind BMP\n\r");
-              buffer = (uint8_t *)malloc(DISPLAY_BMP_IMAGE_SIZE);
-              file_check_bmp = filesystem_read_from_file(last_dot_file.c_str(), buffer, DISPLAY_BMP_IMAGE_SIZE);
-              image_proccess_response = parseBMPHeader(buffer, image_reverse);
-            }
-            else if(last_dot_file == "/last.png"){
-              isPNG = true;
-              Log.info("Rewind PNG\n\r");
-              image_proccess_response = decodePNG(last_dot_file.c_str(), buffer);
-            }
-              
-            if (file_check_bmp)
+
+            bool result = filesystem_read_from_file("/last.bmp", buffer, sizeof(buffer));
+            if (result)
             {
-              switch (image_proccess_response)
+              bool image_reverse = false;
+              bmp_err_e res = parseBMPHeader(buffer, image_reverse);
+              String error = "";
+              switch (res)
               {
-              case IMAGE_NO_ERR:
+              case BMP_NO_ERR:
               {
-                Log.info("Showing image\n\r");
-                display_show_image(buffer, image_reverse,isPNG);
+                // show the image
+                display_show_image(buffer, image_reverse);
                 need_to_refresh_display = 1;
               }
               break;
@@ -988,8 +966,6 @@ static https_request_err_e downloadAndShow()
             }
             else
             {
-              free(buffer);
-              buffer = nullptr;
               showMessageWithLogo(BMP_FORMAT_ERROR);
             }
           }
@@ -1005,36 +981,21 @@ static https_request_err_e downloadAndShow()
 
           if (action.equals("send_to_me"))
           {
-            bool isPNG = false;
             status = false;
             result = HTTPS_SUCCESS;
             Log.info("%s [%d]: send_to_me success\r\n", __FILE__, __LINE__);
-            
-            bool image_reverse = false;
-            bool file_check_bmp = true;
-            image_err_e image_proccess_response = IMAGE_WRONG_FORMAT;
-            
-            // showMessageWithLogo(BMP_FORMAT_ERROR);
-            String current_dot_file = filesystem_file_exists("/current.bmp") ? "/current.bmp" : "/current.png";
-            if(current_dot_file == "/current.bmp"){
-              Log.info("send_to_me BMP\n\r");
-              buffer = (uint8_t *)malloc(DISPLAY_BMP_IMAGE_SIZE);
-              file_check_bmp = filesystem_read_from_file(current_dot_file.c_str(), buffer, DISPLAY_BMP_IMAGE_SIZE);
-              image_proccess_response = parseBMPHeader(buffer, image_reverse);
-            }
-            else if(current_dot_file == "/current.png"){
-              isPNG = true;
-              Log.info("send_to_me PNG\n\r");
-              image_proccess_response = decodePNG(current_dot_file.c_str(), buffer);
-            }
-            
-            if (file_check_bmp)
+            bool result = filesystem_read_from_file("/current.bmp", buffer, sizeof(buffer));
+            if (result)
             {
-              switch (image_proccess_response)
+              bool image_reverse = false;
+              bmp_err_e res = parseBMPHeader(buffer, image_reverse);
+              String error = "";
+              switch (res)
               {
-              case IMAGE_NO_ERR:
+              case BMP_NO_ERR:
               {
-                display_show_image(buffer, image_reverse,isPNG);
+                // show the image
+                display_show_image(buffer, image_reverse);
                 need_to_refresh_display = 1;
               }
               break;
@@ -1048,8 +1009,6 @@ static https_request_err_e downloadAndShow()
             {
               showMessageWithLogo(BMP_FORMAT_ERROR);
             }
-            free(buffer);
-            buffer = nullptr;
           }
           else
           {
@@ -1106,7 +1065,6 @@ static https_request_err_e downloadAndShow()
       }
 
       Log.info("%s [%d]: [HTTPS] Request to %s\r\n", __FILE__, __LINE__, filename);
-      client = strstr(filename, "https://") == nullptr ? insecureClient : secureClient;
       if (!https.begin(*client, filename)) // HTTPS
       {
         Log.error("%s [%d]: unable to connect\r\n", __FILE__, __LINE__);
@@ -1114,13 +1072,11 @@ static https_request_err_e downloadAndShow()
         submit_log("unable to connect to the API");
 
         return HTTPS_UNABLE_TO_CONNECT;
-      }const char* headers[] = { "Content-Type" };
-      https.collectHeaders(headers, 1);
+      }
       Log.info("%s [%d]: [HTTPS] GET..\r\n", __FILE__, __LINE__);
       Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
       // start connection and send HTTP header
       int httpCode = https.GET();
-      int content_size = https.getSize();
 
       // httpCode will be negative on error
       if (httpCode < 0)
@@ -1146,7 +1102,7 @@ static https_request_err_e downloadAndShow()
       Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
 
       uint32_t counter = 0;
-      if (content_size > DISPLAY_BMP_IMAGE_SIZE)
+      if (https.getSize() != DISPLAY_BMP_IMAGE_SIZE)
       {
         Log.error("%s [%d]: Receiving failed. Bad file size\r\n", __FILE__, __LINE__);
 
@@ -1167,36 +1123,24 @@ static https_request_err_e downloadAndShow()
       Log.info("%s [%d]: Stream available: %d\r\n", __FILE__, __LINE__, stream->available());
 
       //  Read and save BMP data to buffer
-      
-      bool isPNG = https.header("Content-Type") == "image/png";
-      int iteration_counter = 0;
-      
-
       unsigned long download_start = millis();
+      int iteration_counter = 0;
 
       Log.info("%s [%d]: Starting a download at: %d\r\n", __FILE__, __LINE__, getTime());
-      heap_caps_check_integrity_all(true);
-      buffer = (uint8_t *)malloc(content_size);
-      int counter2 = content_size;
-      while (counter != content_size && millis() - download_start < 10000)
+      while (counter != DISPLAY_BMP_IMAGE_SIZE && millis() - download_start < 10000)
       {
         if (stream->available())
         {
           Log.info("%s [%d]: Downloading... Available bytes: %d\r\n", __FILE__, __LINE__, stream->available());
-          counter += stream->readBytes(buffer + counter, counter2 -= counter);
-          if (counter >= 2) {
-            if (buffer[0] == 'B' && buffer[1] == 'M') {
-                isPNG = false;
-                Log.info("BMP file detected");
-            }
-        }
+          counter += stream->readBytes(buffer + counter, sizeof(buffer) - counter);
           iteration_counter++;
         }
 
         delay(10);
+      }
       Log.info("%s [%d]: Ending a download at: %d, in %d iterations\r\n", __FILE__, __LINE__, getTime(), iteration_counter);
-    }
-      if (counter != content_size)
+
+      if (counter != DISPLAY_BMP_IMAGE_SIZE)
       {
 
         Log.error("%s [%d]: Receiving failed. Read: %d\r\n", __FILE__, __LINE__, counter);
@@ -1206,59 +1150,40 @@ static https_request_err_e downloadAndShow()
 
         return HTTPS_WRONG_IMAGE_SIZE;
       }
-      
-      String current_dot_file = isPNG ? "/current.png" : "/current.bmp"; 
 
       Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
 
-      bool currentImageExists = filesystem_file_exists("/current.bmp") || filesystem_file_exists("/current.png");
-
-      bool bmp_rename = false;
-      
-      if(currentImageExists){
-        filesystem_file_delete("/last.bmp");
-        filesystem_file_delete("/last.png"); 
-        filesystem_file_rename("/current.png","/last.png"); 
-        bmp_rename = filesystem_file_rename("/current.bmp","/last.bmp");
-      }
-      
       bool image_reverse = false;
-
-      if (isPNG)
-      {
-        writeImageToFile(current_dot_file.c_str(),buffer,content_size);
-        delay(100);
-        free(buffer);
-        buffer = nullptr;
-        Log.info("%s [%d]: Decoding png\r\n", __FILE__, __LINE__);
-
-        res = decodePNG("/current.png",decodedPng);
-      }
-      else{
-        res = parseBMPHeader(buffer, image_reverse);
-        Log.info("Res:%d\n",res);
-      }
+      bmp_err_e res = parseBMPHeader(buffer, image_reverse);
       Serial.println();
       String error = "";
-      uint8_t* imagePointer = (decodedPng == nullptr) ? buffer : decodedPng;
-      bool lastImageExists = filesystem_file_exists("/last.bmp") || filesystem_file_exists("/last.png");
-
       switch (res)
       {
-      case IMAGE_NO_ERR:
+      case BMP_NO_ERR:
       {
-        
 
-        if (!isPNG){
-          writeImageToFile("/current.bmp", imagePointer, DISPLAY_BMP_IMAGE_SIZE);
-          if(!bmp_rename)
-            writeImageToFile("/last.bmp", imagePointer, DISPLAY_BMP_IMAGE_SIZE);
+        if (filesystem_file_exists("/last.bmp") && filesystem_file_exists("/current.bmp"))
+        {
+          Log.info("%s [%d]: Last and current exist!\r\n", __FILE__, __LINE__);
+          if (filesystem_file_delete("/last.bmp"))
+          {
+            if (filesystem_file_rename("/current.bmp", "/last.bmp"))
+            {
+              Log.info("%s [%d]: Current renamed to last!\r\n", __FILE__, __LINE__);
+              delay(10);
+              writeImageToFile("/current.bmp", buffer, sizeof(buffer));
+            }
+          }
         }
-
-        
-      
-        Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
-        display_show_image(imagePointer,image_reverse, isPNG);
+        else
+        {
+          Log.info("%s [%d]: Last and current don't exist!\r\n", __FILE__, __LINE__);
+          writeImageToFile("/current.bmp", buffer, sizeof(buffer));
+          writeImageToFile("/last.bmp", buffer, sizeof(buffer));
+        }
+        // show the image
+        display_show_image(buffer, image_reverse);
+        need_to_refresh_display = 1;
 
         // Using filename from API response
         String new_filename = apiResponse.filename;
@@ -1276,14 +1201,14 @@ static https_request_err_e downloadAndShow()
           result = HTTPS_SUCCESS;
       }
       break;
-      case IMAGE_WRONG_FORMAT:
+      case BMP_NOT_BMP:
       {
-        error = "Wrong image format. Did not pass signature check";
+        error = "First two header bytes are invalid!";
       }
       break;
-      case IMAGE_BAD_SIZE:
+      case BMP_BAD_SIZE:
       {
-        error = "IMAGE width, height or size are invalid";
+        error = "BMP width, height or size are invalid";
       }
       break;
       case BMP_COLOR_SCHEME_FAILED:
@@ -1296,19 +1221,13 @@ static https_request_err_e downloadAndShow()
         error = "BMP header offset is invalid";
       }
       break;
-      case PNG_DECODE_ERR:
-      {
-        error = "could not decode png image";
-      }
-      break;
       default:
         break;
       }
 
-      if (res != IMAGE_NO_ERR)
+      if (res != BMP_NO_ERR)
       {
-        filesystem_file_delete("/current.png");
-        submit_log("error parsing image file - %s", error.c_str());
+        submit_log("error parsing bmp file - %s", error.c_str());
 
         return HTTPS_WRONG_IMAGE_FORMAT;
       }
@@ -1497,29 +1416,24 @@ static void getDeviceCredentials()
 
               uint32_t counter = 0;
               // Read and save BMP data to buffer
-              buffer = (uint8_t *) malloc(https.getSize());
-              if (stream->available() && https.getSize() == DISPLAY_BMP_IMAGE_SIZE)
+              if (stream->available() && https.getSize() == sizeof(buffer))
               {
-                counter = stream->readBytes(buffer, DISPLAY_BMP_IMAGE_SIZE);
+                counter = stream->readBytes(buffer, sizeof(buffer));
               }
               https.end();
-              if (counter == DISPLAY_BMP_IMAGE_SIZE)
+              if (counter == sizeof(buffer))
               {
                 Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
 
-                writeImageToFile("/logo.bmp", buffer, DEFAULT_IMAGE_SIZE);
+                writeImageToFile("/logo.bmp", buffer, sizeof(buffer));
 
                 // show the image
                 String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
                 display_show_msg(buffer, FRIENDLY_ID, friendly_id, true, "", String(message_buffer));
-                free(buffer);
-                buffer = nullptr;
                 need_to_refresh_display = 0;
               }
               else
               {
-                free(buffer);
-                buffer = nullptr;
                 Log.error("%s [%d]: Receiving failed. Read: %d\r\n", __FILE__, __LINE__, counter);
                 if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
                 {
@@ -1884,29 +1798,21 @@ static void writeSpecialFunction(SPECIAL_FUNCTION function)
 
 static void showMessageWithLogo(MSG message_type)
 {
-  buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
   display_show_msg(storedLogoOrDefault(), message_type);
-  free(buffer);
-  buffer = nullptr;
-
   need_to_refresh_display = 1;
   preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
 }
 
 static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message)
 {
-  buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
   display_show_msg(storedLogoOrDefault(), message_type, friendly_id, id, fw_version, message);
-  free(buffer);
-  buffer = nullptr;
-
   need_to_refresh_display = 1;
   preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
 }
 
 static uint8_t *storedLogoOrDefault(void)
 {
-  if (filesystem_read_from_file("/logo.bmp", buffer, DEFAULT_IMAGE_SIZE))
+  if (filesystem_read_from_file("/logo.bmp", buffer, sizeof(buffer)))
   {
     return buffer;
   }
