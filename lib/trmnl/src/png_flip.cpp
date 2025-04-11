@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <cstdint>
 #include <string.h>
 
 unsigned char reverse_bits(unsigned char b) {

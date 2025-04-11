@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include <PNG-flip.c>
+#include "png_flip.h"
 #include <display.h>
 #include <ArduinoLog.h>
 #include "DEV_Config.h"
