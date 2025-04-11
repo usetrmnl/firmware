@@ -41,3 +41,24 @@ struct ApiDisplayResponse
   SPECIAL_FUNCTION special_function;
   String action;
 };
+
+struct ApiDisplayInputs
+{
+  // API connection settings
+  String apiUrl;
+  String apiKey;
+  String friendlyId;
+
+  // Device state information
+  uint32_t refreshRate;
+  bool deviceRegistered;
+
+  // System information for API headers
+  String macAddress;
+  float batteryVoltage;
+  String firmwareVersion;
+  int rssi;
+  int displayWidth;
+  int displayHeight;
+  SPECIAL_FUNCTION specialFunction;
+};
