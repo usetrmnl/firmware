@@ -1374,7 +1374,7 @@ static https_request_err_e downloadAndShow()
         }
       
 
-      if (png_res != PNG_NO_ERR)
+      if (isPNG && png_res != PNG_NO_ERR)
       {
         filesystem_file_delete("/current.png");
         submit_log("error parsing image file - %s", error.c_str());
