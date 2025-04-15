@@ -605,6 +605,7 @@ static https_request_err_e downloadAndShow()
       Log.info("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
       result = HTTPS_REQUEST_FAILED;
       submit_log("returned code is not OK: %d", httpCode);
+      return HTTPS_REQUEST_FAILED;
     }
 
     String payload = https.getString();
@@ -1028,59 +1029,55 @@ static https_request_err_e downloadAndShow()
             Log.info("%s [%d]: send_to_me success\r\n", __FILE__, __LINE__);
             
             bool image_reverse = false;
-            bool file_check_bmp = true;
             image_err_e image_proccess_response = PNG_WRONG_FORMAT;
-            bmp_err_e bmp_proccess_response = BMP_NOT_BMP;
-            
-            // showMessageWithLogo(BMP_FORMAT_ERROR);
-            String current_dot_file = filesystem_file_exists("/current.bmp") ? "/current.bmp" : "/current.png";
-            if(current_dot_file == "/current.bmp"){
-              Log.info("send_to_me BMP\n\r");
+
+            if (!filesystem_file_exists("/current.bmp") && !filesystem_file_exists("/current.png"))
+            {
+              Log.info("%s [%d]: No current image!\r\n", __FILE__, __LINE__);
+              free(buffer);
+              buffer = nullptr;
+              return HTTPS_WRONG_IMAGE_FORMAT;
+            }
+
+            if (filesystem_file_exists("/current.bmp")) {
+              Log.info("%s [%d]: send_to_me BMP\r\n", __FILE__, __LINE__);
               buffer = (uint8_t *)malloc(DISPLAY_BMP_IMAGE_SIZE);
-              file_check_bmp = filesystem_read_from_file(current_dot_file.c_str(), buffer, DISPLAY_BMP_IMAGE_SIZE);
-              bmp_proccess_response = parseBMPHeader(buffer, image_reverse);
+
+              if (!filesystem_read_from_file("/current.bmp", buffer, DISPLAY_BMP_IMAGE_SIZE)) {
+                Log.info("%s [%d]: Error reading image!\r\n", __FILE__, __LINE__);
+                free(buffer);
+                buffer = nullptr;
+                submit_log("Error reading image!");
+                return HTTPS_WRONG_IMAGE_FORMAT;
+              }
+              
+              bmp_err_e bmp_parse_result = parseBMPHeader(buffer, image_reverse);
+              if (bmp_parse_result != BMP_NO_ERR) {
+                Log.info("%s [%d]: Error parsing BMP header, code: %d\r\n", __FILE__, __LINE__, bmp_parse_result);
+                free(buffer);
+                buffer = nullptr;
+                submit_log("Error parsing BMP header, code: %d", bmp_parse_result);
+                return HTTPS_WRONG_IMAGE_FORMAT;
+              }
             }
-            else if(current_dot_file == "/current.png"){
+            else if (filesystem_file_exists("/current.png")) {
+              Log.info("%s [%d]: send_to_me PNG\r\n", __FILE__, __LINE__);
               isPNG = true;
-              Log.info("send_to_me PNG\n\r");
-              image_proccess_response = decodePNG(current_dot_file.c_str(), buffer);
-            }
-            
-            if (file_check_bmp)
-            {
-              switch (image_proccess_response)
-              {
-              case PNG_NO_ERR:
-              {
-                Log.info("Showing image\n\r");
-                display_show_image(buffer, image_reverse,isPNG);
-                need_to_refresh_display = 1;
-              }
-              break;
-              default:
-              {
-              }
-              break;
-              }
-              switch (bmp_proccess_response)
-              {
-              case BMP_NO_ERR:
-              {
-                Log.info("Showing image\n\r");
-                display_show_image(buffer, image_reverse,isPNG);
-                need_to_refresh_display = 1;
-              }
-              break;
-              default:
-              {
-              }
-              break;
+              image_err_e png_parse_result = decodePNG("/current.png", buffer);
+
+              if (png_parse_result != PNG_NO_ERR) {
+                Log.info("%s [%d]: Error parsing PNG header, code: %d\r\n", __FILE__, __LINE__, png_parse_result);
+                free(buffer);
+                buffer = nullptr;
+                submit_log("Error parsing PNG header, code: %d", png_parse_result);
+                return HTTPS_WRONG_IMAGE_FORMAT;
               }
             }
-            else
-            {
-              showMessageWithLogo(BMP_FORMAT_ERROR);
-            }
+
+            Log.info("Showing image\n\r");
+            display_show_image(buffer, image_reverse, isPNG);
+            need_to_refresh_display = 1;
+
             free(buffer);
             buffer = nullptr;
           }
@@ -1201,12 +1198,9 @@ static https_request_err_e downloadAndShow()
         ;
 
       Log.info("%s [%d]: Stream available: %d\r\n", __FILE__, __LINE__, stream->available());
-
-      //  Read and save BMP data to buffer
       
       bool isPNG = https.header("Content-Type") == "image/png";
       int iteration_counter = 0;
-      
 
       unsigned long download_start = millis();
 
@@ -1230,8 +1224,8 @@ static https_request_err_e downloadAndShow()
         }
 
         delay(10);
+      }
       Log.info("%s [%d]: Ending a download at: %d, in %d iterations\r\n", __FILE__, __LINE__, getTime(), iteration_counter);
-    }
       if (counter != content_size)
       {
 
@@ -1242,27 +1236,24 @@ static https_request_err_e downloadAndShow()
 
         return HTTPS_WRONG_IMAGE_SIZE;
       }
-      
-      String current_dot_file = isPNG ? "/current.png" : "/current.bmp"; 
 
       Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
 
-      bool currentImageExists = filesystem_file_exists("/current.bmp") || filesystem_file_exists("/current.png");
-
       bool bmp_rename = false;
       
-      if(currentImageExists){
+      if(filesystem_file_exists("/current.bmp") || filesystem_file_exists("/current.png")){
         filesystem_file_delete("/last.bmp");
         filesystem_file_delete("/last.png"); 
         filesystem_file_rename("/current.png","/last.png"); 
-        bmp_rename = filesystem_file_rename("/current.bmp","/last.bmp");
+        filesystem_file_rename("/current.bmp","/last.bmp");
+
       }
       
       bool image_reverse = false;
 
       if (isPNG)
       {
-        writeImageToFile(current_dot_file.c_str(),buffer,content_size);
+        writeImageToFile("/current.png",buffer,content_size);
         delay(100);
         free(buffer);
         buffer = nullptr;
@@ -1332,7 +1323,9 @@ static https_request_err_e downloadAndShow()
         {
         case BMP_NO_ERR:
         {
-        
+          if(!filesystem_file_exists("/current.png")){
+            writeImageToFile("/current.bmp",buffer,content_size);
+          }
           Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
           display_show_image(imagePointer,image_reverse, isPNG);
   
@@ -1990,6 +1983,7 @@ static bool saveCurrentFileName(String &name)
 {
   if (!preferences.getString(PREFERENCES_FILENAME_KEY, "").equals(name))
   {
+    Log.info("%s [%d]: New filename:  - %s\r\n", __FILE__, __LINE__, name);
     size_t res = preferences.putString(PREFERENCES_FILENAME_KEY, name);
     if (res > 0)
     {
@@ -2012,6 +2006,9 @@ static bool saveCurrentFileName(String &name)
 static bool checkCurrentFileName(String &newName)
 {
   String currentFilename = preferences.getString(PREFERENCES_FILENAME_KEY, "");
+
+  Log.error("%s [%d]: Current filename: %s\r\n", __FILE__, __LINE__, currentFilename);
+
   if (currentFilename.equals(newName))
   {
     Log.info("%s [%d]: Current filename equals to the new filename\r\n", __FILE__, __LINE__);
