@@ -29,6 +29,7 @@
 #include <SPIFFS.h>
 
 bool pref_clear = false;
+String new_filename = "";
 
 uint8_t* buffer = nullptr;
 uint8_t *decodedPng = nullptr;
@@ -806,12 +807,11 @@ static https_request_err_e downloadAndShow()
         free(buffer);
         buffer = nullptr;
         Log.info("%s [%d]: Decoding png\r\n", __FILE__, __LINE__);
-
         png_res = decodePNG("/current.png",decodedPng);
       }
       else{
         bmp_res = parseBMPHeader(buffer, image_reverse);
-        Log.info("Res:%d\n",bmp_res);
+        Log.info("%s [%d]: BMP Parsing result: %d\r\n", __FILE__, __LINE__, bmp_res);
       }
       Serial.println();
       String error = "";
@@ -828,7 +828,7 @@ static https_request_err_e downloadAndShow()
           display_show_image(imagePointer,image_reverse, isPNG);
   
           // Using filename from API response
-          String new_filename = apiResponse.filename;
+          new_filename = apiResponse.filename;
   
           // Print the extracted string
           Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
@@ -878,7 +878,7 @@ static https_request_err_e downloadAndShow()
           display_show_image(imagePointer,image_reverse, isPNG);
   
           // Using filename from API response
-          String new_filename = apiResponse.filename;
+          new_filename = apiResponse.filename;
   
           // Print the extracted string
           Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
@@ -1018,7 +1018,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
             }
           }
           // Using filename from API response
-          String new_filename = apiResponse.filename;
+          new_filename = apiResponse.filename;
 
           // Print the extracted string
           Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
@@ -1538,7 +1538,7 @@ static void getDeviceCredentials()
 
               Log.info("%s [%d]: status - %d\r\n", __FILE__, __LINE__, status);
             }
-            else if (url_status == 404 && apiResponse.message == "MAC Address not registered")
+            else if (url_status == 404)
             {
               Log.info("%s [%d]: MAC Address is not registered on server\r\n", __FILE__, __LINE__);
               showMessageWithLogo(MAC_NOT_REGISTERED);
@@ -2038,7 +2038,7 @@ static bool saveCurrentFileName(String &name)
 {
   if (!preferences.getString(PREFERENCES_FILENAME_KEY, "").equals(name))
   {
-    Log.info("%s [%d]: New filename:  - %s\r\n", __FILE__, __LINE__, name);
+    Log.info("%s [%d]: New filename:  - %s\r\n", __FILE__, __LINE__, name.c_str());
     size_t res = preferences.putString(PREFERENCES_FILENAME_KEY, name);
     if (res > 0)
     {
@@ -2128,6 +2128,7 @@ DeviceStatusStamp getDeviceStatusStamp()
   deviceStatus.battery_voltage = readBatteryVoltage();
   parseWakeupReasonToStr(deviceStatus.wakeup_reason, sizeof(deviceStatus.wakeup_reason), esp_sleep_get_wakeup_cause());
   deviceStatus.free_heap_size = ESP.getFreeHeap();
+  deviceStatus.max_alloc_size = ESP.getMaxAllocHeap();
 
   return deviceStatus;
 }
@@ -2147,11 +2148,15 @@ bool SerializeJsonLog(DeviceStatusStamp device_status_stamp, time_t timestamp, i
   json_log["device_status_stamp"]["battery_voltage"] = device_status_stamp.battery_voltage;
   json_log["device_status_stamp"]["wakeup_reason"] = device_status_stamp.wakeup_reason;
   json_log["device_status_stamp"]["free_heap_size"] = device_status_stamp.free_heap_size;
+  json_log["device_status_stamp"]["max_alloc_size"] = device_status_stamp.max_alloc_size;
 
   json_log["log_id"] = log_id;
   json_log["log_message"] = log_message;
   json_log["log_codeline"] = codeline;
   json_log["log_sourcefile"] = source_file;
+
+  json_log["additional_info"]["filename_current"] = preferences.getString(PREFERENCES_FILENAME_KEY, "");
+  json_log["additional_info"]["filename_new"] = new_filename.c_str();
 
   if (log_retry)
   {
