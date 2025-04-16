@@ -533,6 +533,41 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   return inputs;
 }
 
+void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
+{
+  Log.info("%s [%d]: Added headers:\n\r"
+           "ID: %s\n\r"
+           "Special function: %d\n\r"
+           "Access-Token: %s\n\r"
+           "Refresh_Rate: %s\n\r"
+           "Battery-Voltage: %s\n\r"
+           "FW-Version: %s\r\n"
+           "RSSI: %s\r\n",
+           __FILE__, __LINE__,
+           inputs.macAddress.c_str(),
+           inputs.specialFunction,
+           inputs.apiKey.c_str(),
+           String(inputs.refreshRate).c_str(),
+           String(inputs.batteryVoltage).c_str(),
+           inputs.firmwareVersion.c_str(),
+           String(inputs.rssi));
+
+  https.addHeader("ID", WiFi.macAddress());
+  https.addHeader("Access-Token", inputs.apiKey);
+  https.addHeader("Refresh-Rate", String(inputs.refreshRate));
+  https.addHeader("Battery-Voltage", String(inputs.batteryVoltage));
+  https.addHeader("FW-Version", inputs.firmwareVersion);
+  https.addHeader("RSSI", String(inputs.rssi));
+  https.addHeader("Width", String(inputs.displayWidth));
+  https.addHeader("Height", String(inputs.displayHeight));
+
+  if (special_function != SF_NONE)
+  {
+    Log.info("%s [%d]: Add special function: true (%d)\r\n", __FILE__, __LINE__, special_function);
+    https.addHeader("special_function", "true");
+  }
+}
+
 /**
  * @brief Function to ping server and download and show the image if all is OK
  * @param url Server URL address
@@ -585,21 +620,8 @@ static https_request_err_e downloadAndShow()
     Log.info("%s [%d]: [HTTPS] GET...\r\n", __FILE__, __LINE__);
     Log.info("%s [%d]: [HTTPS] GET Route: %s\r\n", __FILE__, __LINE__, new_url);
     // start connection and send HTTP header
-    https.addHeader("ID", WiFi.macAddress());
-    https.addHeader("Access-Token", api_key);
-    https.addHeader("Refresh-Rate", String(refresh_rate));
-    https.addHeader("Battery-Voltage", String(battery_voltage));
-    https.addHeader("FW-Version", fw_version);
-    https.addHeader("RSSI", String(WiFi.RSSI()));
-    https.addHeader("Width", String(display_width()));
-    https.addHeader("Height", String(display_height()));
 
-    Log.info("%s [%d]: Special function - %d\r\n", __FILE__, __LINE__, special_function);
-    if (special_function != SF_NONE)
-    {
-      Log.info("%s [%d]: Add special function - true\r\n", __FILE__, __LINE__);
-      https.addHeader("special_function", "true");
-    }
+    addHeaders(https, apiDisplayInputs);
 
     delay(5);
 
