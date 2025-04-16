@@ -479,6 +479,60 @@ void bl_process(void)
 {
 }
 
+ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
+{
+  ApiDisplayInputs inputs;
+
+  inputs.baseUrl = preferences.getString(PREFERENCES_API_URL, API_BASE_URL);
+
+  if (preferences.isKey(PREFERENCES_API_KEY))
+  {
+    inputs.apiKey = preferences.getString(PREFERENCES_API_KEY, PREFERENCES_API_KEY_DEFAULT);
+    Log.info("%s [%d]: %s key exists. Value - %s\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY, inputs.apiKey.c_str());
+  }
+  else
+  {
+    Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY);
+  }
+
+  if (preferences.isKey(PREFERENCES_FRIENDLY_ID))
+  {
+    inputs.friendlyId = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
+    Log.info("%s [%d]: %s key exists. Value - %s\r\n", __FILE__, __LINE__, PREFERENCES_FRIENDLY_ID, inputs.friendlyId);
+  }
+  else
+  {
+    Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_FRIENDLY_ID);
+  }
+
+  inputs.refreshRate = SLEEP_TIME_TO_SLEEP;
+
+  if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))
+  {
+    inputs.refreshRate = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+    Log.info("%s [%d]: %s key exists. Value - %d\r\n", __FILE__, __LINE__, PREFERENCES_SLEEP_TIME_KEY, inputs.refreshRate);
+  }
+  else
+  {
+    Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_SLEEP_TIME_KEY);
+  }
+
+  inputs.macAddress = WiFi.macAddress();
+
+  inputs.batteryVoltage = readBatteryVoltage();
+
+  inputs.firmwareVersion = String(FW_MAJOR_VERSION) + "." +
+                           String(FW_MINOR_VERSION) + "." +
+                           String(FW_PATCH_VERSION);
+
+  inputs.rssi = WiFi.RSSI();
+  inputs.displayWidth = display_width();
+  inputs.displayHeight = display_height();
+  inputs.specialFunction = special_function;
+
+  return inputs;
+}
+
 /**
  * @brief Function to ping server and download and show the image if all is OK
  * @param url Server URL address
@@ -486,13 +540,15 @@ void bl_process(void)
  */
 static https_request_err_e downloadAndShow()
 {
+  auto apiDisplayInputs = loadApiDisplayInputs(preferences);
+
   https_request_err_e result = HTTPS_NO_ERR;
   WiFiClientSecure *secureClient = new WiFiClientSecure;
   secureClient->setInsecure();
   WiFiClient *insecureClient = new WiFiClient;
 
   bool isHttps = true;
-  if (preferences.getString(PREFERENCES_API_URL, API_BASE_URL).indexOf("https://") == -1)
+  if (apiDisplayInputs.baseUrl.indexOf("https://") == -1)
   {
     isHttps = false;
   }
@@ -513,49 +569,10 @@ static https_request_err_e downloadAndShow()
     Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
     Log.info("%s [%d]: [HTTPS] begin /api/display/ ...\r\n", __FILE__, __LINE__);
     char new_url[200];
-    strcpy(new_url, preferences.getString(PREFERENCES_API_URL, API_BASE_URL).c_str());
+    strcpy(new_url, apiDisplayInputs.baseUrl.c_str());
     strcat(new_url, "/api/display/");
 
-    String api_key = "";
-
     Log.info("%s [%d]: [HTTPS] URL: %s\r\n", __FILE__, __LINE__, new_url);
-    if (preferences.isKey(PREFERENCES_API_KEY))
-    {
-      api_key = preferences.getString(PREFERENCES_API_KEY, PREFERENCES_API_KEY_DEFAULT);
-      Log.info("%s [%d]: %s key exists. Value - %s\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY, api_key.c_str());
-    }
-    else
-    {
-      Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY);
-    }
-
-    String friendly_id = "";
-    if (preferences.isKey(PREFERENCES_FRIENDLY_ID))
-    {
-      friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
-      Log.info("%s [%d]: %s key exists. Value - %s\r\n", __FILE__, __LINE__, PREFERENCES_FRIENDLY_ID, friendly_id);
-    }
-    else
-    {
-      Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_FRIENDLY_ID);
-    }
-
-    uint32_t refresh_rate = SLEEP_TIME_TO_SLEEP;
-    if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))
-    {
-      refresh_rate = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
-      Log.info("%s [%d]: %s key exists. Value - %d\r\n", __FILE__, __LINE__, PREFERENCES_SLEEP_TIME_KEY, refresh_rate);
-    }
-    else
-    {
-      Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_SLEEP_TIME_KEY);
-    }
-
-    String fw_version = String(FW_MAJOR_VERSION) + "." + String(FW_MINOR_VERSION) + "." + String(FW_PATCH_VERSION);
-
-    float battery_voltage = readBatteryVoltage();
-
-    Log.info("%s [%d]: Added headers:\n\rID: %s\n\rSpecial function: %d\n\rAccess-Token: %s\n\rRefresh_Rate: %s\n\rBattery-Voltage: %s\n\rFW-Version: %s\r\nRSSI: %s\r\n", __FILE__, __LINE__, WiFi.macAddress().c_str(), special_function, api_key.c_str(), String(refresh_rate).c_str(), String(battery_voltage).c_str(), fw_version.c_str(), String(WiFi.RSSI()));
 
     if (!https.begin(*client, new_url))
     {
