@@ -3,7 +3,9 @@
 #include <display.h>
 #include <ArduinoLog.h>
 #include "DEV_Config.h"
-#include "EPD.h"
+#include "utility/Debug.h"
+#include "utility/EPD_7in5_V2.h"
+#include <draw_scalable.h>
 #include "GUI_Paint.h"
 #include <config.h>
 #include <ImageData.h>
@@ -288,8 +290,17 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 
     Log.info("%s [%d]: show image for array\r\n", __FILE__, __LINE__);
     Paint_SelectImage(BlackImage);
-    Paint_Clear(WHITE);
-    Paint_DrawBitMap(image_buffer + 62);
+
+#if defined(SVG_LOGO)
+  Paint_Clear(WHITE);
+   const char* heart = "M43 7 a1 1 0 00-36 36l36 36 36-36a1 1 0 00-36-36z";
+   draw_scalable(heart, 0, 0, 108, 82, 400, 150, 100, BLACK, BLACK, 0.0);
+  draw_scalable(heart, 0, 0, 108, 82, 400, 155, 90, WHITE, BLACK, 0.0);
+  drawFullLogo(400, 240, 384);
+#else
+  Paint_DrawBitMap(image_buffer + 62);
+#endif
+
     switch (message_type)
     {
     case FRIENDLY_ID:
@@ -342,5 +353,5 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 void display_sleep(void)
 {
     Log.info("%s [%d]: Goto Sleep...\r\n", __FILE__, __LINE__);
-    EPD_7IN5B_V2_Sleep();
+    EPD_7IN5_V2_Sleep();
 }
