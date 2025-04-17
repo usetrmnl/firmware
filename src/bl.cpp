@@ -14,7 +14,7 @@
 #include <ImageData.h>
 #include <Preferences.h>
 #include <cstdint>
-#include <png.h>
+#include <png_file.h>
 #include <bmp.h>
 #include <Update.h>
 #include <math.h>
