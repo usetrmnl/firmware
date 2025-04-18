@@ -210,7 +210,7 @@ void bl_init(void)
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
   {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
-    
+
     buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
     display_show_image(storedLogoOrDefault(), false, false);
     free(buffer);
@@ -681,7 +681,7 @@ static https_request_err_e downloadAndShow()
           // we will send a log message back to the server and truncate the timeout to the maximum.
           submit_log("Requested image URL timeout too large (%d ms). Using maximum of %d ms.", requestedTimeout, UINT16_MAX);
           https.setTimeout(UINT16_MAX);
-        } 
+        }
         else {
           https.setTimeout(uint16_t(requestedTimeout));
         }
@@ -747,7 +747,7 @@ static https_request_err_e downloadAndShow()
         ;
 
       Log.info("%s [%d]: Stream available: %d\r\n", __FILE__, __LINE__, stream->available());
-      
+
       bool isPNG = https.header("Content-Type") == "image/png";
       int iteration_counter = 0;
 
@@ -789,15 +789,15 @@ static https_request_err_e downloadAndShow()
       Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
 
       bool bmp_rename = false;
-      
+
       if(filesystem_file_exists("/current.bmp") || filesystem_file_exists("/current.png")){
         filesystem_file_delete("/last.bmp");
-        filesystem_file_delete("/last.png"); 
-        filesystem_file_rename("/current.png","/last.png"); 
+        filesystem_file_delete("/last.png");
+        filesystem_file_rename("/current.png","/last.png");
         filesystem_file_rename("/current.bmp","/last.bmp");
 
       }
-      
+
       bool image_reverse = false;
 
       if (isPNG)
@@ -818,27 +818,27 @@ static https_request_err_e downloadAndShow()
       uint8_t* imagePointer = (decodedPng == nullptr) ? buffer : decodedPng;
       bool lastImageExists = filesystem_file_exists("/last.bmp") || filesystem_file_exists("/last.png");
 
-      
+
         switch (png_res)
         {
         case PNG_NO_ERR:
         {
-        
+
           Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
           display_show_image(imagePointer,image_reverse, isPNG);
-  
+
           // Using filename from API response
           new_filename = apiResponse.filename;
-  
+
           // Print the extracted string
           Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
-  
+
           bool res = saveCurrentFileName(new_filename);
           if (res)
             Log.info("%s [%d]: New filename saved\r\n", __FILE__, __LINE__);
           else
             Log.error("%s [%d]: New image name saving error!", __FILE__, __LINE__);
-  
+
           if (result != HTTPS_PLUGIN_NOT_ATTACHED)
             result = HTTPS_SUCCESS;
         }
@@ -866,7 +866,7 @@ static https_request_err_e downloadAndShow()
         default:
           break;
         }
-  
+
         switch (bmp_res)
         {
         case BMP_NO_ERR:
@@ -876,19 +876,19 @@ static https_request_err_e downloadAndShow()
           }
           Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
           display_show_image(imagePointer,image_reverse, isPNG);
-  
+
           // Using filename from API response
           new_filename = apiResponse.filename;
-  
+
           // Print the extracted string
           Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
-  
+
           bool res = saveCurrentFileName(new_filename);
           if (res)
             Log.info("%s [%d]: New filename saved\r\n", __FILE__, __LINE__);
           else
             Log.error("%s [%d]: New image name saving error!", __FILE__, __LINE__);
-  
+
           if (result != HTTPS_PLUGIN_NOT_ATTACHED)
             result = HTTPS_SUCCESS;
         }
@@ -916,7 +916,7 @@ static https_request_err_e downloadAndShow()
         default:
           break;
         }
-      
+
 
       if (isPNG && png_res != PNG_NO_ERR)
       {
@@ -926,7 +926,7 @@ static https_request_err_e downloadAndShow()
         return HTTPS_WRONG_IMAGE_FORMAT;
       }
     }
-    
+
   }
 
   if (send_log)
@@ -1540,13 +1540,17 @@ static void getDeviceCredentials()
             }
             else if (url_status == 404)
             {
-              Log.info("%s [%d]: MAC Address is not registered on server\r\n", __FILE__, __LINE__);
-              showMessageWithLogo(MAC_NOT_REGISTERED);
+                Log.info("%s [%d]: MAC Address is not registered on server\r\n", __FILE__, __LINE__);
 
-              preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+                // message contains device MAC addr
+                String message_str = apiResponse.message;
 
-              display_sleep();
-              goToSleep();
+                showMessageWithLogo(MAC_NOT_REGISTERED, "", false, "", message_str);
+
+                preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+
+                display_sleep();
+                goToSleep();
             }
             else
             {

@@ -69,7 +69,7 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
     UBYTE *BlackImage;
     /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
-    
+
     Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
     Log.error("%s [%d]: free alloc heap - %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
     if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
@@ -78,7 +78,7 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
         ESP.restart();
     }
     Log.info("%s [%d]: Paint_NewImage %d\r\n", __FILE__, __LINE__, reverse);
-    
+
     Paint_NewImage(BlackImage, width, height, 0, WHITE);
 
     Log.info("%s [%d]: show image for array\r\n", __FILE__, __LINE__);
@@ -223,16 +223,6 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         Paint_DrawString_EN((800 - sizeof(string1) > 9) * 17 ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 400, string1, &Font24, WHITE, BLACK);
     }
     break;
-    case MAC_NOT_REGISTERED:
-    {
-        char string1[] = "MAC Address is not registered,";
-        Paint_DrawString_EN((800 - sizeof(string1) * 17 > 9) ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 370, string1, &Font24, WHITE, BLACK);
-        char string2[] = "so API is not available.";
-        Paint_DrawString_EN((800 - sizeof(string2) * 17 > 9) ? (800 - sizeof(string2) * 17) / 2 + 9 : 0, 400, string2, &Font24, WHITE, BLACK);
-        char string3[] = "Contact support for details.";
-        Paint_DrawString_EN((800 - sizeof(string3) * 17 > 9) ? (800 - sizeof(string3) * 17) / 2 + 9 : 0, 430, string3, &Font24, WHITE, BLACK);
-        break;
-    }
     case TEST:
     {
         Paint_DrawString_EN(0, 0, "ABCDEFGHIYABCDEFGHIYABCDEFGHIYABCDEFGHIYABCDEFGHIY", &Font24, WHITE, BLACK);
@@ -322,6 +312,22 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         Paint_DrawString_EN((800 - sizeof(string4) * 17 > 9) ? (800 - sizeof(string4) * 17) / 2 + 9 : 0, 430, string4, &Font24, WHITE, BLACK);
 
         Paint_DrawImage(wifi_connect_qr, 640, 337, 130, 130);
+    }
+    break;
+    case MAC_NOT_REGISTERED:
+    {
+        Log.info("%s [%d]: mac not registered case\r\n", __FILE__, __LINE__);
+
+        int hyphenIndex = message.indexOf('-');
+
+        String part1 = message.substring(0, hyphenIndex);
+        String part2 = message.substring(hyphenIndex + 1);
+        part1.trim();
+        part2.trim();
+
+        Paint_DrawString_EN((800 - part1.length() * 17 > 9) ? (800 - part1.length() * 17) / 2 + 9 : 0, 400, part2.c_str(), &Font24, WHITE, BLACK);
+        Paint_DrawString_EN((800 - part2.length() * 17 > 9) ? (800 - part2.length() * 17) / 2 + 9 : 0, 430, part2.c_str(), &Font24, WHITE, BLACK);
+
     }
     break;
     default:
