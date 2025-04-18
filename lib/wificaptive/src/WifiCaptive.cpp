@@ -628,8 +628,7 @@ bool WifiCaptive::autoConnect()
                 // success! save the index of the last used network
                 for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
                 {
-                    // Should this also check if the pswd is the same? What if 2 WiFi's have duplicate SSIDs?
-                    if (_savedWifis[i].ssid == network.ssid  && _savedWifis[i].ssid == network.pswd)
+                    if (_savedWifis[i].ssid == network.ssid  && _savedWifis[i].pswd == network.pswd)
                     {
                         saveLastUsedWifiIndex(i);
                         break;
