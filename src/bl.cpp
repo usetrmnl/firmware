@@ -1736,78 +1736,60 @@ static void resetDeviceCredentials(void)
  */
 static void checkAndPerformFirmwareUpdate(void)
 {
-  WiFiClientSecure *secureClient = new WiFiClientSecure;
-  WiFiClient *insecureClient = new WiFiClient;
 
-  secureClient->setInsecure();
+  withHttp(binUrl, [&](HTTPClient *https, HttpError errorCode) -> bool
+           {
+             if (errorCode != HttpError::HTTPCLIENT_SUCCESS || !https)
+             {
+               Log.fatal("%s [%d]: Unable to connect for firmware update\r\n", __FILE__, __LINE__);
+               if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+               {
+                 showMessageWithLogo(API_ERROR);
+               }
+               else
+               {
+                 showMessageWithLogo(WIFI_WEAK);
+               }
+             }
 
-  bool isHttps = true;
-  if (preferences.getString(PREFERENCES_API_URL, API_BASE_URL).indexOf("https://") == -1)
-  {
-    isHttps = false;
-  }
+             int httpCode = https->GET();
+             if (httpCode == HTTP_CODE_OK)
+             {
+               Log.info("%s [%d]: Downloading .bin file...\r\n", __FILE__, __LINE__);
 
-  // define client depending on the isHttps variable
-  WiFiClient *client = isHttps ? secureClient : insecureClient;
+               size_t contentLength = https->getSize();
+               // Perform firmware update
+               if (Update.begin(contentLength))
+               {
+                 Log.info("%s [%d]: Firmware update start\r\n", __FILE__, __LINE__);
+                 showMessageWithLogo(FW_UPDATE);
 
-  if (client)
-  {
-    HTTPClient https;
-    if (https.begin(*client, binUrl))
-    {
-      int httpCode = https.GET();
-      if (httpCode == HTTP_CODE_OK)
-      {
-        Log.info("%s [%d]: Downloading .bin file...\r\n", __FILE__, __LINE__);
-
-        size_t contentLength = https.getSize();
-        // Perform firmware update
-        if (Update.begin(contentLength))
-        {
-          Log.info("%s [%d]: Firmware update start\r\n", __FILE__, __LINE__);
-          showMessageWithLogo(FW_UPDATE);
-
-          if (Update.writeStream(https.getStream()))
-          {
-            if (Update.end(true))
-            {
-              Log.info("%s [%d]: Firmware update successful. Rebooting...\r\n", __FILE__, __LINE__);
-              showMessageWithLogo(FW_UPDATE_SUCCESS);
-            }
-            else
-            {
-              Log.fatal("%s [%d]: Firmware update failed!\r\n", __FILE__, __LINE__);
-              showMessageWithLogo(FW_UPDATE_FAILED);
-            }
-          }
-          else
-          {
-            Log.fatal("%s [%d]: Write to firmware update stream failed!\r\n", __FILE__, __LINE__);
-            showMessageWithLogo(FW_UPDATE_FAILED);
-          }
-        }
-        else
-        {
-          Log.fatal("%s [%d]: Begin firmware update failed!\r\n", __FILE__, __LINE__);
-          showMessageWithLogo(FW_UPDATE_FAILED);
-        }
-      }
-      else
-      {
-        Log.fatal("%s [%d]: HTTP GET failed!\r\n", __FILE__, __LINE__);
-        if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
-        {
-          showMessageWithLogo(API_ERROR);
-        }
-        else
-        {
-          showMessageWithLogo(WIFI_WEAK);
-        }
-      }
-      https.end();
-    }
-  }
-  delete client;
+                 if (Update.writeStream(https->getStream()))
+                 {
+                   if (Update.end(true))
+                   {
+                     Log.info("%s [%d]: Firmware update successful. Rebooting...\r\n", __FILE__, __LINE__);
+                     showMessageWithLogo(FW_UPDATE_SUCCESS);
+                   }
+                   else
+                   {
+                     Log.fatal("%s [%d]: Firmware update failed!\r\n", __FILE__, __LINE__);
+                     showMessageWithLogo(FW_UPDATE_FAILED);
+                   }
+                 }
+                 else
+                 {
+                   Log.fatal("%s [%d]: Write to firmware update stream failed!\r\n", __FILE__, __LINE__);
+                   showMessageWithLogo(FW_UPDATE_FAILED);
+                 }
+               }
+               else
+               {
+                 Log.fatal("%s [%d]: Begin firmware update failed!\r\n", __FILE__, __LINE__);
+                 showMessageWithLogo(FW_UPDATE_FAILED);
+               }
+             }
+             return true; });
 }
 
 /**
