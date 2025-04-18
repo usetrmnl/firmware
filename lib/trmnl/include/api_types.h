@@ -30,6 +30,7 @@ enum class ApiDisplayOutcome
 struct ApiDisplayResponse
 {
   ApiDisplayOutcome outcome;
+  String error_detail;
   uint64_t status;
   String image_url;
   uint32_t image_url_timeout;
