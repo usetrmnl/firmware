@@ -546,6 +546,17 @@ static https_request_err_e downloadAndShow()
 {
   auto apiDisplayInputs = loadApiDisplayInputs(preferences);
 
+  auto apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
+
+  if (apiDisplayResult.error != HTTPS_NO_ERR)
+  {
+    Log.error("%s [%d]: Error fetching API display: %d, detail: %s\r\n", __FILE__, __LINE__, apiDisplayResult.error, apiDisplayResult.error_detail.c_str());
+    submit_log("Error fetching API display: %d, detail: %s", apiDisplayResult.error, apiDisplayResult.error_detail.c_str());
+    return apiDisplayResult.error;
+  }
+
+  handleApiDisplayResponse(apiDisplayResult.response);
+
   https_request_err_e result = HTTPS_NO_ERR;
   WiFiClientSecure *secureClient = new WiFiClientSecure;
   secureClient->setInsecure();
@@ -570,75 +581,13 @@ static https_request_err_e downloadAndShow()
   { // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
 
     HTTPClient https;
-    Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
-    Log.info("%s [%d]: [HTTPS] begin /api/display/ ...\r\n", __FILE__, __LINE__);
-    char new_url[200];
-    strcpy(new_url, apiDisplayInputs.baseUrl.c_str());
-    strcat(new_url, "/api/display/");
-
-    Log.info("%s [%d]: [HTTPS] URL: %s\r\n", __FILE__, __LINE__, new_url);
-
-    if (!https.begin(*client, new_url))
-    {
-      Log.error("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
-      submit_log("unable to connect to the API endpoint");
-      return HTTPS_UNABLE_TO_CONNECT;
-    }
-
-    // HTTPS
-    Log.info("%s [%d]: [HTTPS] GET...\r\n", __FILE__, __LINE__);
-    Log.info("%s [%d]: [HTTPS] GET Route: %s\r\n", __FILE__, __LINE__, new_url);
-    // start connection and send HTTP header
-
-    addHeaders(https, apiDisplayInputs);
-
-    delay(5);
-
-    int httpCode = https.GET();
-
-    // httpCode will be negative on error
-    if (httpCode < 0)
-    {
-      Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
-      submit_log("HTTP Client failed with error: %s", https.errorToString(httpCode).c_str());
-      return HTTPS_RESPONSE_CODE_INVALID;
-    }
-
-    // HTTP header has been send and Server response header has been handled
-    Log.info("%s [%d]: GET... code: %d\r\n", __FILE__, __LINE__, httpCode);
-
-    // file not found at server
-    if (!(httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY))
-    {
-      Log.info("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
-      result = HTTPS_REQUEST_FAILED;
-      submit_log("returned code is not OK: %d", httpCode);
-      return HTTPS_REQUEST_FAILED;
-    }
-
-    String payload = https.getString();
-    size_t size = https.getSize();
-    Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, size);
-    Log.info("%s [%d]: Free heap size: %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
-    Log.info("%s [%d]: Payload - %s\r\n", __FILE__, __LINE__, payload.c_str());
-
-    auto apiResponse = parseResponse_apiDisplay(payload);
-    bool error = apiResponse.outcome == ApiDisplayOutcome::DeserializationError;
-
-    if (error)
-    {
-      return HTTPS_JSON_PARSING_ERR;
-    }
-
-    handleApiDisplayResponse(apiResponse);
-
     if (status && !update_firmware && !reset_firmware)
     {
       status = false;
 
       // The timeout will be zero if no value was returned, and in that case we just use the default timeout.
       // Otherwise, we set the requested timeout.
-      uint32_t requestedTimeout = apiResponse.image_url_timeout;
+      uint32_t requestedTimeout = apiDisplayResult.response.image_url_timeout;
       if (requestedTimeout > 0) {
         // Convert from seconds to milliseconds.
         // A uint32_t should be large enough not to worry about overflow for any reasonable timeout.
@@ -795,8 +744,8 @@ static https_request_err_e downloadAndShow()
           display_show_image(imagePointer,image_reverse, isPNG);
   
           // Using filename from API response
-          new_filename = apiResponse.filename;
-  
+          new_filename = apiDisplayResult.response.filename;
+
           // Print the extracted string
           Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
   
@@ -845,8 +794,8 @@ static https_request_err_e downloadAndShow()
           display_show_image(imagePointer,image_reverse, isPNG);
   
           // Using filename from API response
-          new_filename = apiResponse.filename;
-  
+          new_filename = apiDisplayResult.response.filename;
+
           // Print the extracted string
           Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
   
