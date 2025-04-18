@@ -44,10 +44,73 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
 
 ApiDisplayResult fetchApiDisplay(ApiDisplayInputs &apiDisplayInputs)
 {
-  ApiDisplayResponse response = {};
-  return ApiDisplayResult{
-      .error = https_request_err_e::HTTPS_NO_ERR,
-      .response = response,
-      .error_detail = "",
-  };
-};
+
+  return withHttp(
+      apiDisplayInputs.baseUrl + "/api/display",
+      [&apiDisplayInputs](HTTPClient *https, HttpError error) -> ApiDisplayResult
+      {
+        if (error == HttpError::HTTPCLIENT_WIFICLIENT_ERROR)
+        {
+          Log.error("%s [%d]: Unable to create WiFiClient\r\n", __FILE__, __LINE__);
+          return ApiDisplayResult{
+              .error = https_request_err_e::HTTPS_UNABLE_TO_CONNECT,
+              .response = {},
+              .error_detail = "Unable to create WiFiClient",
+          };
+        }
+        if (error == HttpError::HTTPCLIENT_HTTPCLIENT_ERROR)
+        {
+          Log.error("%s [%d]: Unable to create HTTPClient\r\n", __FILE__, __LINE__);
+          return ApiDisplayResult{
+              .error = https_request_err_e::HTTPS_UNABLE_TO_CONNECT,
+              .response = {},
+              .error_detail = "Unable to create HTTPClient",
+          };
+        }
+
+        addHeaders(*https, apiDisplayInputs);
+
+        delay(5);
+
+        int httpCode = https->GET();
+
+        if (httpCode < 0 ||
+            !(httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY))
+        {
+          Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https->errorToString(httpCode).c_str());
+
+          return ApiDisplayResult{
+              .error = https_request_err_e::HTTPS_RESPONSE_CODE_INVALID,
+              .response = {},
+              .error_detail = "HTTP Client failed with error: " + https->errorToString(httpCode) +
+                              "(" + String(httpCode) + ")"};
+        }
+
+        // HTTP header has been send and Server response header has been handled
+        Log.info("%s [%d]: GET... code: %d\r\n", __FILE__, __LINE__, httpCode);
+
+        String payload = https->getString();
+        size_t size = https->getSize();
+        Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, size);
+        Log.info("%s [%d]: Free heap size: %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
+        Log.info("%s [%d]: Payload - %s\r\n", __FILE__, __LINE__, payload.c_str());
+
+        auto apiResponse = parseResponse_apiDisplay(payload);
+
+        if (apiResponse.outcome == ApiDisplayOutcome::DeserializationError)
+        {
+          return ApiDisplayResult{
+              .error = https_request_err_e::HTTPS_JSON_PARSING_ERR,
+              .response = {},
+              .error_detail = "JSON parse failed with error: " +
+                              apiResponse.error_detail};
+        }
+        else
+        {
+          return ApiDisplayResult{
+              .error = https_request_err_e::HTTPS_NO_ERR,
+              .response = apiResponse,
+              .error_detail = ""};
+        }
+      });
+}
