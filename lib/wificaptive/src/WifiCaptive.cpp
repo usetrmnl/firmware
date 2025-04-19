@@ -628,7 +628,7 @@ bool WifiCaptive::autoConnect()
                 // success! save the index of the last used network
                 for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
                 {
-                    if (_savedWifis[i].ssid == network.ssid  && _savedWifis[i].pswd == network.pswd)
+                    if (_savedWifis[i].ssid == network.ssid)
                     {
                         saveLastUsedWifiIndex(i);
                         break;
