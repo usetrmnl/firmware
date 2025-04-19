@@ -2,6 +2,7 @@
 #define DISPLAY_H
 
 #include <Arduino.h>
+#include <clock_settings.h>
 
 enum MSG {
   NONE,
@@ -45,6 +46,13 @@ uint16_t display_height();
  * @return uint16_t - width of display in pixels
  */
 uint16_t display_width();
+
+/**
+ * @brief Function to display clock according to settings.
+ * @param settings pointer to the clock settings.
+ * @return bool Is the clock drawing enabled.
+ */
+bool display_show_clock(const clock_settings_t *settings);
 
 /**
  * @brief Function to show the image on the display

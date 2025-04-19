@@ -76,12 +76,14 @@ static bool checkCurrentFileName(String &newName);
 static DeviceStatusStamp getDeviceStatusStamp();
 bool SerializeJsonLog(DeviceStatusStamp device_status_stamp, time_t timestamp, int codeline, const char *source_file, char *log_message, uint32_t log_id);
 int submitLog(const char *format, time_t time, int line, const char *file, ...);
+static void redrawClock(void);  // Draw the clock over the image if clock enabled and update next sleep time
 
 #define submit_log(format, ...) submitLog(format, getTime(), __LINE__, __FILE__, ##__VA_ARGS__);
 
 void wait_for_serial()
 {
-#ifdef WAIT_FOR_SERIAL
+//#ifdef WAIT_FOR_SERIAL
+#if 1
   for (int i = 10; i > 0 && !Serial; i--)
   {
     Log_info("## Waiting for serial.. %d", i);
@@ -97,7 +99,6 @@ void wait_for_serial()
  */
 void bl_init(void)
 {
-
   Serial.begin(115200);
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
   Log_info("BL init success");
@@ -105,6 +106,36 @@ void bl_init(void)
   pins_init();
 
   wakeup_reason = esp_sleep_get_wakeup_cause();
+
+#if 0
+  /* DEBUUUG */
+  wait_for_serial();
+
+  Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
+  display_init();
+  /* Clear screen to start off some state */
+  display_reset();
+
+  while (true)
+  {
+    /* Draw one image */
+    Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
+    display_show_image(storedLogoOrDefault(), false);
+    
+    delay(10000);
+
+    display_show_msg(storedLogoOrDefault(), WIFI_FAILED);
+    delay(10000);
+  }
+
+  display_sleep();
+  // esp_deep_sleep_start();
+  while(true) { delay(100); }
+
+  return;
+  /////////
+  /* DEBUUUG */
+#endif
 
   Log.info("%s [%d]: preferences start\r\n", __FILE__, __LINE__);
   bool res = preferences.begin("data", false);
@@ -206,6 +237,8 @@ void bl_init(void)
   // EPD clear
   Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
   display_init();
+  // Mount SPIFFS
+  filesystem_init();
 
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
   {
@@ -221,9 +254,27 @@ void bl_init(void)
     Log.info("%s [%d]: Display TRMNL logo end\r\n", __FILE__, __LINE__);
     preferences.putString(PREFERENCES_FILENAME_KEY, "");
   }
+  else
+  {
+    auto last_sleep_time = preferences.getUInt(PREFERENCES_LAST_SLEEP_TIME, 0);
+    time_t now = time(nullptr);
+    if (last_sleep_time !=0 && now > last_sleep_time)
+    {
+      // The clock is set up & running, we may check the realtime sync options
+      auto next_time_update = preferences.getUInt(PREFERENCES_CLOCK_UPDATE, 0);
+      if (next_time_update != 0 && now > next_time_update)
+      {
+        redrawClock();
+      }
+    }
 
-  // Mount SPIFFS
-  filesystem_init();
+    // If we only wake up for offline update: go back to sleep.
+    auto next_update_time = preferences.getUInt(PREFERENCES_NEXT_UPDATE_TIME, 0);
+    if (next_update_time != 0 && now < next_update_time)
+    {
+      goToSleep();
+    }
+  }
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
   if (WifiCaptivePortal.isSaved())
@@ -603,6 +654,8 @@ static https_request_err_e downloadAndShow()
   { // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
 
     HTTPClient https;
+    https.setTimeout(15000);
+    https.setConnectTimeout(15000);
     Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
     Log.info("%s [%d]: [HTTPS] begin /api/display/ ...\r\n", __FILE__, __LINE__);
     char new_url[200];
@@ -826,6 +879,7 @@ static https_request_err_e downloadAndShow()
         
           Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
           display_show_image(imagePointer,image_reverse, isPNG);
+          redrawClock();
   
           // Using filename from API response
           new_filename = apiResponse.filename;
@@ -876,6 +930,7 @@ static https_request_err_e downloadAndShow()
           }
           Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
           display_show_image(imagePointer,image_reverse, isPNG);
+          redrawClock();
   
           // Using filename from API response
           new_filename = apiResponse.filename;
@@ -958,6 +1013,43 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
       bool sleep_5_seconds = false;
 
       writeSpecialFunction(apiResponse.special_function);
+
+      //const clock_settings_t new_clock_settings = apiResponse.clock_settings;
+      const clock_settings_t new_clock_settings{
+        .Xstart=700,
+        .Xend=800-1,
+        .Ystart=460,
+        .Yend=480-1,
+        .ColorFg=0,
+        .ColorBg=0xff,
+        .FontSize=14,
+        .Format="%Y-%m-%d %H:%M\0\0\0\0\0\0",
+      };
+      clock_settings_t current_clock_settings;
+      if ((preferences.getBytes(PREFERENCES_CLOCK_SETTINGS, &current_clock_settings, sizeof(current_clock_settings)) != sizeof(current_clock_settings)) ||
+          (current_clock_settings.Xstart   != new_clock_settings.Xstart) ||
+          (current_clock_settings.Xend     != new_clock_settings.Xend) ||
+          (current_clock_settings.Ystart   != new_clock_settings.Ystart) ||
+          (current_clock_settings.Yend     != new_clock_settings.Yend) ||
+          (current_clock_settings.ColorFg  != new_clock_settings.ColorFg) ||
+          (current_clock_settings.ColorBg  != new_clock_settings.ColorBg) ||
+          (current_clock_settings.FontSize != new_clock_settings.FontSize) ||
+          (strcmp(current_clock_settings.Format, new_clock_settings.Format) != 0)) {
+        preferences.putBytes(PREFERENCES_CLOCK_SETTINGS, &new_clock_settings, sizeof(new_clock_settings));
+        current_clock_settings = new_clock_settings;
+      }
+      if (current_clock_settings.Xstart != current_clock_settings.Xend &&
+          current_clock_settings.Ystart != current_clock_settings.Yend &&
+          current_clock_settings.FontSize > 0) {
+        // We'll try to update clock at next minute, even if we won't refresh screen now
+        time_t nexttime = time(nullptr);
+        nexttime = nexttime - (nexttime % 60) + 60;
+        preferences.putUInt(PREFERENCES_CLOCK_UPDATE, nexttime);
+        Log.info("%s [%d]: need to draw clock at %u\r\n", __FILE__, __LINE__, nexttime);
+      } else {
+        preferences.putUInt(PREFERENCES_CLOCK_UPDATE, 0);
+        Log.info("%s [%d]: NO need to draw clock\r\n", __FILE__, __LINE__);
+      }
 
       if (update_firmware)
       {
@@ -1819,12 +1911,39 @@ static void goToSleep(void)
 {
   WiFi.disconnect(true);
   filesystem_deinit();
-  uint32_t time_to_sleep = SLEEP_TIME_TO_SLEEP;
-  if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))
-    time_to_sleep = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
-  Log.info("%s [%d]: time to sleep - %d\r\n", __FILE__, __LINE__, time_to_sleep);
-  preferences.putUInt(PREFERENCES_LAST_SLEEP_TIME, getTime());
+  uint32_t now = time(nullptr);  // Do not use getTime here: we either already got time, or no point for (no wifi).
+  uint32_t next_event = 0;
+
+  uint32_t next_time = preferences.getUInt(PREFERENCES_CLOCK_UPDATE);
+  if (next_time != 0 && now > next_time) {
+    next_time = now+1; // If we updated screen whole minute, well, wake in a sec to update.
+    preferences.putUInt(PREFERENCES_CLOCK_UPDATE, next_time);
+    next_event = next_time;
+  }
+  Log.info("%s [%d]: next event - %u\r\n", __FILE__, __LINE__, next_event);
+
+  uint32_t next_update = preferences.getUInt(PREFERENCES_NEXT_UPDATE_TIME, 0);
+  uint32_t sleep_time = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+  if (now > next_update || next_update > now + sleep_time) {
+    next_update = now + sleep_time;
+    preferences.putUInt(PREFERENCES_NEXT_UPDATE_TIME, next_update);
+  }
+
+  // We sleep until the nearest event.
+  if (next_event == 0 || next_update < next_event)
+  {
+    next_event = next_update;
+  }
+
+  uint32_t time_to_sleep = next_event - now;
+
+  Log.info("%s [%d]: now - %u\r\n", __FILE__, __LINE__, now);
+  Log.info("%s [%d]: next event - %u\r\n", __FILE__, __LINE__, next_event);
+  Log.info("%s [%d]: next update - %u\r\n", __FILE__, __LINE__, next_update);
+  Log.info("%s [%d]: time to sleep - %u\r\n", __FILE__, __LINE__, time_to_sleep);
+  preferences.putUInt(PREFERENCES_LAST_SLEEP_TIME, now);
   preferences.end();
+  delay(5000);
   esp_sleep_enable_timer_wakeup((uint64_t)time_to_sleep * SLEEP_uS_TO_S_FACTOR);
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT,
                                     ESP_GPIO_WAKEUP_GPIO_LOW);
@@ -1879,7 +1998,8 @@ static float readBatteryVoltage(void)
   int32_t sensorValue = (adc / 128) * 2;
 
   float voltage = sensorValue / 1000.0;
-  return voltage;
+  //return voltage;
+  return 3.7;
 }
 
 /**
@@ -1913,15 +2033,13 @@ static void log_POST(char *log_buffer, size_t size)
 
 static uint32_t getTime(void)
 {
-  time_t now;
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo, 200))
   {
     Log.info("%s [%d]: Failed to obtain time. \r\n", __FILE__, __LINE__);
     return (0);
   }
-  time(&now);
-  return now;
+  return time(nullptr);
 }
 
 static void checkLogNotes(void)
@@ -2188,4 +2306,24 @@ int submitLog(const char *format, time_t time, int line, const char *file, ...)
   preferences.putUInt(PREFERENCES_LOG_ID_KEY, ++log_id);
 
   return result;
+}
+
+void redrawClock(void)
+{
+  time_t now = time(nullptr);
+  clock_settings_t settings;
+  if (preferences.getBytes(PREFERENCES_CLOCK_SETTINGS, &settings, sizeof(settings)) == sizeof(settings))
+  {
+    if (display_show_clock(&settings))
+    {
+      // If we can update clock, set the next update timestamp: round up to the next minute start.
+      time_t nexttime = now - (now % 60) + 60;
+      preferences.putUInt(PREFERENCES_CLOCK_UPDATE, nexttime);
+    }
+    else
+    {
+      // Disable clock refresh
+      preferences.putUInt(PREFERENCES_CLOCK_UPDATE, 0);
+    }
+  }
 }
