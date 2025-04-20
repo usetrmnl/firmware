@@ -102,6 +102,8 @@ void bl_init(void)
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
   Log_info("BL init success");
   Log_info("Firmware version %d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
+
+  // TODO: should be compat
   // pins_init();
 
   wakeup_reason = esp_sleep_get_wakeup_cause();
@@ -1826,7 +1828,8 @@ static void goToSleep(void)
   preferences.putUInt(PREFERENCES_LAST_SLEEP_TIME, getTime());
   preferences.end();
   esp_sleep_enable_timer_wakeup((uint64_t)time_to_sleep * SLEEP_uS_TO_S_FACTOR);
-  esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 0); // Use ext0 wakeup instead, 0 for LOW level trigger
+  // TODO: should not be 1, but 0
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_INTERRUPT, 1); // Use ext0 wakeup instead, 0 for LOW level trigger
   esp_deep_sleep_start();
 }
 
