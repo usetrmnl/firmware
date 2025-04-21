@@ -3,7 +3,8 @@
 #include <display.h>
 #include <ArduinoLog.h>
 #include "DEV_Config.h"
-#include "EPD.h"
+#include "utility/Debug.h"
+#include "utility/EPD_7in5_V2.h"
 #include "GUI_Paint.h"
 #include <config.h>
 #include <ImageData.h>
@@ -61,52 +62,11 @@ uint16_t display_width()
  * @param reverse shows if the color scheme is reverse
  * @return none
  */
-void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
-{
-    auto width = display_width();
-    auto height = display_height();
-    //  Create a new image cache
-    UBYTE *BlackImage;
-    /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
-    UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
-    
-    Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
-    Log.error("%s [%d]: free alloc heap - %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
-    if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
-    {
-        Log.fatal("%s [%d]: Failed to apply for black memory...\r\n", __FILE__, __LINE__);
-        ESP.restart();
-    }
-    Log.info("%s [%d]: Paint_NewImage %d\r\n", __FILE__, __LINE__, reverse);
-    
-    Paint_NewImage(BlackImage, width, height, 0, WHITE);
-
-    Log.info("%s [%d]: show image for array\r\n", __FILE__, __LINE__);
-    Paint_SelectImage(BlackImage);
-    Paint_Clear(WHITE);
-    if (reverse)
-    {
-        Log.info("%s [%d]: inverse the image\r\n", __FILE__, __LINE__);
-        for (size_t i = 0; i < DISPLAY_BMP_IMAGE_SIZE; i++)
-        {
-            image_buffer[i] = ~image_buffer[i];
-        }
-    }
-    if(isPNG == true)
-    {
-        Log.info("Drawing PNG\n");
-        flip_image(image_buffer, width, height);
-        horizontal_mirror(image_buffer,width,height);
-        Paint_DrawBitMap(image_buffer);
-    }
-    else{
-        Paint_DrawBitMap(image_buffer + 62);
-    }
-    EPD_7IN5_V2_Display(BlackImage);
+void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG) {
+  // this is only used to display a full image so no need to allocate, we use
+  // a direct call to a modiufied driver
+    EPD_7IN5_V2_Display_Mirror_Invert(isPNG ? image_buffer : image_buffer + 62, isPNG, reverse);
     Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
-
-    free(BlackImage);
-    BlackImage = NULL;
 }
 
 /**
@@ -120,7 +80,6 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     auto width = display_width();
     auto height = display_height();
     UBYTE *BlackImage;
-    /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
     Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
     Log.error("%s [%d]: free alloc heap - %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
@@ -135,7 +94,6 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
 
     Log.info("%s [%d]: show image for array\r\n", __FILE__, __LINE__);
     Paint_SelectImage(BlackImage);
-    Paint_Clear(WHITE);
     Paint_DrawBitMap(image_buffer + 62);
     switch (message_type)
     {
@@ -288,7 +246,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 
     Log.info("%s [%d]: show image for array\r\n", __FILE__, __LINE__);
     Paint_SelectImage(BlackImage);
-    Paint_Clear(WHITE);
+
     Paint_DrawBitMap(image_buffer + 62);
     switch (message_type)
     {
@@ -342,5 +300,5 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 void display_sleep(void)
 {
     Log.info("%s [%d]: Goto Sleep...\r\n", __FILE__, __LINE__);
-    EPD_7IN5B_V2_Sleep();
+    EPD_7IN5_V2_Sleep();
 }

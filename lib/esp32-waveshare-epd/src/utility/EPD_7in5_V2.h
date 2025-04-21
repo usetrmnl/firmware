@@ -47,6 +47,7 @@ void EPD_7IN5_V2_Clear(void);
 void EPD_7IN5_V2_ClearBlack(void);
 void EPD_7IN5_V2_ClearWhite(void);
 void EPD_7IN5_V2_Display(const UBYTE *blackimage);
+void EPD_7IN5_V2_Display_Mirror_Invert(const UBYTE *blackimage, bool mirror, bool invert);
 void EPD_7IN5_V2_Sleep(void);
 
 #endif

@@ -628,6 +628,25 @@ void EPD_7IN5_V2_Display(const UBYTE *blackimage)
     EPD_7IN5_V2_TurnOnDisplay();
 }
 
+void EPD_7IN5_V2_Display_Mirror_Invert(const UBYTE *blackimage, bool mirror, bool invert)
+{
+    EPD_WaitUntilIdle();
+    UDOUBLE Width, Height;
+    Width = (EPD_7IN5_V2_WIDTH % 8 == 0) ? (EPD_7IN5_V2_WIDTH / 8) : (EPD_7IN5_V2_WIDTH / 8 + 1);
+    Height = EPD_7IN5_V2_HEIGHT;
+    // send black data
+    EPD_SendCommand(0x13);
+    for (UDOUBLE j = 0; j < Height; j++) {
+      const UBYTE* startRow = mirror ?  (blackimage + j * Width) : (blackimage + (Height - 1 - j) * Width);
+        for (UDOUBLE i = 0; i < Width; i++)
+        {
+            EPD_SendData(invert ? startRow[i] : ~startRow[i]);
+        }
+    }
+    EPD_7IN5_V2_TurnOnDisplay();
+}
+
+
 /******************************************************************************
 function :	Enter sleep mode
 parameter:
