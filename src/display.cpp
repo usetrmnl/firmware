@@ -8,6 +8,120 @@
 #include <config.h>
 #include <ImageData.h>
 
+#define MAX_LINES 4
+#define FONT_WIDTH 17 // From Font24 def
+#define MAX_LINE_LENGTH EPD_7IN5_V2_WIDTH / FONT_WIDTH
+
+// Structure to hold the result of text splitting
+struct TextLines {
+    char lines[MAX_LINES][MAX_LINE_LENGTH + 1];
+    int line_count;
+};
+
+/**
+ * @brief Splits the input text into multiple lines based on max_width.
+ * @param text The input text to split.
+ * @param max_width The maximum width in pixels for each line.
+ * @param font_width The width of a single character in pixels (e.g., 17 for Font24).
+ * @return TextLines A structure containing an array of lines and the line count.
+ */
+TextLines split_text_to_lines(const char *text, uint16_t max_width, uint16_t font_width) {
+    TextLines result = {{{0}}, 0};
+
+    int text_len = strlen(text);
+    int current_width = 0;
+    int line_index = 0;
+    int line_pos = 0;
+    int word_start = 0;
+    int i = 0;
+    char word_buffer[MAX_LINE_LENGTH + 1] = {0};
+    int word_length = 0;
+
+    while (i <= text_len && line_index < MAX_LINES) {
+        word_length = 0;
+        word_start = i;
+
+        while (i < text_len && text[i] == ' ') {
+            i++;
+        }
+        word_start = i;
+
+        // Find end of word or end of text
+        while (i < text_len && text[i] != ' ') {
+            i++;
+        }
+
+        word_length = i - word_start;
+        if (word_length > MAX_LINE_LENGTH) {
+            word_length = MAX_LINE_LENGTH; // Truncate if word is too long
+        }
+
+        if (word_length > 0) {
+            strncpy(word_buffer, text + word_start, word_length);
+            word_buffer[word_length] = '\0';
+        } else {
+            // Handle case of consecutive spaces or end of text
+            i++;
+            continue;
+        }
+
+        int word_width = word_length * font_width;
+
+        // Check if adding the word exceeds max_width
+        if (current_width + word_width + (current_width > 0 ? font_width : 0) <= max_width) {
+            // Add space before word if not the first word in the line
+            if (current_width > 0 && line_pos < MAX_LINE_LENGTH - 1) {
+                result.lines[line_index][line_pos++] = ' ';
+                current_width += font_width;
+            }
+
+            // Add word to current line
+            if (line_pos + word_length <= MAX_LINE_LENGTH) {
+                strcpy(&result.lines[line_index][line_pos], word_buffer);
+                line_pos += word_length;
+                current_width += word_width;
+            }
+        } else {
+            // Current line is full, start a new line
+            if (line_pos > 0) {
+                result.lines[line_index][line_pos] = '\0'; // Null-terminate the current line
+                line_index++;
+                result.line_count++;
+
+                if (line_index >= MAX_LINES) {
+                    break;  // No more lines available to write, text too long
+                }
+
+                // Start new line with this word
+                strncpy(result.lines[line_index], word_buffer, word_length);
+                line_pos = word_length;
+                current_width = word_width;
+            } else {
+                // Handle case where a single word is too long for a line
+                strncpy(result.lines[line_index], word_buffer, MAX_LINE_LENGTH);
+                result.lines[line_index][MAX_LINE_LENGTH] = '\0';
+                line_index++;
+                result.line_count++;
+                line_pos = 0;
+                current_width = 0;
+            }
+        }
+
+        // Move to next word
+        if (text[i] == ' ') {
+            i++;
+        }
+    }
+
+    // Store the last line if it exists
+    if (line_pos > 0 && line_index < MAX_LINES) {
+        result.lines[line_index][line_pos] = '\0'; // Null-terminate the last line
+        result.line_count++;
+    }
+
+    return result;
+}
+
 /**
  * @brief Function to init the display
  * @param none
@@ -92,14 +206,15 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
             image_buffer[i] = ~image_buffer[i];
         }
     }
-    if(isPNG == true)
+    if (isPNG == true)
     {
         Log.info("Drawing PNG\n");
         flip_image(image_buffer, width, height);
-        horizontal_mirror(image_buffer,width,height);
+        horizontal_mirror(image_buffer, width, height);
         Paint_DrawBitMap(image_buffer);
     }
-    else{
+    else
+    {
         Paint_DrawBitMap(image_buffer + 62);
     }
     EPD_7IN5_V2_Display(BlackImage);
@@ -318,16 +433,15 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     {
         Log.info("%s [%d]: mac not registered case\r\n", __FILE__, __LINE__);
 
-        int hyphenIndex = message.indexOf('-');
+        TextLines result = split_text_to_lines(message.c_str(), 800, FONT_WIDTH);
 
-        String part1 = message.substring(0, hyphenIndex);
-        String part2 = message.substring(hyphenIndex + 1);
-        part1.trim();
-        part2.trim();
-
-        Paint_DrawString_EN((800 - part1.length() * 17 > 9) ? (800 - part1.length() * 17) / 2 + 9 : 0, 400, part2.c_str(), &Font24, WHITE, BLACK);
-        Paint_DrawString_EN((800 - part2.length() * 17 > 9) ? (800 - part2.length() * 17) / 2 + 9 : 0, 430, part2.c_str(), &Font24, WHITE, BLACK);
-
+        uint16_t drawHeights[MAX_LINES] = {340, 370, 400, 430}; // Pre-computed draw heights for 4 line messages
+        for (int i = 0; i < result.line_count; i++)
+        {
+            size_t text_length = strlen(result.lines[i]);
+            int x_pos = (800 - text_length * 17 > 9) ? (800 - text_length * 17) / 2 + 9 : 0;
+            Paint_DrawString_EN(x_pos, drawHeights[i], result.lines[i], &Font24, WHITE, BLACK);
+        }
     }
     break;
     default:
