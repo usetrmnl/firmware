@@ -27,6 +27,8 @@
 #include <api_response_parsing.h>
 #include "logging_parcers.h"
 #include <SPIFFS.h>
+#include "http_client.h"
+#include <api-client/display.h>
 
 bool pref_clear = false;
 String new_filename = "";
@@ -535,41 +537,6 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
   return inputs;
 }
 
-void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
-{
-  Log.info("%s [%d]: Added headers:\n\r"
-           "ID: %s\n\r"
-           "Special function: %d\n\r"
-           "Access-Token: %s\n\r"
-           "Refresh_Rate: %s\n\r"
-           "Battery-Voltage: %s\n\r"
-           "FW-Version: %s\r\n"
-           "RSSI: %s\r\n",
-           __FILE__, __LINE__,
-           inputs.macAddress.c_str(),
-           inputs.specialFunction,
-           inputs.apiKey.c_str(),
-           String(inputs.refreshRate).c_str(),
-           String(inputs.batteryVoltage).c_str(),
-           inputs.firmwareVersion.c_str(),
-           String(inputs.rssi));
-
-  https.addHeader("ID", WiFi.macAddress());
-  https.addHeader("Access-Token", inputs.apiKey);
-  https.addHeader("Refresh-Rate", String(inputs.refreshRate));
-  https.addHeader("Battery-Voltage", String(inputs.batteryVoltage));
-  https.addHeader("FW-Version", inputs.firmwareVersion);
-  https.addHeader("RSSI", String(inputs.rssi));
-  https.addHeader("Width", String(inputs.displayWidth));
-  https.addHeader("Height", String(inputs.displayHeight));
-
-  if (special_function != SF_NONE)
-  {
-    Log.info("%s [%d]: Add special function: true (%d)\r\n", __FILE__, __LINE__, special_function);
-    https.addHeader("special_function", "true");
-  }
-}
-
 /**
  * @brief Function to ping server and download and show the image if all is OK
  * @param url Server URL address
@@ -578,6 +545,17 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
 static https_request_err_e downloadAndShow()
 {
   auto apiDisplayInputs = loadApiDisplayInputs(preferences);
+
+  auto apiDisplayResult = fetchApiDisplay(apiDisplayInputs);
+
+  if (apiDisplayResult.error != HTTPS_NO_ERR)
+  {
+    Log.error("%s [%d]: Error fetching API display: %d, detail: %s\r\n", __FILE__, __LINE__, apiDisplayResult.error, apiDisplayResult.error_detail.c_str());
+    submit_log("Error fetching API display: %d, detail: %s", apiDisplayResult.error, apiDisplayResult.error_detail.c_str());
+    return apiDisplayResult.error;
+  }
+
+  handleApiDisplayResponse(apiDisplayResult.response);
 
   https_request_err_e result = HTTPS_NO_ERR;
   WiFiClientSecure *secureClient = new WiFiClientSecure;
@@ -603,75 +581,13 @@ static https_request_err_e downloadAndShow()
   { // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
 
     HTTPClient https;
-    Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
-    Log.info("%s [%d]: [HTTPS] begin /api/display/ ...\r\n", __FILE__, __LINE__);
-    char new_url[200];
-    strcpy(new_url, apiDisplayInputs.baseUrl.c_str());
-    strcat(new_url, "/api/display/");
-
-    Log.info("%s [%d]: [HTTPS] URL: %s\r\n", __FILE__, __LINE__, new_url);
-
-    if (!https.begin(*client, new_url))
-    {
-      Log.error("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
-      submit_log("unable to connect to the API endpoint");
-      return HTTPS_UNABLE_TO_CONNECT;
-    }
-
-    // HTTPS
-    Log.info("%s [%d]: [HTTPS] GET...\r\n", __FILE__, __LINE__);
-    Log.info("%s [%d]: [HTTPS] GET Route: %s\r\n", __FILE__, __LINE__, new_url);
-    // start connection and send HTTP header
-
-    addHeaders(https, apiDisplayInputs);
-
-    delay(5);
-
-    int httpCode = https.GET();
-
-    // httpCode will be negative on error
-    if (httpCode < 0)
-    {
-      Log.error("%s [%d]: [HTTPS] GET... failed, error: %s\r\n", __FILE__, __LINE__, https.errorToString(httpCode).c_str());
-      submit_log("HTTP Client failed with error: %s", https.errorToString(httpCode).c_str());
-      return HTTPS_RESPONSE_CODE_INVALID;
-    }
-
-    // HTTP header has been send and Server response header has been handled
-    Log.info("%s [%d]: GET... code: %d\r\n", __FILE__, __LINE__, httpCode);
-
-    // file not found at server
-    if (!(httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY))
-    {
-      Log.info("%s [%d]: [HTTPS] Unable to connect\r\n", __FILE__, __LINE__);
-      result = HTTPS_REQUEST_FAILED;
-      submit_log("returned code is not OK: %d", httpCode);
-      return HTTPS_REQUEST_FAILED;
-    }
-
-    String payload = https.getString();
-    size_t size = https.getSize();
-    Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, size);
-    Log.info("%s [%d]: Free heap size: %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
-    Log.info("%s [%d]: Payload - %s\r\n", __FILE__, __LINE__, payload.c_str());
-
-    auto apiResponse = parseResponse_apiDisplay(payload);
-    bool error = apiResponse.outcome == ApiDisplayOutcome::DeserializationError;
-
-    if (error)
-    {
-      return HTTPS_JSON_PARSING_ERR;
-    }
-
-    handleApiDisplayResponse(apiResponse);
-
     if (status && !update_firmware && !reset_firmware)
     {
       status = false;
 
       // The timeout will be zero if no value was returned, and in that case we just use the default timeout.
       // Otherwise, we set the requested timeout.
-      uint32_t requestedTimeout = apiResponse.image_url_timeout;
+      uint32_t requestedTimeout = apiDisplayResult.response.image_url_timeout;
       if (requestedTimeout > 0) {
         // Convert from seconds to milliseconds.
         // A uint32_t should be large enough not to worry about overflow for any reasonable timeout.
@@ -828,7 +744,7 @@ static https_request_err_e downloadAndShow()
           display_show_image(imagePointer,image_reverse, isPNG);
 
           // Using filename from API response
-          new_filename = apiResponse.filename;
+          new_filename = apiDisplayResult.response.filename;
 
           // Print the extracted string
           Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
@@ -878,7 +794,7 @@ static https_request_err_e downloadAndShow()
           display_show_image(imagePointer,image_reverse, isPNG);
 
           // Using filename from API response
-          new_filename = apiResponse.filename;
+          new_filename = apiDisplayResult.response.filename;
 
           // Print the extracted string
           Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
@@ -1740,78 +1656,60 @@ static void resetDeviceCredentials(void)
  */
 static void checkAndPerformFirmwareUpdate(void)
 {
-  WiFiClientSecure *secureClient = new WiFiClientSecure;
-  WiFiClient *insecureClient = new WiFiClient;
 
-  secureClient->setInsecure();
+  withHttp(binUrl, [&](HTTPClient *https, HttpError errorCode) -> bool
+           {
+             if (errorCode != HttpError::HTTPCLIENT_SUCCESS || !https)
+             {
+               Log.fatal("%s [%d]: Unable to connect for firmware update\r\n", __FILE__, __LINE__);
+               if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
+               {
+                 showMessageWithLogo(API_ERROR);
+               }
+               else
+               {
+                 showMessageWithLogo(WIFI_WEAK);
+               }
+             }
 
-  bool isHttps = true;
-  if (preferences.getString(PREFERENCES_API_URL, API_BASE_URL).indexOf("https://") == -1)
-  {
-    isHttps = false;
-  }
+             int httpCode = https->GET();
+             if (httpCode == HTTP_CODE_OK)
+             {
+               Log.info("%s [%d]: Downloading .bin file...\r\n", __FILE__, __LINE__);
 
-  // define client depending on the isHttps variable
-  WiFiClient *client = isHttps ? secureClient : insecureClient;
+               size_t contentLength = https->getSize();
+               // Perform firmware update
+               if (Update.begin(contentLength))
+               {
+                 Log.info("%s [%d]: Firmware update start\r\n", __FILE__, __LINE__);
+                 showMessageWithLogo(FW_UPDATE);
 
-  if (client)
-  {
-    HTTPClient https;
-    if (https.begin(*client, binUrl))
-    {
-      int httpCode = https.GET();
-      if (httpCode == HTTP_CODE_OK)
-      {
-        Log.info("%s [%d]: Downloading .bin file...\r\n", __FILE__, __LINE__);
-
-        size_t contentLength = https.getSize();
-        // Perform firmware update
-        if (Update.begin(contentLength))
-        {
-          Log.info("%s [%d]: Firmware update start\r\n", __FILE__, __LINE__);
-          showMessageWithLogo(FW_UPDATE);
-
-          if (Update.writeStream(https.getStream()))
-          {
-            if (Update.end(true))
-            {
-              Log.info("%s [%d]: Firmware update successful. Rebooting...\r\n", __FILE__, __LINE__);
-              showMessageWithLogo(FW_UPDATE_SUCCESS);
-            }
-            else
-            {
-              Log.fatal("%s [%d]: Firmware update failed!\r\n", __FILE__, __LINE__);
-              showMessageWithLogo(FW_UPDATE_FAILED);
-            }
-          }
-          else
-          {
-            Log.fatal("%s [%d]: Write to firmware update stream failed!\r\n", __FILE__, __LINE__);
-            showMessageWithLogo(FW_UPDATE_FAILED);
-          }
-        }
-        else
-        {
-          Log.fatal("%s [%d]: Begin firmware update failed!\r\n", __FILE__, __LINE__);
-          showMessageWithLogo(FW_UPDATE_FAILED);
-        }
-      }
-      else
-      {
-        Log.fatal("%s [%d]: HTTP GET failed!\r\n", __FILE__, __LINE__);
-        if (WiFi.RSSI() > WIFI_CONNECTION_RSSI)
-        {
-          showMessageWithLogo(API_ERROR);
-        }
-        else
-        {
-          showMessageWithLogo(WIFI_WEAK);
-        }
-      }
-      https.end();
-    }
-  }
-  delete client;
+                 if (Update.writeStream(https->getStream()))
+                 {
+                   if (Update.end(true))
+                   {
+                     Log.info("%s [%d]: Firmware update successful. Rebooting...\r\n", __FILE__, __LINE__);
+                     showMessageWithLogo(FW_UPDATE_SUCCESS);
+                   }
+                   else
+                   {
+                     Log.fatal("%s [%d]: Firmware update failed!\r\n", __FILE__, __LINE__);
+                     showMessageWithLogo(FW_UPDATE_FAILED);
+                   }
+                 }
+                 else
+                 {
+                   Log.fatal("%s [%d]: Write to firmware update stream failed!\r\n", __FILE__, __LINE__);
+                   showMessageWithLogo(FW_UPDATE_FAILED);
+                 }
+               }
+               else
+               {
+                 Log.fatal("%s [%d]: Begin firmware update failed!\r\n", __FILE__, __LINE__);
+                 showMessageWithLogo(FW_UPDATE_FAILED);
+               }
+             }
+             return true; });
 }
 
 /**
