@@ -16,6 +16,7 @@
 struct TextLines {
     char lines[MAX_LINES][MAX_LINE_LENGTH + 1];
     int line_count;
+    uint16_t x_offsets[MAX_LINES]; // Store the x-offset for each line to center it
 };
 
 /**
@@ -26,7 +27,10 @@ struct TextLines {
  * @return TextLines A structure containing an array of lines and the line count.
  */
 TextLines split_text_to_lines(const char *text, uint16_t max_width, uint16_t font_width) {
-    TextLines result = {{{0}}, 0};
+    TextLines result = {{{0}}, 0, {0}};
+
+    uint16_t display_width_pixels = max_width;
+    int max_chars_per_line = display_width_pixels / font_width;
 
     int text_len = strlen(text);
     int current_width = 0;
@@ -41,6 +45,7 @@ TextLines split_text_to_lines(const char *text, uint16_t max_width, uint16_t fon
         word_length = 0;
         word_start = i;
 
+        // Skip leading spaces
         while (i < text_len && text[i] == ' ') {
             i++;
         }
@@ -52,15 +57,14 @@ TextLines split_text_to_lines(const char *text, uint16_t max_width, uint16_t fon
         }
 
         word_length = i - word_start;
-        if (word_length > MAX_LINE_LENGTH) {
-            word_length = MAX_LINE_LENGTH; // Truncate if word is too long
+        if (word_length > max_chars_per_line) {
+            word_length = max_chars_per_line; // Truncate if word is too long
         }
 
         if (word_length > 0) {
             strncpy(word_buffer, text + word_start, word_length);
             word_buffer[word_length] = '\0';
         } else {
-            // Handle case of consecutive spaces or end of text
             i++;
             continue;
         }
@@ -68,15 +72,15 @@ TextLines split_text_to_lines(const char *text, uint16_t max_width, uint16_t fon
         int word_width = word_length * font_width;
 
         // Check if adding the word exceeds max_width
-        if (current_width + word_width + (current_width > 0 ? font_width : 0) <= max_width) {
+        if (current_width + word_width + (current_width > 0 ? font_width : 0) <= display_width_pixels) {
             // Add space before word if not the first word in the line
-            if (current_width > 0 && line_pos < MAX_LINE_LENGTH - 1) {
+            if (current_width > 0 && line_pos < max_chars_per_line - 1) {
                 result.lines[line_index][line_pos++] = ' ';
                 current_width += font_width;
             }
 
             // Add word to current line
-            if (line_pos + word_length <= MAX_LINE_LENGTH) {
+            if (line_pos + word_length <= max_chars_per_line) {
                 strcpy(&result.lines[line_index][line_pos], word_buffer);
                 line_pos += word_length;
                 current_width += word_width;
@@ -85,11 +89,14 @@ TextLines split_text_to_lines(const char *text, uint16_t max_width, uint16_t fon
             // Current line is full, start a new line
             if (line_pos > 0) {
                 result.lines[line_index][line_pos] = '\0'; // Null-terminate the current line
+                // Calculate the x-offset for centering this line
+                int line_width = strlen(result.lines[line_index]) * font_width;
+                result.x_offsets[line_index] = (display_width_pixels - line_width) / 2;
                 line_index++;
                 result.line_count++;
 
                 if (line_index >= MAX_LINES) {
-                    break;  // No more lines available to write, text too long
+                    break; // No more lines available to write, text too long
                 }
 
                 // Start new line with this word
@@ -98,8 +105,11 @@ TextLines split_text_to_lines(const char *text, uint16_t max_width, uint16_t fon
                 current_width = word_width;
             } else {
                 // Handle case where a single word is too long for a line
-                strncpy(result.lines[line_index], word_buffer, MAX_LINE_LENGTH);
-                result.lines[line_index][MAX_LINE_LENGTH] = '\0';
+                strncpy(result.lines[line_index], word_buffer, max_chars_per_line);
+                result.lines[line_index][max_chars_per_line] = '\0';
+                // Calculate the x-offset for centering this line
+                int line_width = strlen(result.lines[line_index]) * font_width;
+                result.x_offsets[line_index] = (display_width_pixels - line_width) / 2;
                 line_index++;
                 result.line_count++;
                 line_pos = 0;
@@ -116,6 +126,9 @@ TextLines split_text_to_lines(const char *text, uint16_t max_width, uint16_t fon
     // Store the last line if it exists
     if (line_pos > 0 && line_index < MAX_LINES) {
         result.lines[line_index][line_pos] = '\0'; // Null-terminate the last line
+        // Calculate the x-offset for centering this line
+        int line_width = strlen(result.lines[line_index]) * font_width;
+        result.x_offsets[line_index] = (display_width_pixels - line_width) / 2;
         result.line_count++;
     }
 
@@ -433,14 +446,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     {
         Log.info("%s [%d]: mac not registered case\r\n", __FILE__, __LINE__);
 
-        TextLines result = split_text_to_lines(message.c_str(), 800, FONT_WIDTH);
+        TextLines result = split_text_to_lines(message.c_str(), display_width(), FONT_WIDTH);
 
         uint16_t drawHeights[MAX_LINES] = {340, 370, 400, 430}; // Pre-computed draw heights for 4 line messages
-        for (int i = 0; i < result.line_count; i++)
-        {
-            size_t text_length = strlen(result.lines[i]);
-            int x_pos = (800 - text_length * 17 > 9) ? (800 - text_length * 17) / 2 + 9 : 0;
-            Paint_DrawString_EN(x_pos, drawHeights[i], result.lines[i], &Font24, WHITE, BLACK);
+        for (int i = 0; i < result.line_count; i++) {
+            Paint_DrawString_EN(result.x_offsets[i], drawHeights[i], result.lines[i], &Font24, WHITE, BLACK);
         }
     }
     break;
