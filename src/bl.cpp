@@ -29,6 +29,7 @@
 #include <SPIFFS.h>
 
 bool pref_clear = false;
+String new_filename = "";
 
 uint8_t* buffer = nullptr;
 uint8_t *decodedPng = nullptr;
@@ -54,6 +55,7 @@ RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
 Preferences preferences;
 
 static https_request_err_e downloadAndShow();        // download and show the image
+static https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse);
 static void getDeviceCredentials();                  // receiveing API key and Friendly ID
 static void resetDeviceCredentials(void);            // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
 static void checkAndPerformFirmwareUpdate(void);     // OTA update
@@ -479,6 +481,95 @@ void bl_process(void)
 {
 }
 
+ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
+{
+  ApiDisplayInputs inputs;
+
+  inputs.baseUrl = preferences.getString(PREFERENCES_API_URL, API_BASE_URL);
+
+  if (preferences.isKey(PREFERENCES_API_KEY))
+  {
+    inputs.apiKey = preferences.getString(PREFERENCES_API_KEY, PREFERENCES_API_KEY_DEFAULT);
+    Log.info("%s [%d]: %s key exists. Value - %s\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY, inputs.apiKey.c_str());
+  }
+  else
+  {
+    Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY);
+  }
+
+  if (preferences.isKey(PREFERENCES_FRIENDLY_ID))
+  {
+    inputs.friendlyId = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
+    Log.info("%s [%d]: %s key exists. Value - %s\r\n", __FILE__, __LINE__, PREFERENCES_FRIENDLY_ID, inputs.friendlyId);
+  }
+  else
+  {
+    Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_FRIENDLY_ID);
+  }
+
+  inputs.refreshRate = SLEEP_TIME_TO_SLEEP;
+
+  if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))
+  {
+    inputs.refreshRate = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+    Log.info("%s [%d]: %s key exists. Value - %d\r\n", __FILE__, __LINE__, PREFERENCES_SLEEP_TIME_KEY, inputs.refreshRate);
+  }
+  else
+  {
+    Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_SLEEP_TIME_KEY);
+  }
+
+  inputs.macAddress = WiFi.macAddress();
+
+  inputs.batteryVoltage = readBatteryVoltage();
+
+  inputs.firmwareVersion = String(FW_MAJOR_VERSION) + "." +
+                           String(FW_MINOR_VERSION) + "." +
+                           String(FW_PATCH_VERSION);
+
+  inputs.rssi = WiFi.RSSI();
+  inputs.displayWidth = display_width();
+  inputs.displayHeight = display_height();
+  inputs.specialFunction = special_function;
+
+  return inputs;
+}
+
+void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
+{
+  Log.info("%s [%d]: Added headers:\n\r"
+           "ID: %s\n\r"
+           "Special function: %d\n\r"
+           "Access-Token: %s\n\r"
+           "Refresh_Rate: %s\n\r"
+           "Battery-Voltage: %s\n\r"
+           "FW-Version: %s\r\n"
+           "RSSI: %s\r\n",
+           __FILE__, __LINE__,
+           inputs.macAddress.c_str(),
+           inputs.specialFunction,
+           inputs.apiKey.c_str(),
+           String(inputs.refreshRate).c_str(),
+           String(inputs.batteryVoltage).c_str(),
+           inputs.firmwareVersion.c_str(),
+           String(inputs.rssi));
+
+  https.addHeader("ID", WiFi.macAddress());
+  https.addHeader("Access-Token", inputs.apiKey);
+  https.addHeader("Refresh-Rate", String(inputs.refreshRate));
+  https.addHeader("Battery-Voltage", String(inputs.batteryVoltage));
+  https.addHeader("FW-Version", inputs.firmwareVersion);
+  https.addHeader("RSSI", String(inputs.rssi));
+  https.addHeader("Width", String(inputs.displayWidth));
+  https.addHeader("Height", String(inputs.displayHeight));
+
+  if (special_function != SF_NONE)
+  {
+    Log.info("%s [%d]: Add special function: true (%d)\r\n", __FILE__, __LINE__, special_function);
+    https.addHeader("special_function", "true");
+  }
+}
+
 /**
  * @brief Function to ping server and download and show the image if all is OK
  * @param url Server URL address
@@ -486,13 +577,15 @@ void bl_process(void)
  */
 static https_request_err_e downloadAndShow()
 {
+  auto apiDisplayInputs = loadApiDisplayInputs(preferences);
+
   https_request_err_e result = HTTPS_NO_ERR;
   WiFiClientSecure *secureClient = new WiFiClientSecure;
   secureClient->setInsecure();
   WiFiClient *insecureClient = new WiFiClient;
 
   bool isHttps = true;
-  if (preferences.getString(PREFERENCES_API_URL, API_BASE_URL).indexOf("https://") == -1)
+  if (apiDisplayInputs.baseUrl.indexOf("https://") == -1)
   {
     isHttps = false;
   }
@@ -513,49 +606,10 @@ static https_request_err_e downloadAndShow()
     Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
     Log.info("%s [%d]: [HTTPS] begin /api/display/ ...\r\n", __FILE__, __LINE__);
     char new_url[200];
-    strcpy(new_url, preferences.getString(PREFERENCES_API_URL, API_BASE_URL).c_str());
+    strcpy(new_url, apiDisplayInputs.baseUrl.c_str());
     strcat(new_url, "/api/display/");
 
-    String api_key = "";
-
     Log.info("%s [%d]: [HTTPS] URL: %s\r\n", __FILE__, __LINE__, new_url);
-    if (preferences.isKey(PREFERENCES_API_KEY))
-    {
-      api_key = preferences.getString(PREFERENCES_API_KEY, PREFERENCES_API_KEY_DEFAULT);
-      Log.info("%s [%d]: %s key exists. Value - %s\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY, api_key.c_str());
-    }
-    else
-    {
-      Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY);
-    }
-
-    String friendly_id = "";
-    if (preferences.isKey(PREFERENCES_FRIENDLY_ID))
-    {
-      friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);
-      Log.info("%s [%d]: %s key exists. Value - %s\r\n", __FILE__, __LINE__, PREFERENCES_FRIENDLY_ID, friendly_id);
-    }
-    else
-    {
-      Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_FRIENDLY_ID);
-    }
-
-    uint32_t refresh_rate = SLEEP_TIME_TO_SLEEP;
-    if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))
-    {
-      refresh_rate = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
-      Log.info("%s [%d]: %s key exists. Value - %d\r\n", __FILE__, __LINE__, PREFERENCES_SLEEP_TIME_KEY, refresh_rate);
-    }
-    else
-    {
-      Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_SLEEP_TIME_KEY);
-    }
-
-    String fw_version = String(FW_MAJOR_VERSION) + "." + String(FW_MINOR_VERSION) + "." + String(FW_PATCH_VERSION);
-
-    float battery_voltage = readBatteryVoltage();
-
-    Log.info("%s [%d]: Added headers:\n\rID: %s\n\rSpecial function: %d\n\rAccess-Token: %s\n\rRefresh_Rate: %s\n\rBattery-Voltage: %s\n\rFW-Version: %s\r\nRSSI: %s\r\n", __FILE__, __LINE__, WiFi.macAddress().c_str(), special_function, api_key.c_str(), String(refresh_rate).c_str(), String(battery_voltage).c_str(), fw_version.c_str(), String(WiFi.RSSI()));
 
     if (!https.begin(*client, new_url))
     {
@@ -568,21 +622,8 @@ static https_request_err_e downloadAndShow()
     Log.info("%s [%d]: [HTTPS] GET...\r\n", __FILE__, __LINE__);
     Log.info("%s [%d]: [HTTPS] GET Route: %s\r\n", __FILE__, __LINE__, new_url);
     // start connection and send HTTP header
-    https.addHeader("ID", WiFi.macAddress());
-    https.addHeader("Access-Token", api_key);
-    https.addHeader("Refresh-Rate", String(refresh_rate));
-    https.addHeader("Battery-Voltage", String(battery_voltage));
-    https.addHeader("FW-Version", fw_version);
-    https.addHeader("RSSI", String(WiFi.RSSI()));
-    https.addHeader("Width", String(display_width()));
-    https.addHeader("Height", String(display_height()));
 
-    Log.info("%s [%d]: Special function - %d\r\n", __FILE__, __LINE__, special_function);
-    if (special_function != SF_NONE)
-    {
-      Log.info("%s [%d]: Add special function - true\r\n", __FILE__, __LINE__);
-      https.addHeader("special_function", "true");
-    }
+    addHeaders(https, apiDisplayInputs);
 
     delay(5);
 
@@ -622,499 +663,7 @@ static https_request_err_e downloadAndShow()
       return HTTPS_JSON_PARSING_ERR;
     }
 
-    if (special_function == SF_NONE)
-    {
-      uint64_t request_status = apiResponse.status;
-      Log.info("%s [%d]: status: %d\r\n", __FILE__, __LINE__, request_status);
-      switch (request_status)
-      {
-      case 0:
-      {
-        String image_url = apiResponse.image_url;
-        update_firmware = apiResponse.update_firmware;
-        String firmware_url = apiResponse.firmware_url;
-        uint64_t rate = apiResponse.refresh_rate;
-        reset_firmware = apiResponse.reset_firmware;
-
-        bool sleep_5_seconds = false;
-
-        writeSpecialFunction(apiResponse.special_function);
-
-        if (update_firmware)
-        {
-          Log.info("%s [%d]: update firmware. Check URL\r\n", __FILE__, __LINE__);
-          if (firmware_url.length() == 0)
-          {
-            Log.error("%s [%d]: Empty URL\r\n", __FILE__, __LINE__);
-            update_firmware = false;
-          }
-        }
-        if (image_url.length() > 0)
-        {
-          Log.info("%s [%d]: image_url: %s\r\n", __FILE__, __LINE__, image_url.c_str());
-          Log.info("%s [%d]: image url end with: %d\r\n", __FILE__, __LINE__, image_url.endsWith("/setup-logo.bmp"));
-
-          image_url.toCharArray(filename, image_url.length() + 1);
-          // check if plugin is applied
-          bool flag = preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
-          Log.info("%s [%d]: flag: %d\r\n", __FILE__, __LINE__, flag);
-
-          if (apiResponse.filename == "empty_state")
-          {
-            Log.info("%s [%d]: End with empty_state\r\n", __FILE__, __LINE__);
-            if (!flag)
-            {
-              // draw received logo
-              status = true;
-              // set flag to true
-              if (preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false) != true) // check the flag to avoid the re-writing
-              {
-                bool res = preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, true);
-                if (res)
-                  Log.info("%s [%d]: Flag written true successfully\r\n", __FILE__, __LINE__);
-                else
-                  Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
-              }
-            }
-            else
-            {
-              // don't draw received logo
-              status = false;
-            }
-            // sleep 5 seconds
-            sleep_5_seconds = true;
-          }
-          else
-          {
-            Log.info("%s [%d]: End with NO empty_state\r\n", __FILE__, __LINE__);
-            if (flag)
-            {
-              if (preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false) != false) // check the flag to avoid the re-writing
-              {
-                bool res = preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
-                if (res)
-                  Log.info("%s [%d]: Flag written false successfully\r\n", __FILE__, __LINE__);
-                else
-                  Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
-              }
-            }
-            // Using filename from API response
-            String new_filename = apiResponse.filename;
-
-            // Print the extracted string
-            Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
-            if (!checkCurrentFileName(new_filename))
-            {
-              Log.info("%s [%d]: New image. Show it.\r\n", __FILE__, __LINE__);
-              status = true;
-            }
-            else
-            {
-              Log.info("%s [%d]: Old image. No needed to show it.\r\n", __FILE__, __LINE__);
-              status = false;
-              result = HTTPS_SUCCESS;
-            }
-          }
-        }
-        Log.info("%s [%d]: update_firmware: %d\r\n", __FILE__, __LINE__, update_firmware);
-        if (firmware_url.length() > 0)
-        {
-          Log.info("%s [%d]: firmware_url: %s\r\n", __FILE__, __LINE__, firmware_url.c_str());
-          firmware_url.toCharArray(binUrl, firmware_url.length() + 1);
-        }
-        Log.info("%s [%d]: refresh_rate: %d\r\n", __FILE__, __LINE__, rate);
-        if (rate != preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP))
-        {
-          Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, rate);
-          size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, rate);
-          Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
-        }
-
-        if (reset_firmware)
-        {
-          Log.info("%s [%d]: Reset status is true\r\n", __FILE__, __LINE__);
-        }
-
-        if (update_firmware)
-          result = HTTPS_SUCCESS;
-        if (reset_firmware)
-          result = HTTPS_RESET;
-        if (sleep_5_seconds)
-          result = HTTPS_PLUGIN_NOT_ATTACHED;
-        Log.info("%s [%d]: result - %d\r\n", __FILE__, __LINE__, result);
-      }
-      break;
-      case 202:
-      {
-        result = HTTPS_NO_REGISTER;
-        Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
-        size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
-        Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
-        status = false;
-      }
-      break;
-      case 500:
-      {
-        result = HTTPS_RESET;
-        Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
-        size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
-        Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
-        status = false;
-      }
-      break;
-
-      default:
-        break;
-      }
-    }
-    else if (special_function != SF_NONE)
-    {
-      uint64_t request_status = apiResponse.status;
-      Log.info("%s [%d]: status: %d\r\n", __FILE__, __LINE__, request_status);
-      switch (request_status)
-      {
-      case 0:
-      {
-        switch (special_function)
-        {
-        case SF_IDENTIFY:
-        {
-          String action = apiResponse.action;
-          if (action.equals("identify"))
-          {
-            Log.info("%s [%d]:Identify success\r\n", __FILE__, __LINE__);
-            String image_url = apiResponse.image_url;
-            if (image_url.length() > 0)
-            {
-              Log.info("%s [%d]: image_url: %s\r\n", __FILE__, __LINE__, image_url.c_str());
-              Log.info("%s [%d]: image url end with: %d\r\n", __FILE__, __LINE__, image_url.endsWith("/setup-logo.bmp"));
-
-              image_url.toCharArray(filename, image_url.length() + 1);
-              // check if plugin is applied
-              bool flag = preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
-              Log.info("%s [%d]: flag: %d\r\n", __FILE__, __LINE__, flag);
-
-              if (apiResponse.filename == "empty_state")
-              {
-                Log.info("%s [%d]: End with empty_state\r\n", __FILE__, __LINE__);
-                if (!flag)
-                {
-                  // draw received logo
-                  status = true;
-                  // set flag to true
-                  if (preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false) != true) // check the flag to avoid the re-writing
-                  {
-                    bool res = preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, true);
-                    if (res)
-                      Log.info("%s [%d]: Flag written true successfully\r\n", __FILE__, __LINE__);
-                    else
-                      Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
-                  }
-                }
-                else
-                {
-                  // don't draw received logo
-                  status = false;
-                }
-              }
-              else
-              {
-                Log.info("%s [%d]: End with NO empty_state\r\n", __FILE__, __LINE__);
-                if (flag)
-                {
-                  if (preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false) != false) // check the flag to avoid the re-writing
-                  {
-                    bool res = preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
-                    if (res)
-                      Log.info("%s [%d]: Flag written false successfully\r\n", __FILE__, __LINE__);
-                    else
-                      Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
-                  }
-                }
-                status = true;
-              }
-            }
-          }
-          else
-          {
-            Log.error("%s [%d]: identify failed\r\n", __FILE__, __LINE__);
-          }
-        }
-        break;
-        case SF_SLEEP:
-        {
-          String action = apiResponse.action;
-          if (action.equals("sleep"))
-          {
-            uint64_t rate = apiResponse.refresh_rate;
-            Log.info("%s [%d]: refresh_rate: %d\r\n", __FILE__, __LINE__, rate);
-            if (rate != preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP))
-            {
-              Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, rate);
-              size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, rate);
-              Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
-            }
-            status = false;
-            result = HTTPS_SUCCESS;
-            Log.info("%s [%d]: sleep success\r\n", __FILE__, __LINE__);
-          }
-          else
-          {
-            Log.error("%s [%d]: sleep failed\r\n", __FILE__, __LINE__);
-            // need to add error
-          }
-        }
-        break;
-        case SF_ADD_WIFI:
-        {
-          String action = apiResponse.action;
-          if (action.equals("add_wifi"))
-          {
-            status = false;
-            result = HTTPS_SUCCESS;
-            Log.info("%s [%d]: Add wifi success\r\n", __FILE__, __LINE__);
-          }
-          else
-          {
-            Log.error("%s [%d]: Add wifi failed\r\n", __FILE__, __LINE__);
-          }
-        }
-        break;
-        case SF_RESTART_PLAYLIST:
-        {
-          String action = apiResponse.action;
-          if (action.equals("restart_playlist"))
-          {
-            Log.info("%s [%d]:Restart playlist success\r\n", __FILE__, __LINE__);
-            String image_url = apiResponse.image_url;
-            if (image_url.length() > 0)
-            {
-              Log.info("%s [%d]: image_url: %s\r\n", __FILE__, __LINE__, image_url.c_str());
-              Log.info("%s [%d]: image url end with: %d\r\n", __FILE__, __LINE__, image_url.endsWith("/setup-logo.bmp"));
-
-              image_url.toCharArray(filename, image_url.length() + 1);
-              // check if plugin is applied
-              bool flag = preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
-              Log.info("%s [%d]: flag: %d\r\n", __FILE__, __LINE__, flag);
-
-              if (apiResponse.filename == "empty_state")
-              {
-                Log.info("%s [%d]: End with empty_state\r\n", __FILE__, __LINE__);
-                if (!flag)
-                {
-                  // draw received logo
-                  status = true;
-                  // set flag to true
-                  if (preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false) != true) // check the flag to avoid the re-writing
-                  {
-                    bool res = preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, true);
-                    if (res)
-                      Log.info("%s [%d]: Flag written true successfully\r\n", __FILE__, __LINE__);
-                    else
-                      Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
-                  }
-                }
-                else
-                {
-                  // don't draw received logo
-                  status = false;
-                }
-              }
-              else
-              {
-                Log.info("%s [%d]: End with NO empty_state\r\n", __FILE__, __LINE__);
-                if (flag)
-                {
-                  if (preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false) != false) // check the flag to avoid the re-writing
-                  {
-                    bool res = preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
-                    if (res)
-                      Log.info("%s [%d]: Flag written false successfully\r\n", __FILE__, __LINE__);
-                    else
-                      Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
-                  }
-                }
-                status = true;
-              }
-            }
-          }
-          else
-          {
-            Log.error("%s [%d]: identify failed\r\n", __FILE__, __LINE__);
-          }
-        }
-        break;
-        case SF_REWIND:
-        {
-          String action = apiResponse.action;
-          if (action.equals("rewind"))
-          {
-            bool isPNG = false;
-            status = false;
-            result = HTTPS_SUCCESS;
-            Log.info("%s [%d]: rewind success\r\n", __FILE__, __LINE__);
-            
-            bool image_reverse = false;
-            bool file_check_bmp = true;
-            image_err_e image_proccess_response = PNG_WRONG_FORMAT;
-            bmp_err_e bmp_proccess_response = BMP_NOT_BMP;
-            
-            // showMessageWithLogo(BMP_FORMAT_ERROR);
-            String last_dot_file = filesystem_file_exists("/last.bmp") ? "/last.bmp" : "/last.png";
-            if(last_dot_file == "/last.bmp"){
-              Log.info("Rewind BMP\n\r");
-              buffer = (uint8_t *)malloc(DISPLAY_BMP_IMAGE_SIZE);
-              file_check_bmp = filesystem_read_from_file(last_dot_file.c_str(), buffer, DISPLAY_BMP_IMAGE_SIZE);
-              bmp_proccess_response = parseBMPHeader(buffer, image_reverse);
-            }
-            else if(last_dot_file == "/last.png"){
-              isPNG = true;
-              Log.info("Rewind PNG\n\r");
-              image_proccess_response = decodePNG(last_dot_file.c_str(), buffer);
-            }
-              
-            if (file_check_bmp)
-            {
-              switch (image_proccess_response)
-              {
-              case PNG_NO_ERR:
-              {
-                Log.info("Showing image\n\r");
-                display_show_image(buffer, image_reverse,isPNG);
-                need_to_refresh_display = 1;
-              }
-              break;
-              default:
-              {
-              }
-              break;
-              }
-              switch (bmp_proccess_response)
-              {
-              case BMP_NO_ERR:
-              {
-                Log.info("Showing image\n\r");
-                display_show_image(buffer, image_reverse,isPNG);
-                need_to_refresh_display = 1;
-              }
-              break;
-              default:
-              {
-              }
-              break;
-              }
-            }
-            else
-            {
-              free(buffer);
-              buffer = nullptr;
-              showMessageWithLogo(BMP_FORMAT_ERROR);
-            }
-          }
-          else
-          {
-            Log.error("%s [%d]: rewind failed\r\n", __FILE__, __LINE__);
-          }
-        }
-        break;
-        case SF_SEND_TO_ME:
-        {
-          String action = apiResponse.action;
-
-          if (action.equals("send_to_me"))
-          {
-            bool isPNG = false;
-            status = false;
-            result = HTTPS_SUCCESS;
-            Log.info("%s [%d]: send_to_me success\r\n", __FILE__, __LINE__);
-            
-            bool image_reverse = false;
-            image_err_e image_proccess_response = PNG_WRONG_FORMAT;
-
-            if (!filesystem_file_exists("/current.bmp") && !filesystem_file_exists("/current.png"))
-            {
-              Log.info("%s [%d]: No current image!\r\n", __FILE__, __LINE__);
-              free(buffer);
-              buffer = nullptr;
-              return HTTPS_WRONG_IMAGE_FORMAT;
-            }
-
-            if (filesystem_file_exists("/current.bmp")) {
-              Log.info("%s [%d]: send_to_me BMP\r\n", __FILE__, __LINE__);
-              buffer = (uint8_t *)malloc(DISPLAY_BMP_IMAGE_SIZE);
-
-              if (!filesystem_read_from_file("/current.bmp", buffer, DISPLAY_BMP_IMAGE_SIZE)) {
-                Log.info("%s [%d]: Error reading image!\r\n", __FILE__, __LINE__);
-                free(buffer);
-                buffer = nullptr;
-                submit_log("Error reading image!");
-                return HTTPS_WRONG_IMAGE_FORMAT;
-              }
-              
-              bmp_err_e bmp_parse_result = parseBMPHeader(buffer, image_reverse);
-              if (bmp_parse_result != BMP_NO_ERR) {
-                Log.info("%s [%d]: Error parsing BMP header, code: %d\r\n", __FILE__, __LINE__, bmp_parse_result);
-                free(buffer);
-                buffer = nullptr;
-                submit_log("Error parsing BMP header, code: %d", bmp_parse_result);
-                return HTTPS_WRONG_IMAGE_FORMAT;
-              }
-            }
-            else if (filesystem_file_exists("/current.png")) {
-              Log.info("%s [%d]: send_to_me PNG\r\n", __FILE__, __LINE__);
-              isPNG = true;
-              image_err_e png_parse_result = decodePNG("/current.png", buffer);
-
-              if (png_parse_result != PNG_NO_ERR) {
-                Log.info("%s [%d]: Error parsing PNG header, code: %d\r\n", __FILE__, __LINE__, png_parse_result);
-                free(buffer);
-                buffer = nullptr;
-                submit_log("Error parsing PNG header, code: %d", png_parse_result);
-                return HTTPS_WRONG_IMAGE_FORMAT;
-              }
-            }
-
-            Log.info("Showing image\n\r");
-            display_show_image(buffer, image_reverse, isPNG);
-            need_to_refresh_display = 1;
-
-            free(buffer);
-            buffer = nullptr;
-          }
-          else
-          {
-            Log.error("%s [%d]: send_to_me failed\r\n", __FILE__, __LINE__);
-          }
-        }
-        break;
-        default:
-          break;
-        }
-      }
-      break;
-      case 202:
-      {
-        result = HTTPS_NO_REGISTER;
-        Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
-        size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
-        Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
-        status = false;
-      }
-      break;
-      case 500:
-      {
-        result = HTTPS_RESET;
-        Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
-        size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
-        Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
-        status = false;
-      }
-      break;
-
-      default:
-        break;
-      }
-    }
+    handleApiDisplayResponse(apiResponse);
 
     if (status && !update_firmware && !reset_firmware)
     {
@@ -1258,12 +807,11 @@ static https_request_err_e downloadAndShow()
         free(buffer);
         buffer = nullptr;
         Log.info("%s [%d]: Decoding png\r\n", __FILE__, __LINE__);
-
         png_res = decodePNG("/current.png",decodedPng);
       }
       else{
         bmp_res = parseBMPHeader(buffer, image_reverse);
-        Log.info("Res:%d\n",bmp_res);
+        Log.info("%s [%d]: BMP Parsing result: %d\r\n", __FILE__, __LINE__, bmp_res);
       }
       Serial.println();
       String error = "";
@@ -1280,7 +828,7 @@ static https_request_err_e downloadAndShow()
           display_show_image(imagePointer,image_reverse, isPNG);
   
           // Using filename from API response
-          String new_filename = apiResponse.filename;
+          new_filename = apiResponse.filename;
   
           // Print the extracted string
           Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
@@ -1330,7 +878,7 @@ static https_request_err_e downloadAndShow()
           display_show_image(imagePointer,image_reverse, isPNG);
   
           // Using filename from API response
-          String new_filename = apiResponse.filename;
+          new_filename = apiResponse.filename;
   
           // Print the extracted string
           Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
@@ -1386,6 +934,513 @@ static https_request_err_e downloadAndShow()
     send_log = false;
   }
   Log.info("%s [%d]: Returned result - %d\r\n", __FILE__, __LINE__, result);
+  return result;
+}
+
+https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
+{
+  https_request_err_e result = HTTPS_NO_ERR;
+
+  if (special_function == SF_NONE)
+  {
+    uint64_t request_status = apiResponse.status;
+    Log.info("%s [%d]: status: %d\r\n", __FILE__, __LINE__, request_status);
+    switch (request_status)
+    {
+    case 0:
+    {
+      String image_url = apiResponse.image_url;
+      update_firmware = apiResponse.update_firmware;
+      String firmware_url = apiResponse.firmware_url;
+      uint64_t rate = apiResponse.refresh_rate;
+      reset_firmware = apiResponse.reset_firmware;
+
+      bool sleep_5_seconds = false;
+
+      writeSpecialFunction(apiResponse.special_function);
+
+      if (update_firmware)
+      {
+        Log.info("%s [%d]: update firmware. Check URL\r\n", __FILE__, __LINE__);
+        if (firmware_url.length() == 0)
+        {
+          Log.error("%s [%d]: Empty URL\r\n", __FILE__, __LINE__);
+          update_firmware = false;
+        }
+      }
+      if (image_url.length() > 0)
+      {
+        Log.info("%s [%d]: image_url: %s\r\n", __FILE__, __LINE__, image_url.c_str());
+        Log.info("%s [%d]: image url end with: %d\r\n", __FILE__, __LINE__, image_url.endsWith("/setup-logo.bmp"));
+
+        image_url.toCharArray(filename, image_url.length() + 1);
+        // check if plugin is applied
+        bool flag = preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
+        Log.info("%s [%d]: flag: %d\r\n", __FILE__, __LINE__, flag);
+
+        if (apiResponse.filename == "empty_state")
+        {
+          Log.info("%s [%d]: End with empty_state\r\n", __FILE__, __LINE__);
+          if (!flag)
+          {
+            // draw received logo
+            status = true;
+            // set flag to true
+            if (preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false) != true) // check the flag to avoid the re-writing
+            {
+              bool res = preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, true);
+              if (res)
+                Log.info("%s [%d]: Flag written true successfully\r\n", __FILE__, __LINE__);
+              else
+                Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+            }
+          }
+          else
+          {
+            // don't draw received logo
+            status = false;
+          }
+          // sleep 5 seconds
+          sleep_5_seconds = true;
+        }
+        else
+        {
+          Log.info("%s [%d]: End with NO empty_state\r\n", __FILE__, __LINE__);
+          if (flag)
+          {
+            if (preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false) != false) // check the flag to avoid the re-writing
+            {
+              bool res = preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
+              if (res)
+                Log.info("%s [%d]: Flag written false successfully\r\n", __FILE__, __LINE__);
+              else
+                Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+            }
+          }
+          // Using filename from API response
+          new_filename = apiResponse.filename;
+
+          // Print the extracted string
+          Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
+          if (!checkCurrentFileName(new_filename))
+          {
+            Log.info("%s [%d]: New image. Show it.\r\n", __FILE__, __LINE__);
+            status = true;
+          }
+          else
+          {
+            Log.info("%s [%d]: Old image. No needed to show it.\r\n", __FILE__, __LINE__);
+            status = false;
+            result = HTTPS_SUCCESS;
+          }
+        }
+      }
+      Log.info("%s [%d]: update_firmware: %d\r\n", __FILE__, __LINE__, update_firmware);
+      if (firmware_url.length() > 0)
+      {
+        Log.info("%s [%d]: firmware_url: %s\r\n", __FILE__, __LINE__, firmware_url.c_str());
+        firmware_url.toCharArray(binUrl, firmware_url.length() + 1);
+      }
+      Log.info("%s [%d]: refresh_rate: %d\r\n", __FILE__, __LINE__, rate);
+      if (rate != preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP))
+      {
+        Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, rate);
+        size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, rate);
+        Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+      }
+
+      if (reset_firmware)
+      {
+        Log.info("%s [%d]: Reset status is true\r\n", __FILE__, __LINE__);
+      }
+
+      if (update_firmware)
+        result = HTTPS_SUCCESS;
+      if (reset_firmware)
+        result = HTTPS_RESET;
+      if (sleep_5_seconds)
+        result = HTTPS_PLUGIN_NOT_ATTACHED;
+      Log.info("%s [%d]: result - %d\r\n", __FILE__, __LINE__, result);
+    }
+    break;
+    case 202:
+    {
+      result = HTTPS_NO_REGISTER;
+      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
+      size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
+      Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+      status = false;
+    }
+    break;
+    case 500:
+    {
+      result = HTTPS_RESET;
+      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
+      size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
+      Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+      status = false;
+    }
+    break;
+
+    default:
+      break;
+    }
+  }
+  else if (special_function != SF_NONE)
+  {
+    uint64_t request_status = apiResponse.status;
+    Log.info("%s [%d]: status: %d\r\n", __FILE__, __LINE__, request_status);
+    switch (request_status)
+    {
+    case 0:
+    {
+      switch (special_function)
+      {
+      case SF_IDENTIFY:
+      {
+        String action = apiResponse.action;
+        if (action.equals("identify"))
+        {
+          Log.info("%s [%d]:Identify success\r\n", __FILE__, __LINE__);
+          String image_url = apiResponse.image_url;
+          if (image_url.length() > 0)
+          {
+            Log.info("%s [%d]: image_url: %s\r\n", __FILE__, __LINE__, image_url.c_str());
+            Log.info("%s [%d]: image url end with: %d\r\n", __FILE__, __LINE__, image_url.endsWith("/setup-logo.bmp"));
+
+            image_url.toCharArray(filename, image_url.length() + 1);
+            // check if plugin is applied
+            bool flag = preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
+            Log.info("%s [%d]: flag: %d\r\n", __FILE__, __LINE__, flag);
+
+            if (apiResponse.filename == "empty_state")
+            {
+              Log.info("%s [%d]: End with empty_state\r\n", __FILE__, __LINE__);
+              if (!flag)
+              {
+                // draw received logo
+                status = true;
+                // set flag to true
+                if (preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false) != true) // check the flag to avoid the re-writing
+                {
+                  bool res = preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, true);
+                  if (res)
+                    Log.info("%s [%d]: Flag written true successfully\r\n", __FILE__, __LINE__);
+                  else
+                    Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                }
+              }
+              else
+              {
+                // don't draw received logo
+                status = false;
+              }
+            }
+            else
+            {
+              Log.info("%s [%d]: End with NO empty_state\r\n", __FILE__, __LINE__);
+              if (flag)
+              {
+                if (preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false) != false) // check the flag to avoid the re-writing
+                {
+                  bool res = preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
+                  if (res)
+                    Log.info("%s [%d]: Flag written false successfully\r\n", __FILE__, __LINE__);
+                  else
+                    Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                }
+              }
+              status = true;
+            }
+          }
+        }
+        else
+        {
+          Log.error("%s [%d]: identify failed\r\n", __FILE__, __LINE__);
+        }
+      }
+      break;
+      case SF_SLEEP:
+      {
+        String action = apiResponse.action;
+        if (action.equals("sleep"))
+        {
+          uint64_t rate = apiResponse.refresh_rate;
+          Log.info("%s [%d]: refresh_rate: %d\r\n", __FILE__, __LINE__, rate);
+          if (rate != preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP))
+          {
+            Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, rate);
+            size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, rate);
+            Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+          }
+          status = false;
+          result = HTTPS_SUCCESS;
+          Log.info("%s [%d]: sleep success\r\n", __FILE__, __LINE__);
+        }
+        else
+        {
+          Log.error("%s [%d]: sleep failed\r\n", __FILE__, __LINE__);
+          // need to add error
+        }
+      }
+      break;
+      case SF_ADD_WIFI:
+      {
+        String action = apiResponse.action;
+        if (action.equals("add_wifi"))
+        {
+          status = false;
+          result = HTTPS_SUCCESS;
+          Log.info("%s [%d]: Add wifi success\r\n", __FILE__, __LINE__);
+        }
+        else
+        {
+          Log.error("%s [%d]: Add wifi failed\r\n", __FILE__, __LINE__);
+        }
+      }
+      break;
+      case SF_RESTART_PLAYLIST:
+      {
+        String action = apiResponse.action;
+        if (action.equals("restart_playlist"))
+        {
+          Log.info("%s [%d]:Restart playlist success\r\n", __FILE__, __LINE__);
+          String image_url = apiResponse.image_url;
+          if (image_url.length() > 0)
+          {
+            Log.info("%s [%d]: image_url: %s\r\n", __FILE__, __LINE__, image_url.c_str());
+            Log.info("%s [%d]: image url end with: %d\r\n", __FILE__, __LINE__, image_url.endsWith("/setup-logo.bmp"));
+
+            image_url.toCharArray(filename, image_url.length() + 1);
+            // check if plugin is applied
+            bool flag = preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
+            Log.info("%s [%d]: flag: %d\r\n", __FILE__, __LINE__, flag);
+
+            if (apiResponse.filename == "empty_state")
+            {
+              Log.info("%s [%d]: End with empty_state\r\n", __FILE__, __LINE__);
+              if (!flag)
+              {
+                // draw received logo
+                status = true;
+                // set flag to true
+                if (preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false) != true) // check the flag to avoid the re-writing
+                {
+                  bool res = preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, true);
+                  if (res)
+                    Log.info("%s [%d]: Flag written true successfully\r\n", __FILE__, __LINE__);
+                  else
+                    Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                }
+              }
+              else
+              {
+                // don't draw received logo
+                status = false;
+              }
+            }
+            else
+            {
+              Log.info("%s [%d]: End with NO empty_state\r\n", __FILE__, __LINE__);
+              if (flag)
+              {
+                if (preferences.getBool(PREFERENCES_DEVICE_REGISTERED_KEY, false) != false) // check the flag to avoid the re-writing
+                {
+                  bool res = preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
+                  if (res)
+                    Log.info("%s [%d]: Flag written false successfully\r\n", __FILE__, __LINE__);
+                  else
+                    Log.error("%s [%d]: FLag writing failed\r\n", __FILE__, __LINE__);
+                }
+              }
+              status = true;
+            }
+          }
+        }
+        else
+        {
+          Log.error("%s [%d]: identify failed\r\n", __FILE__, __LINE__);
+        }
+      }
+      break;
+      case SF_REWIND:
+      {
+        String action = apiResponse.action;
+        if (action.equals("rewind"))
+        {
+          bool isPNG = false;
+          status = false;
+          result = HTTPS_SUCCESS;
+          Log.info("%s [%d]: rewind success\r\n", __FILE__, __LINE__);
+
+          bool image_reverse = false;
+          bool file_check_bmp = true;
+          image_err_e image_proccess_response = PNG_WRONG_FORMAT;
+          bmp_err_e bmp_proccess_response = BMP_NOT_BMP;
+
+          // showMessageWithLogo(BMP_FORMAT_ERROR);
+          String last_dot_file = filesystem_file_exists("/last.bmp") ? "/last.bmp" : "/last.png";
+          if (last_dot_file == "/last.bmp")
+          {
+            Log.info("Rewind BMP\n\r");
+            buffer = (uint8_t *)malloc(DISPLAY_BMP_IMAGE_SIZE);
+            file_check_bmp = filesystem_read_from_file(last_dot_file.c_str(), buffer, DISPLAY_BMP_IMAGE_SIZE);
+            bmp_proccess_response = parseBMPHeader(buffer, image_reverse);
+          }
+          else if (last_dot_file == "/last.png")
+          {
+            isPNG = true;
+            Log.info("Rewind PNG\n\r");
+            image_proccess_response = decodePNG(last_dot_file.c_str(), buffer);
+          }
+
+          if (file_check_bmp)
+          {
+            switch (image_proccess_response)
+            {
+            case PNG_NO_ERR:
+            {
+              Log.info("Showing image\n\r");
+              display_show_image(buffer, image_reverse, isPNG);
+              need_to_refresh_display = 1;
+            }
+            break;
+            default:
+            {
+            }
+            break;
+            }
+            switch (bmp_proccess_response)
+            {
+            case BMP_NO_ERR:
+            {
+              Log.info("Showing image\n\r");
+              display_show_image(buffer, image_reverse, isPNG);
+              need_to_refresh_display = 1;
+            }
+            break;
+            default:
+            {
+            }
+            break;
+            }
+          }
+          else
+          {
+            free(buffer);
+            buffer = nullptr;
+            showMessageWithLogo(BMP_FORMAT_ERROR);
+          }
+        }
+        else
+        {
+          Log.error("%s [%d]: rewind failed\r\n", __FILE__, __LINE__);
+        }
+      }
+      break;
+      case SF_SEND_TO_ME:
+      {
+        String action = apiResponse.action;
+
+        if (action.equals("send_to_me"))
+        {
+          bool isPNG = false;
+          status = false;
+          result = HTTPS_SUCCESS;
+          Log.info("%s [%d]: send_to_me success\r\n", __FILE__, __LINE__);
+
+          bool image_reverse = false;
+          image_err_e image_proccess_response = PNG_WRONG_FORMAT;
+
+          if (!filesystem_file_exists("/current.bmp") && !filesystem_file_exists("/current.png"))
+          {
+            Log.info("%s [%d]: No current image!\r\n", __FILE__, __LINE__);
+            free(buffer);
+            buffer = nullptr;
+            return HTTPS_WRONG_IMAGE_FORMAT;
+          }
+
+          if (filesystem_file_exists("/current.bmp"))
+          {
+            Log.info("%s [%d]: send_to_me BMP\r\n", __FILE__, __LINE__);
+            buffer = (uint8_t *)malloc(DISPLAY_BMP_IMAGE_SIZE);
+
+            if (!filesystem_read_from_file("/current.bmp", buffer, DISPLAY_BMP_IMAGE_SIZE))
+            {
+              Log.info("%s [%d]: Error reading image!\r\n", __FILE__, __LINE__);
+              free(buffer);
+              buffer = nullptr;
+              submit_log("Error reading image!");
+              return HTTPS_WRONG_IMAGE_FORMAT;
+            }
+
+            bmp_err_e bmp_parse_result = parseBMPHeader(buffer, image_reverse);
+            if (bmp_parse_result != BMP_NO_ERR)
+            {
+              Log.info("%s [%d]: Error parsing BMP header, code: %d\r\n", __FILE__, __LINE__, bmp_parse_result);
+              free(buffer);
+              buffer = nullptr;
+              submit_log("Error parsing BMP header, code: %d", bmp_parse_result);
+              return HTTPS_WRONG_IMAGE_FORMAT;
+            }
+          }
+          else if (filesystem_file_exists("/current.png"))
+          {
+            Log.info("%s [%d]: send_to_me PNG\r\n", __FILE__, __LINE__);
+            isPNG = true;
+            image_err_e png_parse_result = decodePNG("/current.png", buffer);
+
+            if (png_parse_result != PNG_NO_ERR)
+            {
+              Log.info("%s [%d]: Error parsing PNG header, code: %d\r\n", __FILE__, __LINE__, png_parse_result);
+              free(buffer);
+              buffer = nullptr;
+              submit_log("Error parsing PNG header, code: %d", png_parse_result);
+              return HTTPS_WRONG_IMAGE_FORMAT;
+            }
+          }
+
+          Log.info("Showing image\n\r");
+          display_show_image(buffer, image_reverse, isPNG);
+          need_to_refresh_display = 1;
+
+          free(buffer);
+          buffer = nullptr;
+        }
+        else
+        {
+          Log.error("%s [%d]: send_to_me failed\r\n", __FILE__, __LINE__);
+        }
+      }
+      break;
+      default:
+        break;
+      }
+    }
+    break;
+    case 202:
+    {
+      result = HTTPS_NO_REGISTER;
+      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
+      size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
+      Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+      status = false;
+    }
+    break;
+    case 500:
+    {
+      result = HTTPS_RESET;
+      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
+      size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
+      Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
+      status = false;
+    }
+    break;
+
+    default:
+      break;
+    }
+  }
   return result;
 }
 
@@ -1483,7 +1538,7 @@ static void getDeviceCredentials()
 
               Log.info("%s [%d]: status - %d\r\n", __FILE__, __LINE__, status);
             }
-            else if (url_status == 404 && apiResponse.message == "MAC Address not registered")
+            else if (url_status == 404)
             {
               Log.info("%s [%d]: MAC Address is not registered on server\r\n", __FILE__, __LINE__);
               showMessageWithLogo(MAC_NOT_REGISTERED);
@@ -1983,7 +2038,7 @@ static bool saveCurrentFileName(String &name)
 {
   if (!preferences.getString(PREFERENCES_FILENAME_KEY, "").equals(name))
   {
-    Log.info("%s [%d]: New filename:  - %s\r\n", __FILE__, __LINE__, name);
+    Log.info("%s [%d]: New filename:  - %s\r\n", __FILE__, __LINE__, name.c_str());
     size_t res = preferences.putString(PREFERENCES_FILENAME_KEY, name);
     if (res > 0)
     {
@@ -2073,6 +2128,7 @@ DeviceStatusStamp getDeviceStatusStamp()
   deviceStatus.battery_voltage = readBatteryVoltage();
   parseWakeupReasonToStr(deviceStatus.wakeup_reason, sizeof(deviceStatus.wakeup_reason), esp_sleep_get_wakeup_cause());
   deviceStatus.free_heap_size = ESP.getFreeHeap();
+  deviceStatus.max_alloc_size = ESP.getMaxAllocHeap();
 
   return deviceStatus;
 }
@@ -2092,11 +2148,15 @@ bool SerializeJsonLog(DeviceStatusStamp device_status_stamp, time_t timestamp, i
   json_log["device_status_stamp"]["battery_voltage"] = device_status_stamp.battery_voltage;
   json_log["device_status_stamp"]["wakeup_reason"] = device_status_stamp.wakeup_reason;
   json_log["device_status_stamp"]["free_heap_size"] = device_status_stamp.free_heap_size;
+  json_log["device_status_stamp"]["max_alloc_size"] = device_status_stamp.max_alloc_size;
 
   json_log["log_id"] = log_id;
   json_log["log_message"] = log_message;
   json_log["log_codeline"] = codeline;
   json_log["log_sourcefile"] = source_file;
+
+  json_log["additional_info"]["filename_current"] = preferences.getString(PREFERENCES_FILENAME_KEY, "");
+  json_log["additional_info"]["filename_new"] = new_filename.c_str();
 
   if (log_retry)
   {
