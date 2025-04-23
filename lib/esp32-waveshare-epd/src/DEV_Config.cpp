@@ -30,7 +30,7 @@
 #include "DEV_Config.h"
 #include "SPI.h"
 
-static SPIClass * display_spi = new SPIClass(FSPI);
+static SPIClass * display_spi = new SPIClass(HSPI); // Use HSPI peripheral
 
 void GPIO_Config(void)
 {    
