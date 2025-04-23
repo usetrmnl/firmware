@@ -29,6 +29,7 @@
 #include <SPIFFS.h>
 #include "http_client.h"
 #include <api-client/display.h>
+#include "driver/gpio.h"
 
 bool pref_clear = false;
 String new_filename = "";
@@ -1724,8 +1725,9 @@ static void goToSleep(void)
   preferences.putUInt(PREFERENCES_LAST_SLEEP_TIME, getTime());
   preferences.end();
   esp_sleep_enable_timer_wakeup((uint64_t)time_to_sleep * SLEEP_uS_TO_S_FACTOR);
-  esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT,
-                                    ESP_GPIO_WAKEUP_GPIO_LOW);
+  // Configure GPIO pin for wakeup
+  gpio_wakeup_enable((gpio_num_t)PIN_INTERRUPT, GPIO_INTR_LOW_LEVEL);
+  esp_sleep_enable_gpio_wakeup();
   esp_deep_sleep_start();
 }
 
