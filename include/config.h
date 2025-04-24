@@ -53,6 +53,8 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 #define PIN_INTERRUPT 16
 #define PIN_BATTERY 3
 
+// #define FAKE_BATTERY_VOLTAGE // Uncomment to report 4.2V instead of reading ADC
+
 #define BUTTON_HOLD_TIME 5000
 
 #define SERVER_MAX_RETRIES 3
