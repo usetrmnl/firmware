@@ -1754,8 +1754,14 @@ static void goToSleep(void)
   preferences.end();
   esp_sleep_enable_timer_wakeup((uint64_t)time_to_sleep * SLEEP_uS_TO_S_FACTOR);
   // Configure GPIO pin for wakeup
+#if CONFIG_IDF_TARGET_ESP32
   gpio_wakeup_enable((gpio_num_t)PIN_INTERRUPT, GPIO_INTR_LOW_LEVEL);
   esp_sleep_enable_gpio_wakeup();
+#elif CONFIG_IDF_TARGET_ESP32C3
+  esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
+#else
+  #error "Unsupported ESP32 target for GPIO wakeup configuration"
+#endif
   esp_deep_sleep_start();
 }
 
@@ -1797,6 +1803,10 @@ static bool setClock()
  */
 static float readBatteryVoltage(void)
 {
+#ifdef FAKE_BATTERY_VOLTAGE
+  Log.warning("%s [%d]: FAKE_BATTERY_VOLTAGE is defined. Returning 4.2V.\r\n", __FILE__, __LINE__);
+  return 4.2f;
+#else
   Log.info("%s [%d]: Battery voltage reading...\r\n", __FILE__, __LINE__);
   int32_t adc = 0;
   for (uint8_t i = 0; i < 128; i++)
@@ -1808,6 +1818,7 @@ static float readBatteryVoltage(void)
 
   float voltage = sensorValue / 1000.0;
   return voltage;
+#endif // FAKE_BATTERY_VOLTAGE
 }
 
 /**
