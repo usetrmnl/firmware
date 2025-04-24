@@ -44,12 +44,27 @@
 /**
  * GPIO config
 **/
-#define EPD_SCK_PIN  13 // SCLK -> P13
-#define EPD_MOSI_PIN 14 // DIN -> P14
-#define EPD_CS_PIN   15 // CS -> P15
-#define EPD_RST_PIN  26 // RST -> P26
-#define EPD_DC_PIN   27 // DC -> P27
-#define EPD_BUSY_PIN 25 // BUSY -> P25
+#if defined(BOARD_TRMNL)
+   // Pin definition for TRMNL Board
+   #define EPD_SCK_PIN  7
+   #define EPD_MOSI_PIN 8
+   #define EPD_CS_PIN   6
+   #define EPD_RST_PIN  10
+   #define EPD_DC_PIN   5
+   #define EPD_BUSY_PIN 4
+
+#elif defined(BOARD_WAVESHARE_ESP32_DRIVER)
+   // Pin definition for Waveshare ESP32 Driver Board
+   #define EPD_SCK_PIN  13
+   #define EPD_MOSI_PIN 14
+   #define EPD_CS_PIN   15
+   #define EPD_RST_PIN  26
+   #define EPD_DC_PIN   27
+   #define EPD_BUSY_PIN 25
+
+#else
+   #error "Board type not defined. Please define BOARD_WAVESHARE_ESP32_DRIVER or BOARD_TRMNL in platformio.ini build_flags."
+#endif
 
 #define GPIO_PIN_SET   1
 #define GPIO_PIN_RESET 0

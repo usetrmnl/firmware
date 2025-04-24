@@ -49,8 +49,15 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
     WIFI_THIRD_RETRY = 300
 };
 
+#if defined(BOARD_TRMNL)
+#define PIN_RESET 9
+#define PIN_INTERRUPT 2
+#elif defined(BOARD_WAVESHARE_ESP32_DRIVER)
 #define PIN_RESET 25
 #define PIN_INTERRUPT 16
+#define FAKE_BATTERY_VOLTAGE
+#endif
+
 #define PIN_BATTERY 3
 
 // #define FAKE_BATTERY_VOLTAGE // Uncomment to report 4.2V instead of reading ADC
