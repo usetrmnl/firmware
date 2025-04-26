@@ -328,7 +328,7 @@ void bl_init(void)
     preferences.putInt(PREFERENCES_CONNECT_API_RETRY_COUNT, 1);
   }
 
-  if (request_result != HTTPS_SUCCESS && request_result != HTTPS_NO_REGISTER && request_result != HTTPS_RESET && request_result != HTTPS_PLUGIN_NOT_ATTACHED)
+  if (request_result != HTTPS_SUCCESS && request_result != HTTPS_NO_ERR && request_result != HTTPS_NO_REGISTER && request_result != HTTPS_RESET && request_result != HTTPS_PLUGIN_NOT_ATTACHED)
   {
     uint8_t retries = preferences.getInt(PREFERENCES_CONNECT_API_RETRY_COUNT);
 
