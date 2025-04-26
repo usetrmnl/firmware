@@ -1,14 +1,15 @@
+#include <PNGdec.h>
+#include <SPIFFS.h>
 #include <png.h>
 #include <trmnl_log.h>
-#include <PNGdec.h>
-#include <esp_mac.h>
-#include <SPIFFS.h>
+#include <GUI_Paint.h>
 
-File pngfile;  // Global file handle
 
-void* pngOpen(const char* filename, int32_t* size) {
+File pngfile; // Global file handle
+
+void *pngOpen(const char *filename, int32_t *size) {
   Serial.printf("Attempting to open %s from SPIFFS\n", filename);
-  pngfile = SPIFFS.open(filename, "r");  
+  pngfile = SPIFFS.open(filename, "r");
 
   if (!pngfile) {
     Serial.println("Failed to open file!");
@@ -20,20 +21,22 @@ void* pngOpen(const char* filename, int32_t* size) {
   return &pngfile;
 }
 
-void pngClose(void* handle) {
+void pngClose(void *handle) {
   if (pngfile) {
     pngfile.close();
   }
 }
 
-int32_t pngRead(PNGFILE* page, uint8_t* buffer, int32_t length) {
-  if (!pngfile) return 0;
-  (void)page;  // suppress unused warning
+int32_t pngRead(PNGFILE *page, uint8_t *buffer, int32_t length) {
+  if (!pngfile)
+    return 0;
+  (void)page; // suppress unused warning
   return pngfile.read(buffer, length);
 }
 
-int32_t pngSeek(PNGFILE* page, int32_t position) {
-  if (!pngfile) return 0;
+int32_t pngSeek(PNGFILE *page, int32_t position) {
+  if (!pngfile)
+    return 0;
   (void)page;
   return pngfile.seek(position);
 }
@@ -44,91 +47,68 @@ int32_t pngSeek(PNGFILE* page, int32_t position) {
  * @return image_err_e error code
  */
 
- image_err_e decodePNG(const char *szFilename, uint8_t* &decoded_buffer){
-    PNG* png = new PNG();
+ trmnl_bitmap* decodePNGFromFile(const char *szFilename, trmnl_error* error) {
+  PNG png;
 
-    if(!png) return PNG_MALLOC_FAILED;
+  int rc = png.open(szFilename, pngOpen, pngClose, pngRead, pngSeek, nullptr);
+  if (rc == PNG_INVALID_FILE) {
+    *error = IMAGE_FORMAT_UNEXPECTED_SIGNATURE;
+    return nullptr;
+  }
 
-    int rc = png->open(szFilename, pngOpen, pngClose, pngRead, pngSeek, nullptr);
+  uint32_t width = png.getWidth();
+  uint32_t height = png.getHeight();
+  uint32_t bpp = png.getBpp();
 
-    if(rc == PNG_INVALID_FILE)
-    {
-      Log.error("WRONG_FILE\n\r");
-        delete png;
-        return PNG_WRONG_FORMAT;
-    }
+  trmnl_bitmap *bitmap = bitmap_create(width, height, bpp, stride_8(width, bpp), WHITE);
+  if (bitmap == nullptr) { 
+    *error = IMAGE_CREATION_FAILED;
+    return nullptr;
+  }             
+  png.setBuffer(bitmap->data);
 
-    if(!(decoded_buffer = (uint8_t *)malloc(48000)))
-    {
-      Log.error("PNG MALLOC FAILED\n");
-      delete png;
-      return PNG_MALLOC_FAILED;
-    }
-    png->setBuffer(decoded_buffer);
-    
-    uint32_t width = png->getWidth();
-    uint32_t height = png->getHeight();
-    uint32_t bpp = png->getBpp();
-
-    if (width != 800 || height != 480 || bpp != 1){
-        Log.error("PNG_BAD_SIZE\n");
-        delete png;
-        return PNG_BAD_SIZE;
-    }
-
-    if(!(png->decode(nullptr, 0))){
-      Log.error("PNG_SUCCESS\n");
-      delete png;
-      return PNG_NO_ERR;
-    }
-    Log.error("PNG_DECODE_ERR\n");
-    delete png;
-    return PNG_DECODE_ERR;
- }
-
- /**
- * @brief Function to decode png from buffer
- * @param buffer pointer to the buffer
- * @param decodded_buffer Buffer where decoded PNG bitmap save
- * @return image_err_e error code
- */
-image_err_e decodePNG(uint8_t* buffer, uint8_t* &decoded_buffer){
-    PNG* png = new PNG();
-
-    if(!png) return PNG_MALLOC_FAILED;
-
-    int rc = png->openRAM(buffer, 48000, nullptr);
-
-    if(rc == PNG_INVALID_FILE)
-    {
-        delete png;
-        return PNG_WRONG_FORMAT;
-    }
-
-    if(!(decoded_buffer = (uint8_t *)malloc(48000)))
-    {
-      Log.error("PNG MALLOC FAILED\n");
-      delete png;
-      return PNG_MALLOC_FAILED;
-    }
-    png->setBuffer(decoded_buffer);
-    
-    uint32_t width = png->getWidth();
-    uint32_t height = png->getHeight();
-    uint32_t bpp = png->getBpp();
-
-    if (width != 800 || height != 480 || bpp != 1){
-        Log.error("PNG_BAD_SIZE\n");
-        delete png;
-        return PNG_BAD_SIZE;
-    }
-
-    if(!(png->decode(nullptr, 0))){
-      Log.error("PNG_SUCCESS\n");
-      delete png;
-      return PNG_NO_ERR;
-    }
-    Log.error("PNG_DECODE_ERR\n");
-    delete png;
-    return PNG_DECODE_ERR;
+  if (!(png.decode(nullptr, 0))) {
+    Log.error("PNG_SUCCESS\n");
+    *error = NO_ERROR;
+    return bitmap;
+  }
+  Log.error("PNG_DECODE_ERR\n");
+  *error = IMAGE_DECODE_FAIL;
+  return nullptr;
 }
+
+/** 
+ */
+trmnl_bitmap* decodePNGFromMemory(const uint8_t *bufferin, uint32_t bufferin_size, trmnl_error* error)  {
+  PNG png;
+
+  int rc = png.openRAM((uint8_t*)bufferin, bufferin_size, nullptr);
+
+  if (rc == PNG_INVALID_FILE) {
+    *error = IMAGE_FORMAT_UNEXPECTED_SIGNATURE;
+    return nullptr;
+  }
+
+  uint32_t width = png.getWidth();
+  uint32_t height = png.getHeight();
+  uint32_t bpp = png.getBpp();
+
+  trmnl_bitmap *bitmap = bitmap_create(width, height, bpp, stride_8(width, bpp), WHITE);
+  if (bitmap == nullptr) {
+    *error = IMAGE_CREATION_FAILED;
+    return nullptr;
+  }
+  png.setBuffer(bitmap->data);
+
+  if (!(png.decode(nullptr, 0))) {
+    Log.error("PNG_SUCCESS\n");
+    *error = NO_ERROR;
+    return bitmap;
+  }
+  Log.error("PNG_DECODE_ERR\n");
+  *error = IMAGE_DECODE_FAIL;
+  return nullptr; 
+  }
+
+uint8_t *encodePNG(trmnl_bitmap *bitmap, uint32_t *size) { *size = 0; return nullptr; }
+uint32_t encodePNG(trmnl_bitmap *bitmap, const char *filename) { return 0; }

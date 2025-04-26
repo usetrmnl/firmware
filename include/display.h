@@ -2,6 +2,7 @@
 #define DISPLAY_H
 
 #include <Arduino.h>
+#include <image.h>
 
 enum MSG {
   NONE,
@@ -46,25 +47,24 @@ uint16_t display_height();
  */
 uint16_t display_width();
 
-/**
- * @brief Function to show the image on the display
- * @param image_buffer pointer to the uint8_t image buffer
- * @param reverse shows if the color scheme is reverse 
- * @return none
- */
-void display_show_image(uint8_t * image_buffer, bool reverse, bool isPNG);
+void display_show_bitmap(trmnl_bitmap* bitmap, bool flip = false, bool reverse = false);
+
+// shows image with overlay text
+void display_show_debug(const uint8_t *text);
+void debug_clear_display(uint8_t color);
+void debug_free_resources();
 
 /**
  * @brief Function to show the image with message on the display
- * @param image_buffer pointer to the uint8_t image buffer
+ * @param bitmap pointer to the bitmap
  * @param message_type type of message that will show on the screen
  * @return none
  */
-void display_show_msg(uint8_t * image_buffer, MSG message_type);
+void display_show_msg(trmnl_bitmap* bitmap, MSG message_type);
 
 /**
  * @brief Function to show the image with message on the display
- * @param image_buffer pointer to the uint8_t image buffer
+ * @param bitmap pointer to the bitmap
  * @param message_type type of message that will show on the screen
  * @param friendly_id device friendly ID
  * @param id shows if ID exists
@@ -72,7 +72,7 @@ void display_show_msg(uint8_t * image_buffer, MSG message_type);
  * @param message additional message
  * @return none
  */
-void display_show_msg(uint8_t * image_buffer, MSG message_type, String friendly_id, bool id, const char * fw_version, String message);
+void display_show_msg(trmnl_bitmap* bitmap, MSG message_type, String friendly_id, bool id, const char * fw_version, String message);
 
 /**
  * @brief Function to got the display to the sleep
