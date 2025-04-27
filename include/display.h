@@ -75,6 +75,21 @@ void display_show_msg(uint8_t * image_buffer, MSG message_type);
 void display_show_msg(uint8_t * image_buffer, MSG message_type, String friendly_id, bool id, const char * fw_version, String message);
 
 /**
+ * @brief Function to split and draw fragments of API response message on display
+ * @param message message text from API response
+ * @return none
+ */
+void paint_multi_line_text(const char *message);
+
+/**
+ * @brief Function to show the image with API response message on the display
+ * @param image_buffer pointer to the uint8_t image buffer
+ * @param message message text from API response
+ * @return none
+ */
+void display_show_api_msg(uint8_t *image_buffer, String message);
+
+/**
  * @brief Function to got the display to the sleep
  * @param none
  * @return none

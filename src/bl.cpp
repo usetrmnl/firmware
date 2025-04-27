@@ -71,6 +71,7 @@ static void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size);
 static uint32_t getTime(void);
 static void showMessageWithLogo(MSG message_type);
 static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message);
+static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse);
 static void wifiErrorDeepSleep();
 static uint8_t *storedLogoOrDefault(void);
 static bool saveCurrentFileName(String &name);
@@ -1458,10 +1459,7 @@ static void getDeviceCredentials()
             {
                 Log.info("%s [%d]: MAC Address is not registered on server\r\n", __FILE__, __LINE__);
 
-                // message contains device MAC addr
-                String message_str = apiResponse.message;
-
-                showMessageWithLogo(MAC_NOT_REGISTERED, "", false, "", message_str);
+                showMessageWithLogo(MAC_NOT_REGISTERED, apiResponse);
 
                 preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
 
@@ -1920,6 +1918,23 @@ static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, c
 {
   buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
   display_show_msg(storedLogoOrDefault(), message_type, friendly_id, id, fw_version, message);
+  free(buffer);
+  buffer = nullptr;
+
+  need_to_refresh_display = 1;
+  preferences.putBool(PREFERENCES_DEVICE_REGISTERED_KEY, false);
+}
+
+/**
+ * @brief Show a message with the logo using data from API setup response
+ * @param message_type Type of message to display
+ * @param apiResponse The API setup response containing the message
+ * @return none
+ */
+static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse)
+{
+  buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
+  display_show_api_msg(storedLogoOrDefault(), apiResponse.message);
   free(buffer);
   buffer = nullptr;
 
