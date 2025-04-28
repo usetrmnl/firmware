@@ -1,16 +1,11 @@
 #include <cstdint>
+#include <image.h>
+#include <trmnl_errors.h>
 
-enum image_err_e
-{
-  PNG_BAD_SIZE,
-  PNG_WRONG_FORMAT,
-  PNG_NO_ERR,
-  PNG_DECODE_ERR,
-  PNG_MALLOC_FAILED,
-  PNG_FS_ERROR,
-  PNG_FILE_NOT_FOUND
-};
+trmnl_bitmap* decodePNGFromFile(const char *szFilename, trmnl_error* error);
 
-image_err_e decodePNG(const char *szFilename, uint8_t* &decoded_buffer);
+trmnl_bitmap* decodePNGFromMemory(const uint8_t *bufferin, uint32_t bufferin_size,
+  trmnl_error* error);
 
-image_err_e decodePNG(uint8_t* buffer, uint8_t* &decoded_buffer);
+uint8_t *encodePNG(trmnl_bitmap *bitmap, uint32_t *size);
+uint32_t encodePNG(trmnl_bitmap *bitmap, const char *filename);

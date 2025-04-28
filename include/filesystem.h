@@ -1,6 +1,8 @@
 #pragma once
 
 #include <Arduino.h>
+#include <stdint.h>
+#include <trmnl_errors.h>
 
 /**
  * @brief Function to init the filesystem
@@ -16,29 +18,17 @@ bool filesystem_init(void);
  */
 void filesystem_deinit(void);
 
-/**
- * @brief Function to read data from file
- * @param name filename
- * @param out_buffer pointer to output buffer
- * @return result - true if success; false - if failed
- */
-bool filesystem_read_from_file(const char *name, uint8_t *out_buffer, size_t size);
+uint8_t* filesystem_read_file(const char *name, uint32_t *size, trmnl_error* error);
 
-/**
- * @brief Function to write data to file
- * @param name filename
- * @param in_buffer pointer to input buffer
- * @param size size of the input buffer
- * @return result - true if success; false - if failed
- */
-size_t filesystem_write_to_file(const char *name, uint8_t *in_buffer, size_t size);
+// writes the whole buffer in  file
+trmnl_error filesystem_write_file(const char *name, const uint8_t *in_buffer, size_t size);
 
 /**
  * @brief Function to check if file exists
  * @param name filename
  * @return result - true if exists; false - if not exists
  */
-bool filesystem_file_exists(const char *name);
+bool filesystem_file_exists(const char *name, uint32_t* size = nullptr);
 
 /**
  * @brief Function to delete the file
@@ -54,3 +44,10 @@ bool filesystem_file_delete(const char *name);
  * @return result - true if success; false - if failed
  */
 bool filesystem_file_rename(const char *old_name, const char *new_name);
+
+bool filesystem_open_write_file(const char *name);
+bool filesystem_open_read_file(const char *name);
+bool filesystem_write_to_file(const uint8_t *in_buffer, uint32_t* size);
+bool filesystem_read_from_file(uint8_t *out_buffer, uint32_t* size);
+bool filesystem_close_write_file();
+bool filesystem_close_read_file();
