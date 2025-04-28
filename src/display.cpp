@@ -100,7 +100,10 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
         Paint_DrawBitMap(image_buffer);
     }
     else{
-        Paint_DrawBitMap(image_buffer + 62);
+        // Get the offset of the pixel data
+    uint32_t dataOffset = *(uint32_t *)&image_buffer[10];
+
+        Paint_DrawBitMap(image_buffer + dataOffset);
     }
     EPD_7IN5_V2_Display(BlackImage);
     Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
