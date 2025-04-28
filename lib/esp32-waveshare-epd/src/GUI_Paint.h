@@ -216,6 +216,24 @@ void Paint_DrawTime(UWORD Xstart, UWORD Ystart, PAINT_TIME *pTime, sFONT* Font, 
 void Paint_DrawBitMap(const unsigned char* image_buffer);
 void Paint_DrawImage(const unsigned char *image_buffer, UWORD xStart, UWORD yStart, UWORD W_Image, UWORD H_Image); 
 
+/**
+ * @brief Function to draw multi-line text onto the display
+ * @param x_start X coordinate to start drawing
+ * @param y_start Y coordinate to start drawing
+ * @param message Text message to draw
+ * @param max_width Maximum width in pixels for each line
+ * @param font_width Width of a single character in pixels
+ * @param color_fg Foreground color
+ * @param color_bg Background color
+ * @param font Font to use
+ * @param is_center_aligned If true, center the text; if false, left-align
+ * @return none
+ */
+void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
+                           uint16_t max_width, uint16_t font_width,
+                           UWORD color_fg, UWORD color_bg, sFONT *font,
+                           bool is_center_aligned);
+
 #endif
 
 

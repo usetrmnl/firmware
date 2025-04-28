@@ -8,169 +8,6 @@
 #include <config.h>
 #include <ImageData.h>
 
-#define MAX_LINES 4
-#define FONT_WIDTH 17 // From Font24 def
-#define MAX_LINE_LENGTH EPD_7IN5_V2_WIDTH / FONT_WIDTH
-
-// Structure to hold the result of text splitting
-struct TextLines
-{
-    char lines[MAX_LINES][MAX_LINE_LENGTH + 1];
-    int line_count;
-    uint16_t x_offsets[MAX_LINES]; // Store the x-offset for each line to center it
-};
-
-/**
- * @brief Splits the input text into multiple lines based on max_width.
- * @param text The input text to split.
- * @param max_width The maximum width in pixels for each line.
- * @param font_width The width of a single character in pixels (e.g., 17 for Font24).
- * @return TextLines A structure containing an array of lines and the line count.
- */
-TextLines split_text_to_lines(const char *text, uint16_t max_width, uint16_t font_width)
-{
-    TextLines result = {{{0}}, 0, {0}};
-
-    uint16_t display_width_pixels = max_width;
-    int max_chars_per_line = display_width_pixels / font_width;
-
-    int text_len = strlen(text);
-    int current_width = 0;
-    int line_index = 0;
-    int line_pos = 0;
-    int word_start = 0;
-    int i = 0;
-    char word_buffer[MAX_LINE_LENGTH + 1] = {0};
-    int word_length = 0;
-
-    while (i <= text_len && line_index < MAX_LINES)
-    {
-        word_length = 0;
-        word_start = i;
-
-        // Skip leading spaces
-        while (i < text_len && text[i] == ' ')
-        {
-            i++;
-        }
-        word_start = i;
-
-        // Find end of word or end of text
-        while (i < text_len && text[i] != ' ')
-        {
-            i++;
-        }
-
-        word_length = i - word_start;
-        if (word_length > max_chars_per_line)
-        {
-            word_length = max_chars_per_line; // Truncate if word is too long
-        }
-
-        if (word_length > 0)
-        {
-            strncpy(word_buffer, text + word_start, word_length);
-            word_buffer[word_length] = '\0';
-        }
-        else
-        {
-            i++;
-            continue;
-        }
-
-        int word_width = word_length * font_width;
-
-        // Check if adding the word exceeds max_width
-        if (current_width + word_width + (current_width > 0 ? font_width : 0) <= display_width_pixels)
-        {
-            // Add space before word if not the first word in the line
-            if (current_width > 0 && line_pos < max_chars_per_line - 1)
-            {
-                result.lines[line_index][line_pos++] = ' ';
-                current_width += font_width;
-            }
-
-            // Add word to current line
-            if (line_pos + word_length <= max_chars_per_line)
-            {
-                strcpy(&result.lines[line_index][line_pos], word_buffer);
-                line_pos += word_length;
-                current_width += word_width;
-            }
-        }
-        else
-        {
-            // Current line is full, start a new line
-            if (line_pos > 0)
-            {
-                result.lines[line_index][line_pos] = '\0'; // Null-terminate the current line
-                // Calculate the x-offset for centering this line
-                int line_width = strlen(result.lines[line_index]) * font_width;
-                result.x_offsets[line_index] = (display_width_pixels - line_width) / 2;
-                line_index++;
-                result.line_count++;
-
-                if (line_index >= MAX_LINES)
-                {
-                    break; // No more lines available to write, text too long
-                }
-
-                // Start new line with this word
-                strncpy(result.lines[line_index], word_buffer, word_length);
-                line_pos = word_length;
-                current_width = word_width;
-            }
-            else
-            {
-                // Handle case where a single word is too long for a line
-                strncpy(result.lines[line_index], word_buffer, max_chars_per_line);
-                result.lines[line_index][max_chars_per_line] = '\0';
-                // Calculate the x-offset for centering this line
-                int line_width = strlen(result.lines[line_index]) * font_width;
-                result.x_offsets[line_index] = (display_width_pixels - line_width) / 2;
-                line_index++;
-                result.line_count++;
-                line_pos = 0;
-                current_width = 0;
-            }
-        }
-
-        // Move to next word
-        if (text[i] == ' ')
-        {
-            i++;
-        }
-    }
-
-    // Store the last line if it exists
-    if (line_pos > 0 && line_index < MAX_LINES)
-    {
-        result.lines[line_index][line_pos] = '\0'; // Null-terminate the last line
-        // Calculate the x-offset for centering this line
-        int line_width = strlen(result.lines[line_index]) * font_width;
-        result.x_offsets[line_index] = (display_width_pixels - line_width) / 2;
-        result.line_count++;
-    }
-
-    return result;
-}
-
-/**
- * @brief Function to split and draw fragments of API response message on display
- * @param message message text from API response
- * @return none
- */
-void paint_multi_line_text(const char *message) {
-    TextLines result = split_text_to_lines(message, display_width(), FONT_WIDTH);
-
-    // Pre-computed draw heights for 4 line messages on 480px height screen
-    uint16_t drawHeights[MAX_LINES] = {340, 370, 400, 430};
-    for (int i = 0; i < result.line_count; i++)
-    {
-        Paint_DrawString_EN(result.x_offsets[i], drawHeights[i], result.lines[i], &Font24, WHITE, BLACK);
-    }
-}
-
 /**
  * @brief Function to init the display
  * @param none
@@ -478,48 +315,15 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         Paint_DrawImage(wifi_connect_qr, 640, 337, 130, 130);
     }
     break;
+    case MAC_NOT_REGISTERED:
+    {
+        UWORD y_start = 340;
+        Paint_DrawMultilineText(0, y_start, message.c_str(), width, Font24.Width, WHITE, BLACK, &Font24, true);
+    }
+    break;
     default:
         break;
     }
-    Log.info("%s [%d]: Start drawing...\r\n", __FILE__, __LINE__);
-    EPD_7IN5_V2_Display(BlackImage);
-    Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
-    free(BlackImage);
-    BlackImage = NULL;
-}
-
-/**
- * @brief Function to show the image with API response message on the display
- * @param image_buffer pointer to the uint8_t image buffer
- * @param message message text from API response
- * @return none
- */
-void display_show_msg_api(uint8_t *image_buffer, String message)
-{
-    auto width = display_width();
-    auto height = display_height();
-
-    UBYTE *BlackImage;
-    /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
-    UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
-    Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
-    Log.error("%s [%d]: free alloc heap - %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
-    if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
-    {
-        Log.fatal("%s [%d]: Failed to apply for black memory...\r\n", __FILE__, __LINE__);
-        ESP.restart();
-    }
-
-    Log.info("%s [%d]: Paint_NewImage\r\n", __FILE__, __LINE__);
-    Paint_NewImage(BlackImage, width, height, 0, WHITE);
-
-    Log.info("%s [%d]: show image for array\r\n", __FILE__, __LINE__);
-    Paint_SelectImage(BlackImage);
-    Paint_Clear(WHITE);
-    Paint_DrawBitMap(image_buffer + 62);
-
-    paint_multi_line_text(message.c_str());
-
     Log.info("%s [%d]: Start drawing...\r\n", __FILE__, __LINE__);
     EPD_7IN5_V2_Display(BlackImage);
     Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
