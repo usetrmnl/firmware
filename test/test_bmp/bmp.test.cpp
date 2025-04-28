@@ -111,7 +111,7 @@ void test_parseBMPHeader_BMP_INVALID_OFFSET(void)
 
   bmp_data[10] = 5;
 
-  TEST_ASSERT_EQUAL(BMP_INVALID_TYPE, parseBMPHeader(bmp_data.data(), image_reverse));
+  TEST_ASSERT_EQUAL(BMP_INVALID_OFFSET, parseBMPHeader(bmp_data.data(), image_reverse));
 }
 
 void setUp(void) {
