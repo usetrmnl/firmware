@@ -71,6 +71,7 @@ static void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size);
 static uint32_t getTime(void);
 static void showMessageWithLogo(MSG message_type);
 static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, const char *fw_version, String message);
+static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse);
 static void wifiErrorDeepSleep();
 static uint8_t *storedLogoOrDefault(void);
 static bool saveCurrentFileName(String &name);
