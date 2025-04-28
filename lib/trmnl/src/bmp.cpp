@@ -28,7 +28,7 @@ bmp_err_e parseBMPHeader(uint8_t *data, bool &reversed)
   if (width != 800 || height != 480 || bitsPerPixel != 1 || imageDataSize != 48000 || colorTableEntries != 2)
     return BMP_BAD_SIZE;
 
-    if (biSize != 40 || biSize != 108 || biSize != 124)
+    if (biSize != 40 && biSize != 108 && biSize != 124)
     return BMP_INVALID_TYPE;
   // Get the offset of the pixel data
   uint32_t dataOffset = *(uint32_t *)&data[10];
