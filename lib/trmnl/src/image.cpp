@@ -35,6 +35,7 @@ trmnl_bitmap *bitmap_create(uint32_t width, uint32_t height, uint8_t bpp,
 
   bitmap->data = (uint8_t *)malloc(datasize);
   if (bitmap->data == nullptr) {
+    printf("ca delire\r\n");
     Log.error("%s [%d]: image data malloc failed: %dx%dx%d (%d bytes)\r\n", __FILE__,
               __LINE__, width, height, bpp, datasize);
     free(bitmap->palette);

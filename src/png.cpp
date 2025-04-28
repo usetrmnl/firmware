@@ -80,33 +80,37 @@ int32_t pngSeek(PNGFILE *page, int32_t position) {
 /** 
  */
 trmnl_bitmap* decodePNGFromMemory(const uint8_t *bufferin, uint32_t bufferin_size, trmnl_error* error)  {
-  PNG png;
+  PNG* png = new PNG();
 
-  int rc = png.openRAM((uint8_t*)bufferin, bufferin_size, nullptr);
+  int rc = png->openRAM((uint8_t*)bufferin, bufferin_size, nullptr);
 
   if (rc == PNG_INVALID_FILE) {
     *error = IMAGE_FORMAT_UNEXPECTED_SIGNATURE;
+    delete png;
     return nullptr;
   }
 
-  uint32_t width = png.getWidth();
-  uint32_t height = png.getHeight();
-  uint32_t bpp = png.getBpp();
+  uint32_t width = png->getWidth();
+  uint32_t height = png->getHeight();
+  uint32_t bpp = png->getBpp();
 
   trmnl_bitmap *bitmap = bitmap_create(width, height, bpp, stride_8(width, bpp), WHITE);
   if (bitmap == nullptr) {
     *error = IMAGE_CREATION_FAILED;
+    delete png;
     return nullptr;
   }
-  png.setBuffer(bitmap->data);
+  png->setBuffer(bitmap->data);
 
-  if (!(png.decode(nullptr, 0))) {
+  if (!(png->decode(nullptr, 0))) {
     Log.error("PNG_SUCCESS\n");
     *error = NO_ERROR;
+    delete png;
     return bitmap;
   }
   Log.error("PNG_DECODE_ERR\n");
   *error = IMAGE_DECODE_FAIL;
+  delete png;
   return nullptr; 
   }
 

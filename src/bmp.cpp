@@ -1,13 +1,15 @@
+#include <GUI_Paint.h>
 #include <bmp.h>
+#include <display.h>
 #include <filesystem.h>
 #include <image.h>
-#include <display.h>
 #include <string.h>
 #include <trmnl_log.h>
-#include <GUI_Paint.h>
 
+#pragma pack(push, 1)
+// 40
 typedef struct {
-  uint32_t size; // expect 40
+  uint32_t biSize;
   int32_t width;
   int32_t height;
   uint16_t planes;
@@ -16,16 +18,33 @@ typedef struct {
   uint32_t imagesize;
   uint32_t xresolution;
   uint32_t yresolution;
-  uint32_t ncolors;
-} bitmapinfoheader;
+  uint32_t clrUsed;
+  uint32_t clrImportant;
+} BitmapInfoHeaderV1;
+
+// 52
+typedef struct {
+  BitmapInfoHeaderV1 bihV1;
+  uint32_t biRedMask;
+  uint32_t biGreenMask;
+  uint32_t biBlueMask;
+} BitmapInfoHeaderV2;
+
+// 56
+typedef struct {
+  BitmapInfoHeaderV2 bihV2;
+  uint32_t biAlphaMask;
+} BitmapInfoHeaderV3;
 
 typedef struct {
   uint8_t sig[2];
-  uint8_t disksize;
-  uint32_t reserved;
+  uint32_t disksize;
+  uint16_t reserved1;
+  uint16_t reserved2;
   uint32_t offset;
-  bitmapinfoheader bih;
-} bitmapfileheader;
+} BitmapFileHeader;
+
+#pragma pack(pop)
 
 const uint32_t bmp_bytes_per_color = 4; // 32 bit color
 
@@ -48,43 +67,36 @@ trmnl_bitmap *decodeBMPFromFile(const char *szFilename, trmnl_error *error) {
   return nullptr;
 }
 
-trmnl_bitmap *decodeBMPFromMemory(const uint8_t *bufferin, uint32_t bufferin_size,
-                                  trmnl_error *error) {
+static char dbgbuf[256];
+trmnl_bitmap *decodeBMPFromMemory(const uint8_t *bufferin,
+                                  uint32_t bufferin_size, trmnl_error *error) {
   trmnl_error ierror = NO_ERROR;
- if (bufferin_size < sizeof(bitmapfileheader)) {
-  *error = SIZE_TOO_SMALL;
+  if (bufferin_size < sizeof(BitmapFileHeader)) {
+    *error = SIZE_TOO_SMALL;
     return nullptr;
- }
-    bitmapfileheader *header = (bitmapfileheader *)bufferin;
+  }
+  BitmapFileHeader *header = (BitmapFileHeader *)bufferin;
   if (header->sig[0] != 'B' || header->sig[1] != 'M') {
     *error = IMAGE_FORMAT_UNEXPECTED_SIGNATURE;
-  }
-  display_show_debug((const uint8_t*)"pass here");
-  if (header->offset + 12 > bufferin_size)
-    *error = IMAGE_STRUCTURE_CORRUPTED;
-
-  if (error) {
-    Log.error("%s [%d]: BMP header error: %d\r\n", __FILE__, __LINE__, ierror);
     return nullptr;
   }
 
-  bitmapinfoheader bih = header->bih;
-  int32_t width = bih.width;
-  int32_t height = bih.height;
-  Log.info("%s [%d]: BMP Header Information:\r\nWidth: %d\r\nHeight: "
-           "%d\r\nBits per Pixel: %d\r\nCompression Method: %d\r\nImage Data "
-           "Size: %d\r\nColor Table Entries: %d\r\nData offset: %d\r\n",
-           __FILE__, __LINE__, width, height, bih.bitsperpixel, bih.compression,
-           bih.imagesize, 1 << bih.bitsperpixel, header->offset);
-  if ((bih.size != 40) || (bih.planes > 1) || (bih.bitsperpixel > 8) ||
-      (bih.compression != 0)) {
-    *error = IMAGE_INCOMPATIBLE;
+  BitmapInfoHeaderV1 *bih =
+      (BitmapInfoHeaderV1 *)(bufferin + sizeof(BitmapFileHeader));
+  int32_t width = bih->width;
+  int32_t height = bih->height;
+  boolean is_supported_version =
+      (bih->biSize == 40) || (bih->biSize == 52) | (bih->biSize == 56);
+  if (!is_supported_version || (bih->planes != 1) || (bih->bitsperpixel > 8) ||
+      (bih->compression != 0)) {
+    *error = IMAGE_FORMAT_UNSUPPORTED;
     return nullptr;
   }
 
-  uint32_t srcstride = stride_32(width, bih.bitsperpixel);
+  uint32_t srcstride = stride_32(width, bih->bitsperpixel);
+  uint32_t dststride = stride_8(width, bih->bitsperpixel);
   trmnl_bitmap *bitmap =
-      bitmap_create(width, abs(height), bih.bitsperpixel, stride_8(width, bih.bitsperpixel), WHITE);
+      bitmap_create(width, abs(height), bih->bitsperpixel, dststride, WHITE);
   if (bitmap == nullptr) {
     ierror = MALLOC_FAILED;
     return nullptr;
@@ -92,27 +104,49 @@ trmnl_bitmap *decodeBMPFromMemory(const uint8_t *bufferin, uint32_t bufferin_siz
     return bitmap;
   }
   // copy palette
-  const uint8_t *bmppalette = bufferin + sizeof(bitmapfileheader);
-  for (uint8_t i = 0; i < bitmap->numcolors; ++i) {
+  uint8_t num_colors = 1 << bih->bitsperpixel;
+  const uint32_t palette_offset = sizeof(BitmapFileHeader) + bih->biSize;
+  const uint8_t *bmppalette = bufferin + palette_offset;
+  for (uint8_t i = 0; i < num_colors; ++i) {
     bitmap_set_palette_entry(bitmap, i, bmppalette[i * 4 + 2],
                              bmppalette[i * 4 + 1], bmppalette[i * 4 + 0]);
   }
   // copy data, flipping if necessary
   // note the negative stride
-  bool istopdown = height < 0;
-  // when fliping start from latest row and go backwrds (negative stride )
-  // the loop stays the same..
-  const uint32_t normalstride = stride_8(width, bih.bitsperpixel);
-  const int32_t dststride = istopdown ? normalstride  : -normalstride;
-  uint8_t *dstdata = istopdown
-                         ? bitmap->data
-                         : bitmap->data + bitmap->stride * (bitmap->height - 1);
-  uint8_t *srcdata = (uint8_t *)bufferin + header->offset;
 
-  uint8_t *srcstart =
-      bitmap->data + (istopdown ? 0 : bitmap->stride * (bitmap->height - 1));
-  for (uint32_t h = 0; h < abs(height); ++h) {
-    memcpy(dstdata, (const char *)srcdata, bitmap->stride);
+  sprintf(dbgbuf,
+          "%s [%d]: BMP Header Information:\nWidth: %d\nHeight: "
+          "%d\nBits per Pixel: %d\nCompression Method: %d\nImage Data "
+          "Size: %d\nColor Table Entries: %d\nData offset: %d\nBIH type: %d\n",
+          __FILE__, __LINE__, width, height, bih->bitsperpixel,
+          bih->compression, bih->imagesize, 1 << bih->bitsperpixel,
+          header->offset, bih->biSize);
+  //debug_text((const uint8_t *)dbgbuf);
+
+  // 0 is black 1 is white
+  // bitmaps are topdown
+  bool needsflip = height > 0;
+  bool invert = bitmap->palette[0].red > 10;
+  sprintf(dbgbuf,
+          "color index 0 is %d %d %d\ncolor index 1 is %d %d %d\n -=> invert %s, flip %s\n",
+          bitmap->palette[0].red, bitmap->palette[0].green,
+          bitmap->palette[0].blue, bitmap->palette[1].red,
+          bitmap->palette[1].green, bitmap->palette[1].blue,
+          invert ? "yes" : "no", needsflip ? "yes" : "no");
+  debug_text((const uint8_t *)dbgbuf);
+
+  for (uint32_t h = 0; h < bitmap->height; ++h) {
+    uint8_t *dstdata =
+        needsflip ? (bitmap->data + (dststride * (bitmap->height - h - 1)))
+                                    : bitmap->data;
+    uint8_t *srcdata = (uint8_t *)bufferin + header->offset + (srcstride * h);
+    if (false && invert) {
+      for (uint32_t xx = 0; xx < dststride; ++xx) {
+        dstdata[xx] = ~srcdata[xx];
+      }
+    } else {
+      memcpy(dstdata, (const char *)srcdata, bitmap->stride);
+    }
     dstdata += dststride;
     srcdata += srcstride;
   }

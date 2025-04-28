@@ -6,6 +6,7 @@
 #include <Arduino.h>
 #include <ArduinoLog.h>
 #include <ImageData.h>
+#include <cctype>
 #include <config.h>
 #include <display.h>
 #include <image.h>
@@ -60,50 +61,81 @@ uint16_t display_width() { return EPD_7IN5_V2_WIDTH; }
 void display_show_bitmap(trmnl_bitmap *bitmap, bool flip, bool reverse) {
   // this is only used to display a full image so no need to allocate, we use
   // a direct call to a modified driver
+  // EPD_7IN5_V2_Display(bitmap->data);
   EPD_7IN5_V2_Display_Mirror_Invert(bitmap->data, flip, reverse);
 
   Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
 }
 
-const uint16_t charwidth = 12;
+// font 16
+const uint16_t charwidth = 7;
 const uint16_t charheight = 12;
 const uint16_t lineheight = charheight + 5;
 
-static uint16_t ypos = 10 + lineheight;
-static uint16_t xpos = 10;
+static uint16_t ystart = 10 + lineheight;
+static uint16_t xstart = 10;
+static uint16_t xpos = xstart;
+static uint16_t ypos = ystart;
 static trmnl_bitmap *dbgscreen = nullptr;
-static char buf[200];
 
-
-void display_show_debug(const uint8_t *text) {
-  Log.info("%s [%d]: display_show_debug\r\n", __FILE__, __LINE__);
+void debug_text(const uint8_t *text, trmnl_error error) {
   if (dbgscreen == nullptr) {
-    dbgscreen = bitmap_create(display_width(), display_height(), 1,
-                              stride_8(display_width(), 1), WHITE);
+    dbgscreen = bitmap_create(display_width(), display_height(), 1, 100, WHITE);
   }
-  Paint_SelectImage(dbgscreen->data);
+  Paint_NewImage(dbgscreen->data, display_width(), display_height(), false,
+                 false);
 
-  if (ypos > display_height()) {
-    Paint_Clear(WHITE);
-  }
-  Paint_DrawString_EN(xpos, ypos, (const char*)text, &Font12, WHITE, BLACK);
+#if 1
+  uint8_t *ptr = (uint8_t *)text;
+  do {
+    char cchar = (char)*ptr++;
+    if (cchar == '\n') {
+      ypos += lineheight;
+      xpos = xstart;
+    } else if (!iscntrl(cchar)) {
+      Paint_DrawChar(xpos, ypos, cchar, &Font12, BLACK, WHITE);
+      xpos += charwidth;
+    }
+    if (ypos > (display_height() - 10 - lineheight)) {
+      Paint_Clear(WHITE);
+      ypos = 10 + lineheight;
+      xpos = xstart;
+    }
+  } while (*ptr != 0);
+#else
+  Paint_DrawString_EN(xpos, ypos, (const char *)text, &Font16, WHITE, BLACK);
+#endif
+  if (error != NO_ERROR)
+    Paint_DrawString_EN(xpos, ypos, error_get_text(error), &Font12, WHITE,
+                        BLACK);
   ypos += lineheight;
-  // generic info
-  sprintf(buf, "ESP.getFreeHeap() = %d, ESP.getMaxAllocHeap() = %d", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
-  Paint_DrawString_EN(xpos, ypos, buf,  &Font12, WHITE, BLACK);
-  ypos += lineheight;
-  Paint_DrawBitMap(dbgscreen->data);
-  delay(2000);
- }
-
-void debug_clear_display(uint8_t color) {
-  ypos = 10 + lineheight;
-  memset(dbgscreen->data, color == WHITE ? 0xff : 0x00, dbgscreen->stride * dbgscreen->height);
+  display_show_bitmap(dbgscreen, true, false);
+  delay(4000);
 }
 
-void debug_free_resources() {
+void debug_clear(uint8_t color) {
+  if (dbgscreen == nullptr)
+    return;
+  ypos = ystart;
+  xpos = xstart;
+  memset(dbgscreen->data, color == WHITE ? 0xff : 0x00,
+         dbgscreen->stride * dbgscreen->height);
+}
+
+void debug_heap() {
+  char buf[64];
+  sprintf(buf, "FreeHeap() = %d\nMaxAllocHeap() = %d\n", ESP.getFreeHeap(),
+          ESP.getMaxAllocHeap());
+  debug_text((const uint8_t *)buf);
+}
+
+void debug_clean() {
   bitmap_delete(dbgscreen);
-dbgscreen = nullptr;
+  dbgscreen = nullptr;
+}
+
+void display_send_both(trmnl_bitmap *oldbitmap, trmnl_bitmap *newbitmap) {
+  EPD_Both(oldbitmap->data, newbitmap->data);
 }
 
 void display_show_msg(trmnl_bitmap *bitmap, MSG message_type) {

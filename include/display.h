@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <image.h>
+#include <trmnl_errors.h>
 
 enum MSG {
   NONE,
@@ -49,10 +50,11 @@ uint16_t display_width();
 
 void display_show_bitmap(trmnl_bitmap* bitmap, bool flip = false, bool reverse = false);
 
-// shows image with overlay text
-void display_show_debug(const uint8_t *text);
-void debug_clear_display(uint8_t color);
-void debug_free_resources();
+// debug
+void debug_text(const uint8_t *text, trmnl_error error = NO_ERROR);
+void debug_heap();
+void debug_clear(uint8_t color);
+void debug_clean();
 
 /**
  * @brief Function to show the image with message on the display
@@ -81,4 +83,6 @@ void display_show_msg(trmnl_bitmap* bitmap, MSG message_type, String friendly_id
  */
 void display_sleep(void);
 
+
+void display_send_both(trmnl_bitmap* oldbitmap,  trmnl_bitmap* newbitmap);
 #endif

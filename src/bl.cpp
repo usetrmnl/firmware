@@ -2,6 +2,7 @@
 #include <ArduinoLog.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
+#include <GUI_Paint.h>
 #include <HTTPClient.h>
 #include <ImageData.h>
 #include <Preferences.h>
@@ -17,6 +18,7 @@
 #include <button.h>
 #include <config.h>
 #include <cstdint>
+#include <cstdio>
 #include <display.h>
 #include <filesystem.h>
 #include <http_client.h>
@@ -26,13 +28,15 @@
 #include <pins.h>
 #include <png.h>
 #include <rover_bmp.h>
+#include <rover_topdown_bmp.h>
 #include <special_function.h>
 #include <stdlib.h>
 #include <stored_logs.h>
 #include <trmnl_logo_bmp.h>
+#include <sleep_bmp.h>
 #include <trmnl_logo_png.h>
 #include <types.h>
-#include <GUI_Paint.h>
+#include  "utility/EPD_7in5_V2.h"
 
 bool pref_clear = false;
 String new_filename = "";
@@ -107,61 +111,123 @@ void wait_for_serial() {
 #endif
 }
 
+void double_buffer() {
+  trmnl_error error;
+  trmnl_bitmap *buffer1 =
+      decodeBMPFromMemory(rover_bmp, sizeof(rover_bmp), &error);
+  trmnl_bitmap *buffer2 =
+      decodeBMPFromMemory(trmnl_logo_bmp, sizeof(trmnl_logo_bmp), &error);
+
+  bool even  = true;
+  while (true) {
+    display_send_both(even ? buffer1 : buffer2, even ? buffer2 : buffer1);
+    even = !even;
+    delay(2000);
+  }
+}
+
 void debug_fred() {
+  printf("e-Paper Init and Clear...\r\n");
+  display_init();
+  delay(300);
+  char buff[100] = {0};
+ double_buffer();
+  while (true) {
+    printf("hello\n");
+    trmnl_error error;
+    debug_text((const uint8_t *)"Logo PNG\n");
+    trmnl_bitmap *logo =
+    decodePNGFromMemory(trmnl_logo_png, sizeof(trmnl_logo_png), &error);
+    if (logo) {
+      display_show_bitmap(logo);
+      bitmap_delete(logo);
+    } else {
+      printf("fail\n");
+      debug_text(
+          (const uint8_t *)"Failure\n", error);
+    }
+    delay(5000);
+
+    debug_text((const uint8_t *)"Rover\n");
+    trmnl_bitmap *rover =
+        decodeBMPFromMemory(rover_bmp, sizeof(rover_bmp), &error);
+    if (rover) {
+      display_show_bitmap(rover);
+      bitmap_delete(rover);
+    } else {
+      debug_text(
+          (const uint8_t *)"Failure\n", error);
+    }
+    delay(5000);
+    debug_text((const uint8_t *)"Top Down Rover\n");
+    trmnl_bitmap *frover = decodeBMPFromMemory(
+        rover_topdown_bmp, sizeof(rover_topdown_bmp), &error);
+    if (frover) {
+      debug_text(
+          (const uint8_t *)"Success\n");
+
+      display_show_bitmap(frover);
+      bitmap_delete(frover);
+    } else {
+      debug_text(
+          (const uint8_t *)"Failure", error);
+    }
+    debug_heap();
+    debug_text((const uint8_t*)"end of tests cleaning debug\n");
+    debug_heap();
+    debug_clean();
+    delay(5000);
+  }
   trmnl_bitmap *logo = getLogoBitmap();
   if (logo) {
     display_show_bitmap(logo);
     bitmap_delete(logo);
     delay(2000);
   }
-
-  SPIFFS.format();
-  trmnl_error error;
+  delay(40000);
+  // SPIFFS.format();
   uint8_t buffer[128];
-  sprintf((char *)buffer, "choucroute logo error %d",  &error);
-  display_show_debug((const uint8_t *)buffer);
   delay(5000);
   Log.info("%s [%d]: Fred's firmware start\r\n", __FILE__, __LINE__);
   uint32_t pass = 1;
 
   while (true) {
+    debug_heap();
+    trmnl_error error;
     trmnl_bitmap *logo =
         decodeBMPFromMemory(trmnl_logo_bmp, sizeof(trmnl_logo_bmp), &error);
     if (logo) {
+      debug_text((const uint8_t *)"logo.bmp from memory success\n");
       display_show_bitmap(logo);
       bitmap_delete(logo);
-      delay(5000);
     } else {
-      sprintf((char *)buffer, "choucroute logo error %d, error");
-      display_show_debug((const uint8_t *)buffer);
-      delay(5000);
+      debug_text((const uint8_t *)"logo.bmp from memory failed\n", error);
     }
-   delay(5000);
+    delay(5000);
 
     trmnl_bitmap *pnglogo =
         decodePNGFromMemory(trmnl_logo_png, sizeof(trmnl_logo_png), &error);
     if (pnglogo) {
-      display_show_debug((const uint8_t *)"TRMNL logo in PNG form\nread from memory");
+      debug_text((const uint8_t *)"PNG TRMNL logo read from memory success\n");
       display_show_bitmap(pnglogo);
       bitmap_delete(pnglogo);
     } else {
-      sprintf((char *)buffer, "error %d, error");
-      display_show_debug((const uint8_t *)buffer);
+      debug_text((const uint8_t *)"PNG TRMNL logo read from memory failed \n", error);
     }
 
     delay(2000);
-    debug_free_resources();
+    debug_clean();
   }
   delay(10000);
   while (true) {
     sprintf((char *)buffer, "Firmware\nby Fred\n2025\n\nPass %d", pass);
 
     trmnl_bitmap *logo = getLogoBitmap();
-    display_show_debug((const uint8_t*)"passing by");
     bitmap_delete(logo);
     delay(2000);
   }
 }
+
 /**
  * @brief Function to init business logic module
  * @param none
@@ -176,6 +242,7 @@ void bl_init(void) {
            FW_PATCH_VERSION);
   pins_init();
 
+  debug_fred();
   wakeup_reason = esp_sleep_get_wakeup_cause();
 
   Log.info("%s [%d]: preferences start\r\n", __FILE__, __LINE__);
@@ -263,10 +330,6 @@ void bl_init(void) {
   // EPD clear
   Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
   display_init();
-  // Mount SPIFFS
-  filesystem_init();
-
-  debug_fred();
 
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER) {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
@@ -1705,6 +1768,7 @@ static void showMessageWithLogo(MSG message_type, String friendly_id, bool id,
 
 static trmnl_bitmap *getLogoBitmap() {
   trmnl_error error;
+  printf("ooo\r\n");
   return decodeBitmapFromMemory(trmnl_logo_bmp, sizeof(trmnl_logo_bmp), &error);
   trmnl_bitmap *logo = decodeBitmapFromFile("/logo.png", &error);
   if (logo != nullptr && error == NO_ERROR) {
@@ -1738,12 +1802,12 @@ static trmnl_bitmap *decodeBitmapFromMemory(const uint8_t *data,
                                             trmnl_error *error) {
   trmnl_bitmap *result = nullptr;
   // try PNG
-  result = decodePNGFromMemory(data, datasize, error);
+  result = decodeBMPFromMemory(data, datasize, error);
   if ((result != nullptr) && (*error == NO_ERROR)) {
     return result;
   }
   // try bmp
-  return decodeBMPFromMemory(data, datasize, error);
+  return decodePNGFromMemory(data, datasize, error);
 }
 
 static bool saveCurrentFileName(String &name) {

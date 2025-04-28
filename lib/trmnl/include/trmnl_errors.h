@@ -19,4 +19,6 @@ enum trmnl_error {
   IMAGE_DECODE_FAIL
   };
 
+
+const char* error_get_text(trmnl_error error);
 #endif
