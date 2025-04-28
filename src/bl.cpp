@@ -1934,7 +1934,7 @@ static void showMessageWithLogo(MSG message_type, String friendly_id, bool id, c
 static void showMessageWithLogo(MSG message_type, const ApiSetupResponse &apiResponse)
 {
   buffer = (uint8_t *)malloc(DEFAULT_IMAGE_SIZE);
-  display_show_api_msg(storedLogoOrDefault(), apiResponse.message);
+  display_show_msg_api(storedLogoOrDefault(), apiResponse.message);
   free(buffer);
   buffer = nullptr;
 

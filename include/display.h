@@ -49,7 +49,7 @@ uint16_t display_width();
 /**
  * @brief Function to show the image on the display
  * @param image_buffer pointer to the uint8_t image buffer
- * @param reverse shows if the color scheme is reverse 
+ * @param reverse shows if the color scheme is reverse
  * @return none
  */
 void display_show_image(uint8_t * image_buffer, bool reverse, bool isPNG);
@@ -87,7 +87,7 @@ void paint_multi_line_text(const char *message);
  * @param message message text from API response
  * @return none
  */
-void display_show_api_msg(uint8_t *image_buffer, String message);
+void display_show_msg_api(uint8_t *image_buffer, String message);
 
 /**
  * @brief Function to got the display to the sleep
