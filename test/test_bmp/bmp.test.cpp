@@ -114,6 +114,16 @@ void test_parseBMPHeader_BMP_INVALID_OFFSET(void)
   TEST_ASSERT_EQUAL(BMP_INVALID_OFFSET, parseBMPHeader(bmp_data.data(), image_reverse));
 }
 
+void test_parseBMPHeader_BMP_INVALID_TYPE(void)
+{
+  auto bmp_data = readBMPFile("./test.bmp");
+  bool image_reverse = false;
+
+  bmp_data[14] = 112;
+
+  TEST_ASSERT_EQUAL(BMP_INVALID_TYPE, parseBMPHeader(bmp_data.data(), image_reverse));
+}
+
 void setUp(void) {
   // set stuff up here
 }
@@ -133,6 +143,7 @@ void process()
   RUN_TEST(test_parseBMPHeader_BMP_INVALID_OFFSET);
 
   RUN_TEST(test_parseBMPHeader_BMPV3_NO_ERR);
+  RUN_TEST(test_parseBMPHeader_BMP_INVALID_TYPE);
   UNITY_END();
 }
 
