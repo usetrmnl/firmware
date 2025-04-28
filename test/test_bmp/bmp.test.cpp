@@ -45,6 +45,17 @@ void test_parseBMPHeader_BMP_NO_ERR(void)
   TEST_ASSERT_EQUAL(false, image_reverse);
 }
 
+void test_parseBMPHeader_BMPV3_NO_ERR(void)
+{
+  auto bmp_data = readBMPFile("./logo.bmp");
+  bool image_reverse = false;
+
+  bmp_err_e result = parseBMPHeader(bmp_data.data(), image_reverse);
+
+  TEST_ASSERT_EQUAL(BMP_NO_ERR, result);
+  TEST_ASSERT_EQUAL(false, image_reverse);
+}
+
 void test_parseBMPHeader_BMP_NO_ERR_reversed(void)
 {
   auto bmp_data = readBMPFile("./test.bmp");
@@ -120,6 +131,8 @@ void process()
   RUN_TEST(test_parseBMPHeader_BMP_BAD_SIZE);
   RUN_TEST(test_parseBMPHeader_BMP_COLOR_SCHEME_FAILED);
   RUN_TEST(test_parseBMPHeader_BMP_INVALID_OFFSET);
+
+  RUN_TEST(test_parseBMPHeader_BMPV3_NO_ERR);
   UNITY_END();
 }
 

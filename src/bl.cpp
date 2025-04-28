@@ -644,7 +644,7 @@ static https_request_err_e downloadAndShow()
       Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
 
       uint32_t counter = 0;
-      if (content_size > DISPLAY_BMP_IMAGE_SIZE)
+      if (content_size > MAX_BMP_PAYLOAD_SIZE)
       {
         Log.error("%s [%d]: Receiving failed. Bad file size\r\n", __FILE__, __LINE__);
 
@@ -1199,8 +1199,8 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           if (last_dot_file == "/last.bmp")
           {
             Log.info("Rewind BMP\n\r");
-            buffer = (uint8_t *)malloc(DISPLAY_BMP_IMAGE_SIZE);
-            file_check_bmp = filesystem_read_from_file(last_dot_file.c_str(), buffer, DISPLAY_BMP_IMAGE_SIZE);
+            buffer = (uint8_t *)malloc(MAX_BMP_PAYLOAD_SIZE);
+            file_check_bmp = filesystem_read_from_file(last_dot_file.c_str(), buffer, MAX_BMP_PAYLOAD_SIZE);
             bmp_proccess_response = parseBMPHeader(buffer, image_reverse);
           }
           else if (last_dot_file == "/last.png")
@@ -1279,9 +1279,9 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           if (filesystem_file_exists("/current.bmp"))
           {
             Log.info("%s [%d]: send_to_me BMP\r\n", __FILE__, __LINE__);
-            buffer = (uint8_t *)malloc(DISPLAY_BMP_IMAGE_SIZE);
+            buffer = (uint8_t *)malloc(MAX_BMP_PAYLOAD_SIZE);
 
-            if (!filesystem_read_from_file("/current.bmp", buffer, DISPLAY_BMP_IMAGE_SIZE))
+            if (!filesystem_read_from_file("/current.bmp", buffer, MAX_BMP_PAYLOAD_SIZE))
             {
               Log.info("%s [%d]: Error reading image!\r\n", __FILE__, __LINE__);
               free(buffer);
@@ -1535,16 +1535,16 @@ static void getDeviceCredentials()
               uint32_t counter = 0;
               // Read and save BMP data to buffer
               buffer = (uint8_t *) malloc(https.getSize());
-              if (stream->available() && https.getSize() == DISPLAY_BMP_IMAGE_SIZE)
+              if (stream->available() && https.getSize() <= MAX_BMP_PAYLOAD_SIZE)
               {
-                counter = stream->readBytes(buffer, DISPLAY_BMP_IMAGE_SIZE);
+                counter = stream->readBytes(buffer, MAX_BMP_PAYLOAD_SIZE);
               }
               https.end();
-              if (counter == DISPLAY_BMP_IMAGE_SIZE)
+              if ((counter == DISPLAY_BMP_IMAGE_SIZE) || (counter == MAX_BMP_PAYLOAD_SIZE))
               {
                 Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
 
-                writeImageToFile("/logo.bmp", buffer, DEFAULT_IMAGE_SIZE);
+                writeImageToFile("/logo.bmp", buffer, counter);
 
                 // show the image
                 String friendly_id = preferences.getString(PREFERENCES_FRIENDLY_ID, PREFERENCES_FRIENDLY_ID_DEFAULT);

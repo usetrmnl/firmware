@@ -37,27 +37,28 @@ bmp_err_e parseBMPHeader(uint8_t *data, bool &reversed)
   {
     // Read color table entries
     uint32_t colorTableSize = colorTableEntries * 4; // Each color entry is 4 bytes
+    uint8_t* colorTable = data + dataOffset - colorTableSize;
 
     // Display color table
     Log.info("%s [%d]: Color table\r\n", __FILE__, __LINE__);
     for (uint32_t i = 0; i < colorTableSize; i += 4)
     {
-      Log.info("%s [%d]: Color %d: B-%d, R-%d, G-%d\r\n", __FILE__, __LINE__, i / 4 + 1, data[54 + 4 * i], data[55 + 4 * i], data[56 + 4 * i], data[57 + 4 * i]);
+      Log.info("%s [%d]: Color %d: B-%d, R-%d, G-%d\r\n", __FILE__, __LINE__, i / 4 + 1, colorTable[4 * i + 0], colorTable[4 * i + 1], colorTable[4 * i + 2], colorTable[4 * i + 3]);
     }
 
-    if (data[54] == 0 && data[55] == 0 && data[56] == 0 && data[57] == 0 && data[58] == 255 && data[59] == 255 && data[60] == 255 && data[61] == 0)
+    if (colorTable[0] == 0 && colorTable[1] == 0 && colorTable[2] == 0 && colorTable[4] == 255 && colorTable[5] == 255 && colorTable[6] == 255)
     {
       Log.info("%s [%d]: Color scheme standart\r\n", __FILE__, __LINE__);
       reversed = false;
     }
-    else if (data[54] == 255 && data[55] == 255 && data[56] == 255 && data[57] == 0 && data[58] == 0 && data[59] == 0 && data[60] == 0 && data[61] == 0)
+    else if (colorTable[0] == 255 && colorTable[1] == 255 && colorTable[2] == 255 && colorTable[4] == 0 && colorTable[5] == 0 && colorTable[6] == 0)
     {
       Log.info("%s [%d]: Color scheme reversed\r\n", __FILE__, __LINE__);
       reversed = true;
     }
     else
     {
-      Log.info("%s [%d]: Color scheme demaged\r\n", __FILE__, __LINE__);
+      Log.info("%s [%d]: Color scheme damaged\r\n", __FILE__, __LINE__);
       return BMP_COLOR_SCHEME_FAILED;
     }
     return BMP_NO_ERR;
