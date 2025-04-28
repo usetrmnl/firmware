@@ -1459,7 +1459,7 @@ static void getDeviceCredentials()
             {
                 Log.info("%s [%d]: MAC Address is not registered on server\r\n", __FILE__, __LINE__);
 
-                showMessageWithLogo(MAC_NOT_REGISTERED, apiResponse.message);
+                showMessageWithLogo(MAC_NOT_REGISTERED, apiResponse);
 
                 preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
 
