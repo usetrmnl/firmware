@@ -37,7 +37,7 @@ bmp_err_e parseBMPHeader(uint8_t *data, bool &reversed)
   Log.info("%s [%d]: BMP Header Information:\r\nbiSize:%d\r\nWidth: %d\r\nHeight: %d\r\nBits per Pixel: %d\r\nCompression Method: %d\r\nImage Data Size: %d\r\nColor Table Entries: %d\r\nData offset: %d\r\n", __FILE__, __LINE__, biSize, width, height, bitsPerPixel, compressionMethod, imageDataSize, colorTableEntries, dataOffset);
 
   // Check if there's a color table
-  if (dataOffset > (biSize + 14))
+  if (dataOffset >= (biSize + 14))
   {
     // Read color table entries
     uint32_t colorTableSize = colorTableEntries * 4; // Each color entry is 4 bytes
