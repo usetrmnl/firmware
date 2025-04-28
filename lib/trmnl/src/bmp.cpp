@@ -23,9 +23,13 @@ bmp_err_e parseBMPHeader(uint8_t *data, bool &reversed)
   uint32_t compressionMethod = *(uint32_t *)&data[30];
   uint32_t imageDataSize = *(uint32_t *)&data[34];
   uint32_t colorTableEntries = *(uint32_t *)&data[46];
+  uint32_t biSize = *(uint32_t *)&data[14];
 
   if (width != 800 || height != 480 || bitsPerPixel != 1 || imageDataSize != 48000 || colorTableEntries != 2)
     return BMP_BAD_SIZE;
+
+    if (biSize != 40 || biSize != 108 || biSize != 124)
+    return BMP_INVALID_TYPE;
   // Get the offset of the pixel data
   uint32_t dataOffset = *(uint32_t *)&data[10];
 
@@ -33,11 +37,11 @@ bmp_err_e parseBMPHeader(uint8_t *data, bool &reversed)
   Log.info("%s [%d]: BMP Header Information:\r\nWidth: %d\r\nHeight: %d\r\nBits per Pixel: %d\r\nCompression Method: %d\r\nImage Data Size: %d\r\nColor Table Entries: %d\r\nData offset: %d\r\n", __FILE__, __LINE__, width, height, bitsPerPixel, compressionMethod, imageDataSize, colorTableEntries, dataOffset);
 
   // Check if there's a color table
-  if (dataOffset > 54)
+  if (dataOffset > (biSize + 14))
   {
     // Read color table entries
     uint32_t colorTableSize = colorTableEntries * 4; // Each color entry is 4 bytes
-    uint8_t* colorTable = data + dataOffset - colorTableSize;
+    uint8_t* colorTable = data + dataOffset - colorTableSize; // = data + biSize + 14
 
     // Display color table
     Log.info("%s [%d]: Color table\r\n", __FILE__, __LINE__);

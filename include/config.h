@@ -26,7 +26,7 @@
 #define WIFI_CONNECTION_RSSI (-100)
 
 #define DISPLAY_BMP_IMAGE_SIZE 48062 // in bytes - 62 bytes - header; 48000 bytes - bitmap (480*800 1bpp) / 8
-#define MAX_BMP_PAYLOAD_SIZE 48130 // V3 header add 68 bytes , only offset changes but it is a valid file
+#define MAX_BMP_PAYLOAD_SIZE 48146 // V3 header add 68 bytes , and v4 84 but only offset changes but it is a valid file
 #define DEFAULT_IMAGE_SIZE 48000
 
 #define SLEEP_uS_TO_S_FACTOR 1000000           /* Conversion factor for micro seconds to seconds */
