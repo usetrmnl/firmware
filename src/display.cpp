@@ -7,6 +7,9 @@
 #include "GUI_Paint.h"
 #include <config.h>
 #include <ImageData.h>
+#include <advanced_paint.h>
+#include "Roboto_Black_ttf.h"
+         
 
 /**
  * @brief Function to init the display
@@ -102,6 +105,7 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
     else{
         Paint_DrawBitMap(image_buffer + 62);
     }
+
     EPD_7IN5_V2_Display(BlackImage);
     Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
 
@@ -244,7 +248,9 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     default:
         break;
     }
-
+    AdvancedPaint_TrueType_Init((uint8_t *)Roboto_Black, sizeof(Roboto_Black));
+    AdvancedPaint_TrueType_SetSize(100);
+    AdvancedPaint_TrueType_DrawText(100, 100, "Roboto Font at 100");
     EPD_7IN5_V2_Display(BlackImage);
     Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
     free(BlackImage);
