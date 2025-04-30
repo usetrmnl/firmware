@@ -82,7 +82,6 @@ void Paint_DrawString_EN_Centered(uint16_t Xstart, uint16_t Ystart, uint16_t Xen
     Paint_DrawString_EN(Xmiddle - halflen, Ymiddle - halfheight, string, font, ColorFg, ColorBg);
 }
 
-static char clock_buffer[100];
 /**
  * @brief Function to display clock according to settings.
  * @param settings pointer to the clock settings.
@@ -91,6 +90,8 @@ static char clock_buffer[100];
 bool display_show_clock(const clock_settings_t *settings)
 {
     /*
+    static char clock_buffer[100];
+
     if (settings->Xstart != settings->Xend && settings->Ystart != settings->Yend && settings->FontSize > 0)
     {
         Paint_ClearWindows(settings->Xstart, settings->Ystart, settings->Xend, settings->Yend, settings->ColorBg);
