@@ -99,6 +99,8 @@ void wait_for_serial()
  */
 void bl_init(void)
 {
+  esp_log_level_set("wifi", ESP_LOG_VERBOSE);
+  
   Serial.begin(115200);
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
   Log_info("BL init success");
@@ -630,7 +632,7 @@ static https_request_err_e downloadAndShow()
 {
   auto apiDisplayInputs = loadApiDisplayInputs(preferences);
 
-  https_request_err_e result = HTTPS_NO_ERR;
+  https_request_err_e result = HTTPS_SUCCESS; // HTTPS_NO_ERR;
   WiFiClientSecure *secureClient = new WiFiClientSecure;
   secureClient->setInsecure();
   WiFiClient *insecureClient = new WiFiClient;
@@ -1983,6 +1985,7 @@ static bool setClock()
  */
 static float readBatteryVoltage(void)
 {
+  /*
   Log.info("%s [%d]: Battery voltage reading...\r\n", __FILE__, __LINE__);
   int32_t adc = 0;
   for (uint8_t i = 0; i < 128; i++)
@@ -1993,7 +1996,7 @@ static float readBatteryVoltage(void)
   int32_t sensorValue = (adc / 128) * 2;
 
   float voltage = sensorValue / 1000.0;
-  //return voltage;
+  */
   return 3.7;
 }
 
