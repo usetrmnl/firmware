@@ -485,7 +485,7 @@ std::vector<WifiCaptive::Network> WifiCaptive::getScannedUniqueNetworks(bool run
             }
             if (!found)
             {
-                uniqueNetworks.push_back({ssid, rssi, open});
+                uniqueNetworks.push_back({ssid, rssi, open, false});
             }
         }
     }

@@ -14,4 +14,4 @@ enum SPECIAL_FUNCTION
 };
 
 SPECIAL_FUNCTION parseSpecialFunction(String &special_function_str);
-bool parseSpecialFunctionToStr(char *buffer, SPECIAL_FUNCTION special_function);
+bool parseSpecialFunctionToStr(char *buffer, size_t buffer_size, SPECIAL_FUNCTION special_function);

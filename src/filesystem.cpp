@@ -73,7 +73,7 @@ bool filesystem_read_from_file(const char *name, uint8_t *out_buffer, size_t siz
 size_t filesystem_write_to_file(const char *name, uint8_t *in_buffer, size_t size)
 {
     uint32_t SPIFFS_freeBytes = (SPIFFS.totalBytes() - SPIFFS.usedBytes());
-    Log.info("%s [%d]: SPIFFS freee space - %d, total -%d\r\n", __FILE__, __LINE__, SPIFFS_freeBytes,SPIFFS.totalBytes());
+    Log.info("%s [%d]: SPIFFS free space: %d, total: %d\r\n", __FILE__, __LINE__, SPIFFS_freeBytes,SPIFFS.totalBytes());
     if (SPIFFS.exists(name))
     {
         Log.info("%s [%d]: file %s exists. Deleting...\r\n", __FILE__, __LINE__, name);
@@ -191,8 +191,10 @@ bool filesystem_file_rename(const char *old_name, const char *new_name)
             return true;
         }
         else
+        {
             Log.error("%s [%d]: file %s wasn't renamed.\r\n", __FILE__, __LINE__, old_name);
             return false;
+        }
     }
     else
     {
