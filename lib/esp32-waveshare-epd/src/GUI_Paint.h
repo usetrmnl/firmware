@@ -15,7 +15,7 @@
 * V3.2(2020-07-23):
 * 1. Change: Paint_SetScale(UBYTE scale)
 *			Add scale 7 for 5.65f e-Parper
-* 2. Change: Paint_SetPixel(UWORD Xpoint, UWORD Ypoint, UWORD Color)  
+* 2. Change: Paint_SetPixel(UWORD Xpoint, UWORD Ypoint, UWORD Color)
 * 			Add the branch for scale 7
 * 3. Change: Paint_Clear(UWORD Color)
 *			Add the branch for scale 7
@@ -24,9 +24,9 @@
 * 1. Add gray level
 *   PAINT Add Scale
 * 2. Add void Paint_SetScale(UBYTE scale);
-* 
+*
 * V3.0(2019-04-18):
-* 1.Change: 
+* 1.Change:
 *    Paint_DrawPoint(..., DOT_STYLE DOT_STYLE)
 * => Paint_DrawPoint(..., DOT_STYLE Dot_Style)
 *    Paint_DrawLine(..., LINE_STYLE Line_Style, DOT_PIXEL Dot_Pixel)
@@ -43,16 +43,16 @@
 * 2.add: Paint_SelectImage()
 *    Select the picture to be drawn
 * 3.add: Paint_SetRotate()
-*    Set the direction of the cache    
-* 4.add: Paint_RotateImage() 
-*    Can flip the picture, Support 0-360 degrees, 
+*    Set the direction of the cache
+* 4.add: Paint_RotateImage()
+*    Can flip the picture, Support 0-360 degrees,
 *    but only 90.180.270 rotation is better
-* 4.add: Paint_SetMirroring() 
+* 4.add: Paint_SetMirroring()
 *    Can Mirroring the picture, horizontal, vertical, origin
-* 5.add: Paint_DrawString_CN() 
-*    Can display Chinese(GB1312)   
+* 5.add: Paint_DrawString_CN()
+*    Can display Chinese(GB1312)
 *
-* ----------------------------------------------------------------------------- 
+* -----------------------------------------------------------------------------
 * V1.0(2018-07-17):
 *   Create library
 *
@@ -214,25 +214,7 @@ void Paint_DrawTime(UWORD Xstart, UWORD Ystart, PAINT_TIME *pTime, sFONT* Font, 
 
 //pic
 void Paint_DrawBitMap(const unsigned char* image_buffer);
-void Paint_DrawImage(const unsigned char *image_buffer, UWORD xStart, UWORD yStart, UWORD W_Image, UWORD H_Image); 
-
-/**
- * @brief Function to draw multi-line text onto the display
- * @param x_start X coordinate to start drawing
- * @param y_start Y coordinate to start drawing
- * @param message Text message to draw
- * @param max_width Maximum width in pixels for each line
- * @param font_width Width of a single character in pixels
- * @param color_fg Foreground color
- * @param color_bg Background color
- * @param font Font to use
- * @param is_center_aligned If true, center the text; if false, left-align
- * @return none
- */
-void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
-                           uint16_t max_width, uint16_t font_width,
-                           UWORD color_fg, UWORD color_bg, sFONT *font,
-                           bool is_center_aligned);
+void Paint_DrawImage(const unsigned char *image_buffer, UWORD xStart, UWORD yStart, UWORD W_Image, UWORD H_Image);
 
 #endif
 
