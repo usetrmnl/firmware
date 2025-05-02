@@ -2063,7 +2063,7 @@ DeviceStatusStamp getDeviceStatusStamp()
   deviceStatus.refresh_rate = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY);
   deviceStatus.time_since_last_sleep = time_since_sleep;
   snprintf(deviceStatus.current_fw_version, sizeof(deviceStatus.current_fw_version), "%d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
-  parseSpecialFunctionToStr(deviceStatus.special_function, special_function);
+  parseSpecialFunctionToStr(deviceStatus.special_function,sizeof(deviceStatus.special_function), special_function);
   deviceStatus.battery_voltage = readBatteryVoltage();
   parseWakeupReasonToStr(deviceStatus.wakeup_reason, sizeof(deviceStatus.wakeup_reason), esp_sleep_get_wakeup_cause());
   deviceStatus.free_heap_size = ESP.getFreeHeap();

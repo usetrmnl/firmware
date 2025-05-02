@@ -17,7 +17,6 @@ void addHeaders(HTTPClient &https, ApiDisplayInputs &inputs)
            "Battery-Voltage: %s\n\r"
            "FW-Version: %s\r\n"
            "RSSI: %s\r\n",
-           __FILE__, __LINE__,
            inputs.macAddress.c_str(),
            inputs.specialFunction,
            inputs.apiKey.c_str(),
