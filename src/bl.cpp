@@ -606,6 +606,8 @@ static https_request_err_e downloadAndShow()
   { // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
 
     HTTPClient https;
+    https.setTimeout(15000);
+    https.setConnectTimeout(15000);
     if (status && !update_firmware && !reset_firmware)
     {
       status = false;
@@ -1415,6 +1417,8 @@ static void getDeviceCredentials()
     {
       // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
       HTTPClient https;
+      https.setTimeout(15000);
+      https.setConnectTimeout(15000);
 
       Log.info("%s [%d]: [HTTPS] begin /api/setup/ ...\r\n", __FILE__, __LINE__);
       char new_url[200];
