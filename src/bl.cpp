@@ -429,7 +429,7 @@ void bl_init(void)
   break;
   case HTTPS_WRONG_IMAGE_FORMAT:
   {
-    showMessageWithLogo(BMP_FORMAT_ERROR);
+    showMessageWithLogo(MSG_FORMAT_ERROR);
   }
   break;
   case HTTPS_WRONG_IMAGE_SIZE:
@@ -455,7 +455,7 @@ void bl_init(void)
     {
       Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED);
       size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED);
-      Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED);
+      Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
     }
   }
   break;
@@ -735,8 +735,6 @@ static https_request_err_e downloadAndShow()
 
       Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
 
-      bool bmp_rename = false;
-
       if (filesystem_file_exists("/current.bmp") || filesystem_file_exists("/current.png"))
       {
         filesystem_file_delete("/last.bmp");
@@ -764,7 +762,6 @@ static https_request_err_e downloadAndShow()
       Serial.println();
       String error = "";
       uint8_t *imagePointer = (decodedPng == nullptr) ? buffer : decodedPng;
-      bool lastImageExists = filesystem_file_exists("/last.bmp") || filesystem_file_exists("/last.png");
 
       switch (png_res)
       {
@@ -841,7 +838,7 @@ static https_request_err_e downloadAndShow()
           result = HTTPS_SUCCESS;
       }
       break;
-      case BMP_FORMAT_ERROR:
+      case BMP_NOT_BMP:
       {
         error = "First two header bytes are invalid!";
       }
@@ -1224,7 +1221,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           image_err_e image_proccess_response = PNG_WRONG_FORMAT;
           bmp_err_e bmp_proccess_response = BMP_NOT_BMP;
 
-          // showMessageWithLogo(BMP_FORMAT_ERROR);
+          // showMessageWithLogo(MSG_FORMAT_ERROR);
           String last_dot_file = filesystem_file_exists("/last.bmp") ? "/last.bmp" : "/last.png";
           if (last_dot_file == "/last.bmp")
           {
@@ -1275,7 +1272,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           {
             free(buffer);
             buffer = nullptr;
-            showMessageWithLogo(BMP_FORMAT_ERROR);
+            showMessageWithLogo(MSG_FORMAT_ERROR);
           }
         }
         else
@@ -1296,7 +1293,6 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           Log.info("%s [%d]: send_to_me success\r\n", __FILE__, __LINE__);
 
           bool image_reverse = false;
-          image_err_e image_proccess_response = PNG_WRONG_FORMAT;
 
           if (!filesystem_file_exists("/current.bmp") && !filesystem_file_exists("/current.png"))
           {
@@ -2082,7 +2078,7 @@ DeviceStatusStamp getDeviceStatusStamp()
   deviceStatus.refresh_rate = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY);
   deviceStatus.time_since_last_sleep = time_since_sleep;
   snprintf(deviceStatus.current_fw_version, sizeof(deviceStatus.current_fw_version), "%d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
-  parseSpecialFunctionToStr(deviceStatus.special_function,sizeof(deviceStatus.special_function), special_function);
+  parseSpecialFunctionToStr(deviceStatus.special_function, sizeof(deviceStatus.special_function), special_function);
   deviceStatus.battery_voltage = readBatteryVoltage();
   parseWakeupReasonToStr(deviceStatus.wakeup_reason, sizeof(deviceStatus.wakeup_reason), esp_sleep_get_wakeup_cause());
   deviceStatus.free_heap_size = ESP.getFreeHeap();

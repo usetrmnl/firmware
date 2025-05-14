@@ -58,7 +58,7 @@ ReturnType withHttp(const String &url, Callback callback)
     }
     else
     {
-      ReturnType result = callback(nullptr, HTTPCLIENT_HTTPCLIENT_ERROR);
+      result = callback(nullptr, HTTPCLIENT_HTTPCLIENT_ERROR);
     }
   }
   delete client;
