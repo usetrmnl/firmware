@@ -40,12 +40,18 @@ jobs:
         run: |
           pio system info
           g++ --version
+          gcc --version
 
       - name: build
         run: pio run
 
       - name: test
+        if: matrix.os != 'windows-latest'
         run: pio test -e native -v
+
+      - name: test (windows)
+        if: matrix.os == 'windows-latest'
+        run: pio test -e native-windows -v
 
       - name: static analysis
         run: pio check --skip-packages --fail-on-defect high
