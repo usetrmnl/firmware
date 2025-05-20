@@ -108,6 +108,14 @@ void bl_init(void)
   Log_info("Firmware version %d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
   pins_init();
 
+  delay(3000);
+
+  if (digitalRead(9) == LOW) {
+    Log_info("Boot button pressed during startup, resetting WiFi credentials...");
+    WifiCaptivePortal.resetSettings();
+    Log_info("WiFi credentials reset completed");
+  }
+
   wakeup_reason = esp_sleep_get_wakeup_cause();
 
   Log.info("%s [%d]: preferences start\r\n", __FILE__, __LINE__);
@@ -1761,6 +1769,7 @@ static void goToSleep(void)
   esp_sleep_enable_gpio_wakeup();
 #elif CONFIG_IDF_TARGET_ESP32C3
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
+#elif CONFIG_IDF_TARGET_ESP32S3
 #else
   #error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
