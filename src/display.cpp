@@ -493,5 +493,5 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 void display_sleep(void)
 {
     Log.info("%s [%d]: Goto Sleep...\r\n", __FILE__, __LINE__);
-    EPD_7IN5B_V2_Sleep();
+    EPD_7IN5_V2_Sleep();
 }
