@@ -108,6 +108,7 @@ void bl_init(void)
   Log_info("Firmware version %d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
   pins_init();
 
+#if defined(BOARD_SEEED_XIAO_ESP32C3) || defined(BOARD_SEEED_XIAO_ESP32S3)
   delay(3000);
 
   if (digitalRead(9) == LOW) {
@@ -115,6 +116,7 @@ void bl_init(void)
     WifiCaptivePortal.resetSettings();
     Log_info("WiFi credentials reset completed");
   }
+#endif
 
   wakeup_reason = esp_sleep_get_wakeup_cause();
 
