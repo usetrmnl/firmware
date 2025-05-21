@@ -6,7 +6,7 @@ image_err_e processPNG(PNG *png, uint8_t *&decoded_buffer)
 {
   if (!(decoded_buffer = (uint8_t *)malloc(48000)))
   {
-    Log.error("PNG MALLOC FAILED\n");
+    Log_error("PNG MALLOC FAILED");
     return PNG_MALLOC_FAILED;
   }
   png->setBuffer(decoded_buffer);
@@ -17,16 +17,16 @@ image_err_e processPNG(PNG *png, uint8_t *&decoded_buffer)
 
   if (width != 800 || height != 480 || bpp != 1)
   {
-    Log.error("PNG_BAD_SIZE\n");
+    Log_error("PNG_BAD_SIZE");
     return PNG_BAD_SIZE;
   }
 
   if (!(png->decode(nullptr, 0)))
   {
-    Log.error("PNG_SUCCESS\n");
+    Log_error("PNG_SUCCESS");
     return PNG_NO_ERR;
   }
-  Log.error("PNG_DECODE_ERR\n");
+  Log_error("PNG_DECODE_ERR");
   return PNG_DECODE_ERR;
 }
 

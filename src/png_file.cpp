@@ -64,7 +64,7 @@ image_err_e decodePNG(const char *szFilename, uint8_t *&decoded_buffer)
 
   if (rc == PNG_INVALID_FILE)
   {
-    Log.error("WRONG_FILE\n\r");
+    Log_error("WRONG_FILE");
     delete png;
     return PNG_WRONG_FORMAT;
   }
