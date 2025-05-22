@@ -105,7 +105,6 @@ void bl_init(void)
   Serial.begin(115200);
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
   Log_info("BL init success");
-  Log_info("Firmware version %d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
   pins_init();
 
   wakeup_reason = esp_sleep_get_wakeup_cause();
@@ -229,6 +228,9 @@ void bl_init(void)
   // Mount SPIFFS
   filesystem_init();
 
+  Log_info("Firmware version %d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
+  Log_info("Arduino version %d.%d.%d", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
+  Log_info("ESP-IDF version %d.%d.%d", ESP_IDF_VERSION_MAJOR, ESP_IDF_VERSION_MINOR, ESP_IDF_VERSION_PATCH);
   list_files();
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
