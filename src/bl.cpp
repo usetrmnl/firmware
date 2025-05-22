@@ -626,8 +626,8 @@ static https_request_err_e downloadAndShow()
 
           const char *headers[] = {"Content-Type"};
           https.collectHeaders(headers, 1);
-          Log.info("%s [%d]: [HTTPS] GET..\r\n", __FILE__, __LINE__);
-          Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
+          Log_info("GET...");
+          Log_info("RSSI: %d", WiFi.RSSI());
           // start connection and send HTTP header
           int httpCode = https.GET();
           int content_size = https.getSize();
@@ -862,7 +862,7 @@ static https_request_err_e downloadAndShow()
 
   if (result == HTTPS_UNABLE_TO_CONNECT)
   {
-    Log.error("%s [%d]: unable to connect\r\n", __FILE__, __LINE__);
+    Log_error("unable to connect");
     submit_log("unable to connect to the API");
   }
 
@@ -871,7 +871,7 @@ static https_request_err_e downloadAndShow()
     send_log = false;
   }
 
-  Log.info("%s [%d]: Returned result - %d\r\n", __FILE__, __LINE__, result);
+  Log_info("Returned result - %d", result);
 
   return result;
 }
