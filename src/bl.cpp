@@ -1490,14 +1490,14 @@ static void getDeviceCredentials()
             }
             else if (url_status == 404)
             {
-                Log.info("%s [%d]: MAC Address is not registered on server\r\n", __FILE__, __LINE__);
+              Log.info("%s [%d]: MAC Address is not registered on server\r\n", __FILE__, __LINE__);
 
-                showMessageWithLogo(MAC_NOT_REGISTERED, apiResponse);
+              showMessageWithLogo(MAC_NOT_REGISTERED, apiResponse);
 
-                preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+              preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
 
-                display_sleep();
-                goToSleep();
+              display_sleep();
+              goToSleep();
             }
             else
             {
@@ -1766,7 +1766,7 @@ static void goToSleep(void)
 #elif CONFIG_IDF_TARGET_ESP32C3
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
 #else
-  #error "Unsupported ESP32 target for GPIO wakeup configuration"
+#error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
   esp_deep_sleep_start();
 }
@@ -2086,7 +2086,7 @@ DeviceStatusStamp getDeviceStatusStamp()
   deviceStatus.refresh_rate = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY);
   deviceStatus.time_since_last_sleep = time_since_sleep;
   snprintf(deviceStatus.current_fw_version, sizeof(deviceStatus.current_fw_version), "%d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
-  parseSpecialFunctionToStr(deviceStatus.special_function,sizeof(deviceStatus.special_function), special_function);
+  parseSpecialFunctionToStr(deviceStatus.special_function, sizeof(deviceStatus.special_function), special_function);
   deviceStatus.battery_voltage = readBatteryVoltage();
   parseWakeupReasonToStr(deviceStatus.wakeup_reason, sizeof(deviceStatus.wakeup_reason), esp_sleep_get_wakeup_cause());
   deviceStatus.free_heap_size = ESP.getFreeHeap();
