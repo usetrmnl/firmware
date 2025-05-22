@@ -229,6 +229,8 @@ void bl_init(void)
   // Mount SPIFFS
   filesystem_init();
 
+  list_files();
+
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
   if (WifiCaptivePortal.isSaved())
   {
