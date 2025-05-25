@@ -1497,7 +1497,7 @@ static void getDeviceCredentials()
             }
             else if (url_status == 404)
             {
-              Log.info("%s [%d]: MAC Address is not registered on server\r\n", __FILE__, __LINE__);
+              Log_info("MAC Address is not registered on server");
 
               showMessageWithLogo(MAC_NOT_REGISTERED, apiResponse);
 
