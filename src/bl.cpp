@@ -30,6 +30,7 @@
 #include "http_client.h"
 #include <api-client/display.h>
 #include "driver/gpio.h"
+#include <nvs.h>
 
 bool pref_clear = false;
 String new_filename = "";
@@ -80,6 +81,7 @@ static bool checkCurrentFileName(String &newName);
 static DeviceStatusStamp getDeviceStatusStamp();
 bool SerializeJsonLog(DeviceStatusStamp device_status_stamp, time_t timestamp, int codeline, const char *source_file, char *log_message, uint32_t log_id);
 int submitLog(const char *format, time_t time, int line, const char *file, ...);
+void log_nvs_usage();
 
 #define submit_log(format, ...) submitLog(format, getTime(), __LINE__, __FILE__, ##__VA_ARGS__);
 
@@ -232,6 +234,7 @@ void bl_init(void)
   Log_info("Arduino version %d.%d.%d", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
   Log_info("ESP-IDF version %d.%d.%d", ESP_IDF_VERSION_MAJOR, ESP_IDF_VERSION_MINOR, ESP_IDF_VERSION_PATCH);
   list_files();
+  log_nvs_usage();
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
   if (WifiCaptivePortal.isSaved())
@@ -2154,4 +2157,21 @@ int submitLog(const char *format, time_t time, int line, const char *file, ...)
   preferences.putUInt(PREFERENCES_LOG_ID_KEY, ++log_id);
 
   return result;
+}
+
+void log_nvs_usage()
+{
+  nvs_stats_t nv;
+  esp_err_t ret = nvs_get_stats(NULL, &nv);
+  if (ret == ESP_OK)
+  {
+    float percent = (float)nv.used_entries / (float)nv.total_entries * 100.0f;
+    char percent_str[16];
+    dtostrf(percent, 0, 2, percent_str); // 2 decimal places
+    Log_info("NVS Usage: %d/%d entries (%s%%)", nv.used_entries, nv.total_entries, percent_str);
+  }
+  else
+  {
+    Log_error("Failed to get NVS stats: %s", esp_err_to_name(ret));
+  }
 }
