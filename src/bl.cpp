@@ -111,27 +111,6 @@ void bl_init(void)
 
   wakeup_reason = esp_sleep_get_wakeup_cause();
 
-  Log.info("%s [%d]: preferences start\r\n", __FILE__, __LINE__);
-  bool res = preferences.begin("data", false);
-  if (res)
-  {
-    Log.info("%s [%d]: preferences init success\r\n", __FILE__, __LINE__);
-    if (pref_clear)
-    {
-      res = preferences.clear(); // if needed to clear the saved data
-      if (res)
-        Log.info("%s [%d]: preferences cleared success\r\n", __FILE__, __LINE__);
-      else
-        Log_fatal("preferences clearing error");
-    }
-  }
-  else
-  {
-    Log.fatal("%s [%d]: preferences init failed\r\n", __FILE__, __LINE__);
-    ESP.restart();
-  }
-  Log.info("%s [%d]: preferences end\r\n", __FILE__, __LINE__);
-
   if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO)
   {
     auto button = read_button_presses();
@@ -156,6 +135,27 @@ void bl_init(void)
     wait_for_serial();
     Log_info("Non-GPIO wakeup (%d) -> didn't read buttons", wakeup_reason);
   }
+
+  Log_info("preferences start");
+  bool res = preferences.begin("data", false);
+  if (res)
+  {
+    Log_info("preferences init success (%d free entries)", preferences.freeEntries());
+    if (pref_clear)
+    {
+      res = preferences.clear(); // if needed to clear the saved data
+      if (res)
+        Log_info("preferences cleared success");
+      else
+        Log_fatal("preferences clearing error");
+    }
+  }
+  else
+  {
+    Log_fatal("preferences init failed");
+    ESP.restart();
+  }
+  Log_info("preferences end");
 
   if (double_click)
   { // special function reading
