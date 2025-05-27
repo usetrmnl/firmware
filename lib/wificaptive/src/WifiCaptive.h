@@ -9,7 +9,6 @@
 #include "Preferences.h"
 #include "WifiCaptivePage.h"
 #include <ArduinoJson.h>
-#include <ArduinoLog.h>
 
 #define WIFI_SSID "TRMNL"
 #define WIFI_PASSWORD NULL

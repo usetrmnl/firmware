@@ -12,11 +12,15 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload)
   if (error)
   {
     Log_error("JSON deserialization error.");
-    return {.outcome = ApiDisplayOutcome::DeserializationError};
+    return ApiDisplayResponse{
+        .outcome = ApiDisplayOutcome::DeserializationError,
+        .error_detail = error.c_str()};
   }
   String special_function_str = doc["special_function"];
 
   return ApiDisplayResponse{
+      .outcome = ApiDisplayOutcome::Ok,
+      .error_detail = "",
       .status = doc["status"],
       .image_url = doc["image_url"] | "",
       .image_url_timeout = doc["image_url_timeout"],
@@ -27,5 +31,5 @@ ApiDisplayResponse parseResponse_apiDisplay(String &payload)
       .reset_firmware = doc["reset_firmware"],
       .special_function = parseSpecialFunction(special_function_str),
       .action = doc["action"] | "",
-      };
+  };
 }

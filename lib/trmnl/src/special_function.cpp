@@ -31,13 +31,13 @@ SPECIAL_FUNCTION parseSpecialFunction(String &special_function_str)
   return SF_NONE;
 }
 
-bool parseSpecialFunctionToStr(char *buffer, SPECIAL_FUNCTION special_function)
+bool parseSpecialFunctionToStr(char *buffer,size_t buffer_size, SPECIAL_FUNCTION special_function)
 {
   for (const SpecialFunctionMap &entry : specialFunctionMap)
   {
     if (special_function == entry.value)
     {
-      strncpy(buffer, entry.name, sizeof(buffer));
+      strncpy(buffer, entry.name, buffer_size);
       return true;
     }
   }

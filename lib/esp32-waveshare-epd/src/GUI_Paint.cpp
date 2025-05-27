@@ -940,11 +940,11 @@ void Paint_DrawBitMap(const unsigned char *image_buffer)
         for (x = 0; x < Paint.WidthByte; x++)
         { // 8 pixel =  1 byte
             Addr = x + y * Paint.WidthByte;
-            Addr_in = (479 - y) * 100 + x; 
-            //Serial.print("Addr: ");
-            //Serial.print(Addr);
-            //Serial.print("Addr_in: ");
-            //Serial.println(Addr_in);
+            Addr_in = (479 - y) * 100 + x;
+            // Serial.print("Addr: ");
+            // Serial.print(Addr);
+            // Serial.print("Addr_in: ");
+            // Serial.println(Addr_in);
             Paint.Image[Addr] = (unsigned char)image_buffer[Addr_in];
         }
     }

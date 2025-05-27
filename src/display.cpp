@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include "png_flip.h"
 #include <display.h>
-#include <ArduinoLog.h>
 #include "DEV_Config.h"
 #include "utility/Debug.h"
 #include "utility/EPD_7in5_V2.h"
@@ -9,6 +8,8 @@
 #include "GUI_Paint.h"
 #include <config.h>
 #include <ImageData.h>
+#include <ctype.h> //iscntrl()
+#include <trmnl_log.h>
 
 /**
  * @brief Function to init the display
@@ -17,13 +18,13 @@
  */
 void display_init(void)
 {
-    Log.info("%s [%d]: dev module start\r\n", __FILE__, __LINE__);
+    Log_info("dev module start");
     DEV_Module_Init();
-    Log.info("%s [%d]: dev module end\r\n", __FILE__, __LINE__);
+    Log_info("dev module end");
 
-    Log.info("%s [%d]: screen hw start\r\n", __FILE__, __LINE__);
+    Log_info("screen hw start");
     EPD_7IN5_V2_Init_New();
-    Log.info("%s [%d]: screen hw end\r\n", __FILE__, __LINE__);
+    Log_info("screen hw end");
 }
 
 /**
@@ -33,9 +34,9 @@ void display_init(void)
  */
 void display_reset(void)
 {
-    Log.info("%s [%d]: e-Paper Clear start\r\n", __FILE__, __LINE__);
+    Log_info("e-Paper Clear start");
     EPD_7IN5_V2_Clear();
-    Log.info("%s [%d]:  e-Paper Clear end\r\n", __FILE__, __LINE__);
+    Log_info("e-Paper Clear end");
     // DEV_Delay_ms(500);
 }
 
@@ -58,6 +59,159 @@ uint16_t display_width()
 }
 
 /**
+ * @brief Function to draw multi-line text onto the display
+ * @param x_start X coordinate to start drawing
+ * @param y_start Y coordinate to start drawing
+ * @param message Text message to draw
+ * @param max_width Maximum width in pixels for each line
+ * @param font_width Width of a single character in pixels
+ * @param color_fg Foreground color
+ * @param color_bg Background color
+ * @param font Font to use
+ * @param is_center_aligned If true, center the text; if false, left-align
+ * @return none
+ */
+void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
+                             uint16_t max_width, uint16_t font_width,
+                             UWORD color_fg, UWORD color_bg, sFONT *font,
+                             bool is_center_aligned)
+{
+    uint16_t display_width_pixels = max_width;
+    int max_chars_per_line = display_width_pixels / font_width;
+
+    uint8_t MAX_LINES = 4;
+
+    char lines[MAX_LINES][max_chars_per_line + 1] = {0};
+    uint16_t line_count = 0;
+
+    int text_len = strlen(message);
+    int current_width = 0;
+    int line_index = 0;
+    int line_pos = 0;
+    int word_start = 0;
+    int i = 0;
+    char word_buffer[max_chars_per_line + 1] = {0};
+    int word_length = 0;
+
+    while (i <= text_len && line_index < MAX_LINES)
+    {
+        word_length = 0;
+        word_start = i;
+
+        // Skip leading spaces
+        while (i < text_len && message[i] == ' ')
+        {
+            i++;
+        }
+        word_start = i;
+
+        // Find end of word or end of text
+        while (i < text_len && message[i] != ' ')
+        {
+            i++;
+        }
+
+        word_length = i - word_start;
+        if (word_length > max_chars_per_line)
+        {
+            word_length = max_chars_per_line; // Truncate if word is too long
+        }
+
+        if (word_length > 0)
+        {
+            strncpy(word_buffer, message + word_start, word_length);
+            word_buffer[word_length] = '\0';
+        }
+        else
+        {
+            i++;
+            continue;
+        }
+
+        int word_width = word_length * font_width;
+
+        // Check if adding the word exceeds max_width
+        if (current_width + word_width + (current_width > 0 ? font_width : 0) <= display_width_pixels)
+        {
+            // Add space before word if not the first word in the line
+            if (current_width > 0 && line_pos < max_chars_per_line - 1)
+            {
+                lines[line_index][line_pos++] = ' ';
+                current_width += font_width;
+            }
+
+            // Add word to current line
+            if (line_pos + word_length <= max_chars_per_line)
+            {
+                strcpy(&lines[line_index][line_pos], word_buffer);
+                line_pos += word_length;
+                current_width += word_width;
+            }
+        }
+        else
+        {
+            // Current line is full, draw it
+            if (line_pos > 0)
+            {
+                lines[line_index][line_pos] = '\0'; // Null-terminate the current line
+                line_index++;
+                line_count++;
+
+                if (line_index >= MAX_LINES)
+                {
+                    break;
+                }
+
+                // Start new line with this word
+                strncpy(lines[line_index], word_buffer, word_length);
+                line_pos = word_length;
+                current_width = word_width;
+            }
+            else
+            {
+                // Single long word case
+                strncpy(lines[line_index], word_buffer, max_chars_per_line);
+                lines[line_index][max_chars_per_line] = '\0';
+                line_index++;
+                line_count++;
+                line_pos = 0;
+                current_width = 0;
+            }
+        }
+
+        // Move to next word
+        if (message[i] == ' ')
+        {
+            i++;
+        }
+    }
+
+    // Store the last line if any
+    if (line_pos > 0 && line_index < MAX_LINES)
+    {
+        lines[line_index][line_pos] = '\0';
+        line_count++;
+    }
+
+    // Draw the lines
+    for (int j = 0; j < line_count; j++)
+    {
+        uint16_t line_width = strlen(lines[j]) * font_width;
+        uint16_t draw_x = x_start;
+
+        if (is_center_aligned)
+        {
+            if (line_width < max_width)
+            {
+                draw_x = x_start + (max_width - line_width) / 2;
+            }
+        }
+
+        Paint_DrawString_EN(draw_x, y_start + j * (font->Height + 5), lines[j], font, color_fg, color_bg);
+    }
+}
+
+/**
  * @brief Function to show the image on the display
  * @param image_buffer pointer to the uint8_t image buffer
  * @param reverse shows if the color scheme is reverse
@@ -72,40 +226,41 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
     /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
     
-    Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
-    Log.error("%s [%d]: free alloc heap - %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
+    Log_error("free heap - %d", ESP.getFreeHeap());
+    Log_error("free alloc heap - %d", ESP.getMaxAllocHeap());
     if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
     {
-        Log.fatal("%s [%d]: Failed to apply for black memory...\r\n", __FILE__, __LINE__);
+        Log_fatal("Failed to apply for black memory...");
         ESP.restart();
     }
-    Log.info("%s [%d]: Paint_NewImage %d\r\n", __FILE__, __LINE__, reverse);
+    Log_info("Paint_NewImage %d", reverse);
     
     Paint_NewImage(BlackImage, width, height, 0, WHITE);
 
-    Log.info("%s [%d]: show image for array\r\n", __FILE__, __LINE__);
+    Log_info("show image for array");
     Paint_SelectImage(BlackImage);
     Paint_Clear(WHITE);
     if (reverse)
     {
-        Log.info("%s [%d]: inverse the image\r\n", __FILE__, __LINE__);
+        Log_info("inverse the image");
         for (size_t i = 0; i < DISPLAY_BMP_IMAGE_SIZE; i++)
         {
             image_buffer[i] = ~image_buffer[i];
         }
     }
-    if(isPNG == true)
+    if (isPNG == true)
     {
-        Log.info("Drawing PNG\n");
+        Log_info("Drawing PNG");
         flip_image(image_buffer, width, height);
-        horizontal_mirror(image_buffer,width,height);
+        horizontal_mirror(image_buffer, width, height);
         Paint_DrawBitMap(image_buffer);
     }
-    else{
+    else
+    {
         Paint_DrawBitMap(image_buffer + 62);
     }
     EPD_7IN5_V2_Display(BlackImage);
-    Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
+    Log_info("display");
 
     free(BlackImage);
     BlackImage = NULL;
@@ -124,18 +279,18 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     UBYTE *BlackImage;
     /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
-    Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
-    Log.error("%s [%d]: free alloc heap - %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
+    Log_error("free heap - %d", ESP.getFreeHeap());
+    Log_error("free alloc heap - %d", ESP.getMaxAllocHeap());
     if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
     {
-        Log.fatal("%s [%d]: Failed to apply for black memory...\r\n", __FILE__, __LINE__);
+        Log_fatal("Failed to apply for black memory...");
         ESP.restart();
     }
 
-    Log.info("%s [%d]: Paint_NewImage\r\n", __FILE__, __LINE__);
+    Log_info("Paint_NewImage");
     Paint_NewImage(BlackImage, width, height, 0, WHITE);
 
-    Log.info("%s [%d]: show image for array\r\n", __FILE__, __LINE__);
+    Log_info("show image for array");
     Paint_SelectImage(BlackImage);
     Paint_Clear(WHITE);
     Paint_DrawBitMap(image_buffer + 62);
@@ -225,16 +380,6 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
         Paint_DrawString_EN((800 - sizeof(string1) > 9) * 17 ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 400, string1, &Font24, WHITE, BLACK);
     }
     break;
-    case MAC_NOT_REGISTERED:
-    {
-        char string1[] = "MAC Address is not registered,";
-        Paint_DrawString_EN((800 - sizeof(string1) * 17 > 9) ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 370, string1, &Font24, WHITE, BLACK);
-        char string2[] = "so API is not available.";
-        Paint_DrawString_EN((800 - sizeof(string2) * 17 > 9) ? (800 - sizeof(string2) * 17) / 2 + 9 : 0, 400, string2, &Font24, WHITE, BLACK);
-        char string3[] = "Contact support for details.";
-        Paint_DrawString_EN((800 - sizeof(string3) * 17 > 9) ? (800 - sizeof(string3) * 17) / 2 + 9 : 0, 430, string3, &Font24, WHITE, BLACK);
-        break;
-    }
     case TEST:
     {
         Paint_DrawString_EN(0, 0, "ABCDEFGHIYABCDEFGHIYABCDEFGHIYABCDEFGHIYABCDEFGHIY", &Font24, WHITE, BLACK);
@@ -248,7 +393,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     }
 
     EPD_7IN5_V2_Display(BlackImage);
-    Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
+    Log_info("display");
     free(BlackImage);
     BlackImage = NULL;
 }
@@ -267,7 +412,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
 {
     if (message_type == WIFI_CONNECT)
     {
-        Log.info("%s [%d]: Display set to white\r\n", __FILE__, __LINE__);
+        Log_info("Display set to white");
         EPD_7IN5_V2_ClearWhite();
         delay(1000);
     }
@@ -277,18 +422,18 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     UBYTE *BlackImage;
     /* you have to edit the startup_stm32fxxx.s file and set a big enough heap size */
     UWORD Imagesize = ((width % 8 == 0) ? (width / 8) : (width / 8 + 1)) * height;
-    Log.error("%s [%d]: free heap - %d\r\n", __FILE__, __LINE__, ESP.getFreeHeap());
-    Log.error("%s [%d]: free alloc heap - %d\r\n", __FILE__, __LINE__, ESP.getMaxAllocHeap());
+    Log_error("free heap - %d", ESP.getFreeHeap());
+    Log_error("free alloc heap - %d", ESP.getMaxAllocHeap());
     if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL)
     {
-        Log.fatal("%s [%d]: Failed to apply for black memory...\r\n", __FILE__, __LINE__);
+        Log_fatal("Failed to apply for black memory...");
         ESP.restart();
     }
 
-    Log.info("%s [%d]: Paint_NewImage\r\n", __FILE__, __LINE__);
+    Log_info("Paint_NewImage");
     Paint_NewImage(BlackImage, width, height, 0, WHITE);
 
-    Log.info("%s [%d]: show image for array\r\n", __FILE__, __LINE__);
+    Log_info("show image for array");
     Paint_SelectImage(BlackImage);
 
 #if defined(SVG_LOGO)
@@ -305,7 +450,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     {
     case FRIENDLY_ID:
     {
-        Log.info("%s [%d]: friendly id case\r\n", __FILE__, __LINE__);
+        Log_info("friendly id case");
         char string1[] = "Please sign up at usetrmnl.com/signup";
         Paint_DrawString_EN((800 - sizeof(string1) * 17 > 9) ? (800 - sizeof(string1) * 17) / 2 + 9 : 0, 400, string1, &Font24, WHITE, BLACK);
 
@@ -320,7 +465,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     break;
     case WIFI_CONNECT:
     {
-        Log.info("%s [%d]: wifi connect case\r\n", __FILE__, __LINE__);
+        Log_info("wifi connect case");
 
         String string1 = "FW: ";
         string1 += fw_version;
@@ -335,12 +480,18 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
         Paint_DrawImage(wifi_connect_qr, 640, 337, 130, 130);
     }
     break;
+    case MAC_NOT_REGISTERED:
+    {
+        UWORD y_start = 340;
+        Paint_DrawMultilineText(0, y_start, message.c_str(), width, Font24.Width, WHITE, BLACK, &Font24, true);
+    }
+    break;
     default:
         break;
     }
-    Log.info("%s [%d]: Start drawing...\r\n", __FILE__, __LINE__);
+    Log_info("Start drawing...");
     EPD_7IN5_V2_Display(BlackImage);
-    Log.info("%s [%d]: display\r\n", __FILE__, __LINE__);
+    Log_info("display");
     free(BlackImage);
     BlackImage = NULL;
 }
@@ -352,6 +503,6 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
  */
 void display_sleep(void)
 {
-    Log.info("%s [%d]: Goto Sleep...\r\n", __FILE__, __LINE__);
-    EPD_7IN5_V2_Sleep();
+    Log_info("Goto Sleep...");
+    EPD_7IN5B_V2_Sleep();
 }
