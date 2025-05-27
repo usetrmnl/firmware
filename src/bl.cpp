@@ -30,6 +30,7 @@
 #include "http_client.h"
 #include <api-client/display.h>
 #include "driver/gpio.h"
+#include <nvs.h>
 
 bool pref_clear = false;
 String new_filename = "";
@@ -80,6 +81,7 @@ static bool checkCurrentFileName(String &newName);
 static DeviceStatusStamp getDeviceStatusStamp();
 bool SerializeJsonLog(DeviceStatusStamp device_status_stamp, time_t timestamp, int codeline, const char *source_file, char *log_message, uint32_t log_id);
 int submitLog(const char *format, time_t time, int line, const char *file, ...);
+void log_nvs_usage();
 
 #define submit_log(format, ...) submitLog(format, getTime(), __LINE__, __FILE__, ##__VA_ARGS__);
 
@@ -105,31 +107,9 @@ void bl_init(void)
   Serial.begin(115200);
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
   Log_info("BL init success");
-  Log_info("Firmware version %d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
   pins_init();
 
   wakeup_reason = esp_sleep_get_wakeup_cause();
-
-  Log.info("%s [%d]: preferences start\r\n", __FILE__, __LINE__);
-  bool res = preferences.begin("data", false);
-  if (res)
-  {
-    Log.info("%s [%d]: preferences init success\r\n", __FILE__, __LINE__);
-    if (pref_clear)
-    {
-      res = preferences.clear(); // if needed to clear the saved data
-      if (res)
-        Log.info("%s [%d]: preferences cleared success\r\n", __FILE__, __LINE__);
-      else
-        Log_fatal("preferences clearing error");
-    }
-  }
-  else
-  {
-    Log.fatal("%s [%d]: preferences init failed\r\n", __FILE__, __LINE__);
-    ESP.restart();
-  }
-  Log.info("%s [%d]: preferences end\r\n", __FILE__, __LINE__);
 
   if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO)
   {
@@ -155,6 +135,27 @@ void bl_init(void)
     wait_for_serial();
     Log_info("Non-GPIO wakeup (%d) -> didn't read buttons", wakeup_reason);
   }
+
+  Log_info("preferences start");
+  bool res = preferences.begin("data", false);
+  if (res)
+  {
+    Log_info("preferences init success (%d free entries)", preferences.freeEntries());
+    if (pref_clear)
+    {
+      res = preferences.clear(); // if needed to clear the saved data
+      if (res)
+        Log_info("preferences cleared success");
+      else
+        Log_fatal("preferences clearing error");
+    }
+  }
+  else
+  {
+    Log_fatal("preferences init failed");
+    ESP.restart();
+  }
+  Log_info("preferences end");
 
   if (double_click)
   { // special function reading
@@ -228,6 +229,12 @@ void bl_init(void)
 
   // Mount SPIFFS
   filesystem_init();
+
+  Log_info("Firmware version %d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
+  Log_info("Arduino version %d.%d.%d", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
+  Log_info("ESP-IDF version %d.%d.%d", ESP_IDF_VERSION_MAJOR, ESP_IDF_VERSION_MINOR, ESP_IDF_VERSION_PATCH);
+  list_files();
+  log_nvs_usage();
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
   if (WifiCaptivePortal.isSaved())
@@ -1481,7 +1488,7 @@ static void getDeviceCredentials()
             }
             else if (url_status == 404)
             {
-              Log.info("%s [%d]: MAC Address is not registered on server\r\n", __FILE__, __LINE__);
+              Log_info("MAC Address is not registered on server");
 
               showMessageWithLogo(MAC_NOT_REGISTERED, apiResponse);
 
@@ -2141,4 +2148,21 @@ int submitLog(const char *format, time_t time, int line, const char *file, ...)
   preferences.putUInt(PREFERENCES_LOG_ID_KEY, ++log_id);
 
   return result;
+}
+
+void log_nvs_usage()
+{
+  nvs_stats_t nv;
+  esp_err_t ret = nvs_get_stats(NULL, &nv);
+  if (ret == ESP_OK)
+  {
+    float percent = (float)nv.used_entries / (float)nv.total_entries * 100.0f;
+    char percent_str[16];
+    dtostrf(percent, 0, 2, percent_str); // 2 decimal places
+    Log_info("NVS Usage: %d/%d entries (%s%%)", nv.used_entries, nv.total_entries, percent_str);
+  }
+  else
+  {
+    Log_error("Failed to get NVS stats: %s", esp_err_to_name(ret));
+  }
 }
