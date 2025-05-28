@@ -37,9 +37,9 @@
 
 enum API_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the API (in seconds)
 {
-    API_FIRST_RETRY = 5,
-    API_SECOND_RETRY = 10,
-    API_THIRD_RETRY = 30
+    API_FIRST_RETRY = 15,
+    API_SECOND_RETRY = 30,
+    API_THIRD_RETRY = 60
 };
 
 enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi-Fi (in seconds)
