@@ -30,6 +30,7 @@
 #include "http_client.h"
 #include <api-client/display.h>
 #include "driver/gpio.h"
+#include <nvs.h>
 
 bool pref_clear = false;
 String new_filename = "";
@@ -80,6 +81,7 @@ static bool checkCurrentFileName(String &newName);
 static DeviceStatusStamp getDeviceStatusStamp();
 bool SerializeJsonLog(DeviceStatusStamp device_status_stamp, time_t timestamp, int codeline, const char *source_file, char *log_message, uint32_t log_id);
 int submitLog(const char *format, time_t time, int line, const char *file, ...);
+void log_nvs_usage();
 
 #define submit_log(format, ...) submitLog(format, getTime(), __LINE__, __FILE__, ##__VA_ARGS__);
 
@@ -105,7 +107,6 @@ void bl_init(void)
   Serial.begin(115200);
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
   Log_info("BL init success");
-  Log_info("Firmware version %d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
   pins_init();
 
 #if defined(BOARD_SEEED_XIAO_ESP32C3) || defined(BOARD_SEEED_XIAO_ESP32S3)
@@ -119,27 +120,6 @@ void bl_init(void)
 #endif
 
   wakeup_reason = esp_sleep_get_wakeup_cause();
-
-  Log.info("%s [%d]: preferences start\r\n", __FILE__, __LINE__);
-  bool res = preferences.begin("data", false);
-  if (res)
-  {
-    Log.info("%s [%d]: preferences init success\r\n", __FILE__, __LINE__);
-    if (pref_clear)
-    {
-      res = preferences.clear(); // if needed to clear the saved data
-      if (res)
-        Log.info("%s [%d]: preferences cleared success\r\n", __FILE__, __LINE__);
-      else
-        Log_fatal("preferences clearing error");
-    }
-  }
-  else
-  {
-    Log.fatal("%s [%d]: preferences init failed\r\n", __FILE__, __LINE__);
-    ESP.restart();
-  }
-  Log.info("%s [%d]: preferences end\r\n", __FILE__, __LINE__);
 
   if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO)
   {
@@ -165,6 +145,27 @@ void bl_init(void)
     wait_for_serial();
     Log_info("Non-GPIO wakeup (%d) -> didn't read buttons", wakeup_reason);
   }
+
+  Log_info("preferences start");
+  bool res = preferences.begin("data", false);
+  if (res)
+  {
+    Log_info("preferences init success (%d free entries)", preferences.freeEntries());
+    if (pref_clear)
+    {
+      res = preferences.clear(); // if needed to clear the saved data
+      if (res)
+        Log_info("preferences cleared success");
+      else
+        Log_fatal("preferences clearing error");
+    }
+  }
+  else
+  {
+    Log_fatal("preferences init failed");
+    ESP.restart();
+  }
+  Log_info("preferences end");
 
   if (double_click)
   { // special function reading
@@ -238,6 +239,12 @@ void bl_init(void)
 
   // Mount SPIFFS
   filesystem_init();
+
+  Log_info("Firmware version %d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
+  Log_info("Arduino version %d.%d.%d", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
+  Log_info("ESP-IDF version %d.%d.%d", ESP_IDF_VERSION_MAJOR, ESP_IDF_VERSION_MINOR, ESP_IDF_VERSION_PATCH);
+  list_files();
+  log_nvs_usage();
 
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
   if (WifiCaptivePortal.isSaved())
@@ -593,303 +600,296 @@ static https_request_err_e downloadAndShow()
   handleApiDisplayResponse(apiDisplayResult.response);
 
   https_request_err_e result = HTTPS_NO_ERR;
-  WiFiClientSecure *secureClient = new WiFiClientSecure;
-  secureClient->setInsecure();
-  WiFiClient *insecureClient = new WiFiClient;
 
-  bool isHttps = true;
-  if (apiDisplayInputs.baseUrl.indexOf("https://") == -1)
-  {
-    isHttps = false;
-  }
-
-  // define client depending on the isHttps variable
-  WiFiClient *client = isHttps ? secureClient : insecureClient;
-
-  if (!client)
-  {
-    Log.error("%s [%d]: Unable to create client\r\n", __FILE__, __LINE__);
-
-    return HTTPS_UNABLE_TO_CONNECT;
-  }
-
-  { // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
-
-    HTTPClient https;
-    if (status && !update_firmware && !reset_firmware)
-    {
-      status = false;
-
-      // The timeout will be zero if no value was returned, and in that case we just use the default timeout.
-      // Otherwise, we set the requested timeout.
-      uint32_t requestedTimeout = apiDisplayResult.response.image_url_timeout;
-      if (requestedTimeout > 0)
+  auto withHttpResult = withHttp(
+      filename,
+      [&](HTTPClient *httpsp, HttpError error) -> https_request_err_e
       {
-        // Convert from seconds to milliseconds.
-        // A uint32_t should be large enough not to worry about overflow for any reasonable timeout.
-        requestedTimeout *= MS_TO_S_FACTOR;
-        if (requestedTimeout > UINT16_MAX)
+        if (error != HttpError::HTTPCLIENT_SUCCESS)
         {
-          // To avoid surprising behaviour if the server returned a timeout of more than 65 seconds
-          // we will send a log message back to the server and truncate the timeout to the maximum.
-          submit_log("Requested image URL timeout too large (%d ms). Using maximum of %d ms.", requestedTimeout, UINT16_MAX);
-          https.setTimeout(UINT16_MAX);
+
+          return HTTPS_UNABLE_TO_CONNECT;
         }
-        else
+
+        HTTPClient &https = *httpsp;
+
+        https.setTimeout(15000);
+	https.setConnectTimeout(15000);
+
+        if (status && !update_firmware && !reset_firmware)
         {
-          https.setTimeout(uint16_t(requestedTimeout));
-        }
-      }
+          status = false;
 
-      Log.info("%s [%d]: [HTTPS] Request to %s\r\n", __FILE__, __LINE__, filename);
-      client = strstr(filename, "https://") == nullptr ? insecureClient : secureClient;
-      if (!https.begin(*client, filename)) // HTTPS
-      {
-        Log.error("%s [%d]: unable to connect\r\n", __FILE__, __LINE__);
-
-        submit_log("unable to connect to the API");
-
-        return HTTPS_UNABLE_TO_CONNECT;
-      }
-      const char *headers[] = {"Content-Type"};
-      https.collectHeaders(headers, 1);
-      Log.info("%s [%d]: [HTTPS] GET..\r\n", __FILE__, __LINE__);
-      Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
-      // start connection and send HTTP header
-      int httpCode = https.GET();
-      int content_size = https.getSize();
-
-      // httpCode will be negative on error
-      if (httpCode < 0)
-      {
-        Log.error("%s [%d]: [HTTPS] GET... failed, error: %d (%s)\r\n", __FILE__, __LINE__, httpCode, https.errorToString(httpCode).c_str());
-
-        submit_log("HTTP Client failed with error: %s", https.errorToString(httpCode).c_str());
-
-        return HTTPS_REQUEST_FAILED;
-      }
-
-      // HTTP header has been send and Server response header has been handled
-      Log.error("%s [%d]: [HTTPS] GET... code: %d\r\n", __FILE__, __LINE__, httpCode);
-      Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
-      // file found at server
-      if (httpCode != HTTP_CODE_OK && httpCode != HTTP_CODE_MOVED_PERMANENTLY)
-      {
-        Log.error("%s [%d]: [HTTPS] GET... failed, code: %d (%s)\r\n", __FILE__, __LINE__, httpCode, https.errorToString(httpCode).c_str());
-
-        submit_log("HTTPS returned code is not OK. Code: %d", httpCode);
-        return HTTPS_REQUEST_FAILED;
-      }
-      Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
-
-      uint32_t counter = 0;
-      if (content_size > DISPLAY_BMP_IMAGE_SIZE)
-      {
-        Log.error("%s [%d]: Receiving failed. Bad file size\r\n", __FILE__, __LINE__);
-
-        submit_log("HTTPS request error. Returned code - %d, available bytes - %d, received bytes - %d", httpCode, https.getSize(), counter);
-
-        return HTTPS_REQUEST_FAILED;
-      }
-      WiFiClient *stream = https.getStreamPtr();
-      Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
-      Log.info("%s [%d]: Stream timeout: %d\r\n", __FILE__, __LINE__, stream->getTimeout());
-
-      Log.info("%s [%d]: Stream available: %d\r\n", __FILE__, __LINE__, stream->available());
-
-      uint32_t timer = millis();
-      while (stream->available() < 4000 && millis() - timer < 1000)
-        ;
-
-      Log.info("%s [%d]: Stream available: %d\r\n", __FILE__, __LINE__, stream->available());
-
-      bool isPNG = https.header("Content-Type") == "image/png";
-      int iteration_counter = 0;
-
-      unsigned long download_start = millis();
-
-      Log.info("%s [%d]: Starting a download at: %d\r\n", __FILE__, __LINE__, getTime());
-      heap_caps_check_integrity_all(true);
-      buffer = (uint8_t *)malloc(content_size);
-      int counter2 = content_size;
-      while (counter != content_size && millis() - download_start < 10000)
-      {
-        if (stream->available())
-        {
-          Log.info("%s [%d]: Downloading... Available bytes: %d\r\n", __FILE__, __LINE__, stream->available());
-          counter += stream->readBytes(buffer + counter, counter2 -= counter);
-          if (counter >= 2)
+          // The timeout will be zero if no value was returned, and in that case we just use the default timeout.
+          // Otherwise, we set the requested timeout.
+          uint32_t requestedTimeout = apiDisplayResult.response.image_url_timeout;
+          if (requestedTimeout > 0)
           {
-            if (buffer[0] == 'B' && buffer[1] == 'M')
+            // Convert from seconds to milliseconds.
+            // A uint32_t should be large enough not to worry about overflow for any reasonable timeout.
+            requestedTimeout *= MS_TO_S_FACTOR;
+            if (requestedTimeout > UINT16_MAX)
             {
-              isPNG = false;
-              Log.info("BMP file detected");
+              // To avoid surprising behaviour if the server returned a timeout of more than 65 seconds
+              // we will send a log message back to the server and truncate the timeout to the maximum.
+              submit_log("Requested image URL timeout too large (%d ms). Using maximum of %d ms.", requestedTimeout, UINT16_MAX);
+              https.setTimeout(UINT16_MAX);
+            }
+            else
+            {
+              https.setTimeout(uint16_t(requestedTimeout));
             }
           }
-          iteration_counter++;
+
+          const char *headers[] = {"Content-Type"};
+          https.collectHeaders(headers, 1);
+          Log_info("GET...");
+          Log_info("RSSI: %d", WiFi.RSSI());
+          // start connection and send HTTP header
+          int httpCode = https.GET();
+          int content_size = https.getSize();
+
+          // httpCode will be negative on error
+          if (httpCode < 0)
+          {
+            Log.error("%s [%d]: [HTTPS] GET... failed, error: %d (%s)\r\n", __FILE__, __LINE__, httpCode, https.errorToString(httpCode).c_str());
+
+            submit_log("HTTP Client failed with error: %s", https.errorToString(httpCode).c_str());
+
+            return HTTPS_REQUEST_FAILED;
+          }
+
+          // HTTP header has been send and Server response header has been handled
+          Log.error("%s [%d]: [HTTPS] GET... code: %d\r\n", __FILE__, __LINE__, httpCode);
+          Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
+          // file found at server
+          if (httpCode != HTTP_CODE_OK && httpCode != HTTP_CODE_MOVED_PERMANENTLY)
+          {
+            Log.error("%s [%d]: [HTTPS] GET... failed, code: %d (%s)\r\n", __FILE__, __LINE__, httpCode, https.errorToString(httpCode).c_str());
+
+            submit_log("HTTPS returned code is not OK. Code: %d", httpCode);
+            return HTTPS_REQUEST_FAILED;
+          }
+          Log.info("%s [%d]: Content size: %d\r\n", __FILE__, __LINE__, https.getSize());
+
+          uint32_t counter = 0;
+          if (content_size > DISPLAY_BMP_IMAGE_SIZE)
+          {
+            Log.error("%s [%d]: Receiving failed. Bad file size\r\n", __FILE__, __LINE__);
+
+            submit_log("HTTPS request error. Returned code - %d, available bytes - %d, received bytes - %d", httpCode, https.getSize(), counter);
+
+            return HTTPS_REQUEST_FAILED;
+          }
+          WiFiClient *stream = https.getStreamPtr();
+          Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
+          Log.info("%s [%d]: Stream timeout: %d\r\n", __FILE__, __LINE__, stream->getTimeout());
+
+          Log.info("%s [%d]: Stream available: %d\r\n", __FILE__, __LINE__, stream->available());
+
+          uint32_t timer = millis();
+          while (stream->available() < 4000 && millis() - timer < 1000)
+            ;
+
+          Log.info("%s [%d]: Stream available: %d\r\n", __FILE__, __LINE__, stream->available());
+
+          bool isPNG = https.header("Content-Type") == "image/png";
+          int iteration_counter = 0;
+
+          unsigned long download_start = millis();
+
+          Log.info("%s [%d]: Starting a download at: %d\r\n", __FILE__, __LINE__, getTime());
+          heap_caps_check_integrity_all(true);
+          buffer = (uint8_t *)malloc(content_size);
+          int counter2 = content_size;
+          while (counter != content_size && millis() - download_start < 10000)
+          {
+            if (stream->available())
+            {
+              Log.info("%s [%d]: Downloading... Available bytes: %d\r\n", __FILE__, __LINE__, stream->available());
+              counter += stream->readBytes(buffer + counter, counter2 -= counter);
+              if (counter >= 2)
+              {
+                if (buffer[0] == 'B' && buffer[1] == 'M')
+                {
+                  isPNG = false;
+                  Log.info("BMP file detected");
+                }
+              }
+              iteration_counter++;
+            }
+
+            delay(10);
+          }
+          Log.info("%s [%d]: Ending a download at: %d, in %d iterations\r\n", __FILE__, __LINE__, getTime(), iteration_counter);
+          if (counter != content_size)
+          {
+
+            Log.error("%s [%d]: Receiving failed. Read: %d\r\n", __FILE__, __LINE__, counter);
+
+            // display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
+            submit_log("HTTPS request error. Returned code - %d, available bytes - %d, received bytes - %d in %d iterations", httpCode, https.getSize(), counter, iteration_counter);
+
+            return HTTPS_WRONG_IMAGE_SIZE;
+          }
+
+          Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
+
+          bool bmp_rename = false;
+
+          if (filesystem_file_exists("/current.bmp") || filesystem_file_exists("/current.png"))
+          {
+            filesystem_file_delete("/last.bmp");
+            filesystem_file_delete("/last.png");
+            filesystem_file_rename("/current.png", "/last.png");
+            filesystem_file_rename("/current.bmp", "/last.bmp");
+          }
+
+          bool image_reverse = false;
+
+          if (isPNG)
+          {
+            writeImageToFile("/current.png", buffer, content_size);
+            delay(100);
+            free(buffer);
+            buffer = nullptr;
+            Log.info("%s [%d]: Decoding png\r\n", __FILE__, __LINE__);
+            png_res = decodePNG("/current.png", decodedPng);
+          }
+          else
+          {
+            bmp_res = parseBMPHeader(buffer, image_reverse);
+            Log.info("%s [%d]: BMP Parsing result: %d\r\n", __FILE__, __LINE__, bmp_res);
+          }
+          Serial.println();
+          String error = "";
+          uint8_t *imagePointer = (decodedPng == nullptr) ? buffer : decodedPng;
+          bool lastImageExists = filesystem_file_exists("/last.bmp") || filesystem_file_exists("/last.png");
+
+          switch (png_res)
+          {
+          case PNG_NO_ERR:
+          {
+
+            Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
+            display_show_image(imagePointer, image_reverse, isPNG);
+
+            // Using filename from API response
+            new_filename = apiDisplayResult.response.filename;
+
+            // Print the extracted string
+            Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
+
+            bool res = saveCurrentFileName(new_filename);
+            if (res)
+              Log.info("%s [%d]: New filename saved\r\n", __FILE__, __LINE__);
+            else
+              Log.error("%s [%d]: New image name saving error!", __FILE__, __LINE__);
+
+            if (result != HTTPS_PLUGIN_NOT_ATTACHED)
+              result = HTTPS_SUCCESS;
+          }
+          break;
+          case PNG_WRONG_FORMAT:
+          {
+            error = "Wrong image format. Did not pass signature check";
+          }
+          break;
+          case PNG_BAD_SIZE:
+          {
+            error = "IMAGE width, height or size are invalid";
+          }
+          break;
+          case PNG_DECODE_ERR:
+          {
+            error = "could not decode png image";
+          }
+          break;
+          case PNG_MALLOC_FAILED:
+          {
+            error = "could not allocate memory for png image decoder";
+          }
+          break;
+          default:
+            break;
+          }
+
+          switch (bmp_res)
+          {
+          case BMP_NO_ERR:
+          {
+            if (!filesystem_file_exists("/current.png"))
+            {
+              writeImageToFile("/current.bmp", buffer, content_size);
+            }
+            Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
+            display_show_image(imagePointer, image_reverse, isPNG);
+
+            // Using filename from API response
+            new_filename = apiDisplayResult.response.filename;
+
+            // Print the extracted string
+            Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
+
+            bool res = saveCurrentFileName(new_filename);
+            if (res)
+              Log.info("%s [%d]: New filename saved\r\n", __FILE__, __LINE__);
+            else
+              Log.error("%s [%d]: New image name saving error!", __FILE__, __LINE__);
+
+            if (result != HTTPS_PLUGIN_NOT_ATTACHED)
+              result = HTTPS_SUCCESS;
+          }
+          break;
+          case BMP_FORMAT_ERROR:
+          {
+            error = "First two header bytes are invalid!";
+          }
+          break;
+          case BMP_BAD_SIZE:
+          {
+            error = "BMP width, height or size are invalid";
+          }
+          break;
+          case BMP_COLOR_SCHEME_FAILED:
+          {
+            error = "BMP color scheme is invalid";
+          }
+          break;
+          case BMP_INVALID_OFFSET:
+          {
+            error = "BMP header offset is invalid";
+          }
+          break;
+          default:
+            break;
+          }
+
+          if (isPNG && png_res != PNG_NO_ERR)
+          {
+            filesystem_file_delete("/current.png");
+            submit_log("error parsing image file - %s", error.c_str());
+
+            return HTTPS_WRONG_IMAGE_FORMAT;
+          }
         }
 
-        delay(10);
-      }
-      Log.info("%s [%d]: Ending a download at: %d, in %d iterations\r\n", __FILE__, __LINE__, getTime(), iteration_counter);
-      if (counter != content_size)
-      {
+        return result;
+      });
 
-        Log.error("%s [%d]: Receiving failed. Read: %d\r\n", __FILE__, __LINE__, counter);
-
-        // display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
-        submit_log("HTTPS request error. Returned code - %d, available bytes - %d, received bytes - %d in %d iterations", httpCode, https.getSize(), counter, iteration_counter);
-
-        return HTTPS_WRONG_IMAGE_SIZE;
-      }
-
-      Log.info("%s [%d]: Received successfully\r\n", __FILE__, __LINE__);
-
-      bool bmp_rename = false;
-
-      if (filesystem_file_exists("/current.bmp") || filesystem_file_exists("/current.png"))
-      {
-        filesystem_file_delete("/last.bmp");
-        filesystem_file_delete("/last.png");
-        filesystem_file_rename("/current.png", "/last.png");
-        filesystem_file_rename("/current.bmp", "/last.bmp");
-      }
-
-      bool image_reverse = false;
-
-      if (isPNG)
-      {
-        writeImageToFile("/current.png", buffer, content_size);
-        delay(100);
-        free(buffer);
-        buffer = nullptr;
-        Log.info("%s [%d]: Decoding png\r\n", __FILE__, __LINE__);
-        png_res = decodePNG("/current.png", decodedPng);
-      }
-      else
-      {
-        bmp_res = parseBMPHeader(buffer, image_reverse);
-        Log.info("%s [%d]: BMP Parsing result: %d\r\n", __FILE__, __LINE__, bmp_res);
-      }
-      Serial.println();
-      String error = "";
-      uint8_t *imagePointer = (decodedPng == nullptr) ? buffer : decodedPng;
-      bool lastImageExists = filesystem_file_exists("/last.bmp") || filesystem_file_exists("/last.png");
-
-      switch (png_res)
-      {
-      case PNG_NO_ERR:
-      {
-
-        Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
-        display_show_image(imagePointer, image_reverse, isPNG);
-
-        // Using filename from API response
-        new_filename = apiDisplayResult.response.filename;
-
-        // Print the extracted string
-        Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
-
-        bool res = saveCurrentFileName(new_filename);
-        if (res)
-          Log.info("%s [%d]: New filename saved\r\n", __FILE__, __LINE__);
-        else
-          Log.error("%s [%d]: New image name saving error!", __FILE__, __LINE__);
-
-        if (result != HTTPS_PLUGIN_NOT_ATTACHED)
-          result = HTTPS_SUCCESS;
-      }
-      break;
-      case PNG_WRONG_FORMAT:
-      {
-        error = "Wrong image format. Did not pass signature check";
-      }
-      break;
-      case PNG_BAD_SIZE:
-      {
-        error = "IMAGE width, height or size are invalid";
-      }
-      break;
-      case PNG_DECODE_ERR:
-      {
-        error = "could not decode png image";
-      }
-      break;
-      case PNG_MALLOC_FAILED:
-      {
-        error = "could not allocate memory for png image decoder";
-      }
-      break;
-      default:
-        break;
-      }
-
-      switch (bmp_res)
-      {
-      case BMP_NO_ERR:
-      {
-        if (!filesystem_file_exists("/current.png"))
-        {
-          writeImageToFile("/current.bmp", buffer, content_size);
-        }
-        Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
-        display_show_image(imagePointer, image_reverse, isPNG);
-
-        // Using filename from API response
-        new_filename = apiDisplayResult.response.filename;
-
-        // Print the extracted string
-        Log.info("%s [%d]: New filename - %s\r\n", __FILE__, __LINE__, new_filename.c_str());
-
-        bool res = saveCurrentFileName(new_filename);
-        if (res)
-          Log.info("%s [%d]: New filename saved\r\n", __FILE__, __LINE__);
-        else
-          Log.error("%s [%d]: New image name saving error!", __FILE__, __LINE__);
-
-        if (result != HTTPS_PLUGIN_NOT_ATTACHED)
-          result = HTTPS_SUCCESS;
-      }
-      break;
-      case BMP_FORMAT_ERROR:
-      {
-        error = "First two header bytes are invalid!";
-      }
-      break;
-      case BMP_BAD_SIZE:
-      {
-        error = "BMP width, height or size are invalid";
-      }
-      break;
-      case BMP_COLOR_SCHEME_FAILED:
-      {
-        error = "BMP color scheme is invalid";
-      }
-      break;
-      case BMP_INVALID_OFFSET:
-      {
-        error = "BMP header offset is invalid";
-      }
-      break;
-      default:
-        break;
-      }
-
-      if (isPNG && png_res != PNG_NO_ERR)
-      {
-        filesystem_file_delete("/current.png");
-        submit_log("error parsing image file - %s", error.c_str());
-
-        return HTTPS_WRONG_IMAGE_FORMAT;
-      }
-    }
+  if (result == HTTPS_UNABLE_TO_CONNECT)
+  {
+    Log_error("unable to connect");
+    submit_log("unable to connect to the API");
   }
 
   if (send_log)
   {
     send_log = false;
   }
-  Log.info("%s [%d]: Returned result - %d\r\n", __FILE__, __LINE__, result);
+
+  Log_info("Returned result - %d", result);
+
   return result;
 }
 
@@ -1425,6 +1425,8 @@ static void getDeviceCredentials()
     {
       // Add a scoping block for HTTPClient https to make sure it is destroyed before WiFiClientSecure *client is
       HTTPClient https;
+      https.setTimeout(15000);
+      https.setConnectTimeout(15000);
 
       Log.info("%s [%d]: [HTTPS] begin /api/setup/ ...\r\n", __FILE__, __LINE__);
       char new_url[200];
@@ -1496,14 +1498,14 @@ static void getDeviceCredentials()
             }
             else if (url_status == 404)
             {
-                Log.info("%s [%d]: MAC Address is not registered on server\r\n", __FILE__, __LINE__);
+              Log_info("MAC Address is not registered on server");
 
-                showMessageWithLogo(MAC_NOT_REGISTERED, apiResponse);
+              showMessageWithLogo(MAC_NOT_REGISTERED, apiResponse);
 
-                preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+              preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
 
-                display_sleep();
-                goToSleep();
+              display_sleep();
+              goToSleep();
             }
             else
             {
@@ -1773,7 +1775,7 @@ static void goToSleep(void)
   esp_deep_sleep_enable_gpio_wakeup(1 << PIN_INTERRUPT, ESP_GPIO_WAKEUP_GPIO_LOW);
 #elif CONFIG_IDF_TARGET_ESP32S3
 #else
-  #error "Unsupported ESP32 target for GPIO wakeup configuration"
+#error "Unsupported ESP32 target for GPIO wakeup configuration"
 #endif
   esp_deep_sleep_start();
 }
@@ -2093,7 +2095,7 @@ DeviceStatusStamp getDeviceStatusStamp()
   deviceStatus.refresh_rate = preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY);
   deviceStatus.time_since_last_sleep = time_since_sleep;
   snprintf(deviceStatus.current_fw_version, sizeof(deviceStatus.current_fw_version), "%d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
-  parseSpecialFunctionToStr(deviceStatus.special_function,sizeof(deviceStatus.special_function), special_function);
+  parseSpecialFunctionToStr(deviceStatus.special_function, sizeof(deviceStatus.special_function), special_function);
   deviceStatus.battery_voltage = readBatteryVoltage();
   parseWakeupReasonToStr(deviceStatus.wakeup_reason, sizeof(deviceStatus.wakeup_reason), esp_sleep_get_wakeup_cause());
   deviceStatus.free_heap_size = ESP.getFreeHeap();
@@ -2157,4 +2159,21 @@ int submitLog(const char *format, time_t time, int line, const char *file, ...)
   preferences.putUInt(PREFERENCES_LOG_ID_KEY, ++log_id);
 
   return result;
+}
+
+void log_nvs_usage()
+{
+  nvs_stats_t nv;
+  esp_err_t ret = nvs_get_stats(NULL, &nv);
+  if (ret == ESP_OK)
+  {
+    float percent = (float)nv.used_entries / (float)nv.total_entries * 100.0f;
+    char percent_str[16];
+    dtostrf(percent, 0, 2, percent_str); // 2 decimal places
+    Log_info("NVS Usage: %d/%d entries (%s%%)", nv.used_entries, nv.total_entries, percent_str);
+  }
+  else
+  {
+    Log_error("Failed to get NVS stats: %s", esp_err_to_name(ret));
+  }
 }

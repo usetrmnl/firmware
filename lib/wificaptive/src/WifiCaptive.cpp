@@ -1,4 +1,5 @@
 #include "WifiCaptive.h"
+#include <trmnl_log.h>
 
 void WifiCaptive::setUpDNSServer(DNSServer &dnsServer, const IPAddress &localIP)
 {
@@ -217,7 +218,7 @@ bool WifiCaptive::startPortal()
     auto status = WiFi.status();
     if (status != WL_CONNECTED)
     {
-        Log.info("Not connected after AP disconnect\r\n");
+        Log_info("Not connected after AP disconnect");
         WiFi.mode(WIFI_STA);
         WiFi.begin(_ssid.c_str(), _password.c_str());
         waitForConnectResult();
@@ -332,7 +333,7 @@ void WifiCaptive::readWifiCredentials()
 
 void WifiCaptive::saveWifiCredentials(String ssid, String pass)
 {
-    Log.info("Saving wifi credentials: %s\r\n", ssid.c_str());
+    Log_info("Saving wifi credentials: %s", ssid.c_str());
 
     // Check if the credentials already exist
     for (u16_t i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
@@ -442,12 +443,12 @@ std::vector<WifiCaptive::Network> WifiCaptive::getScannedUniqueNetworks(bool run
                 // where you can race before the data is parsed. scanComplete will be -2, we'll see that and fail out, but then a few microseconds later it actually
                 // fills in. This fixes that, in case we ever move back to the async version of scanNetworks, but as long as it's sync above it'll work
                 // first shot always.
-                Log.verboseln("Supposedly failed to finish scan, let's wait 10 seconds before checking again");
+                Log_verbose("Supposedly failed to finish scan, let's wait 10 seconds before checking again");
                 delay(10000);
                 n = WiFi.scanComplete();
                 if (n > 0)
                 {
-                    Log.verboseln("Scan actually did complete, we have %d networks, breaking loop.", n);
+                    Log_verbose("Scan actually did complete, we have %d networks, breaking loop.", n);
                     // it didn't actually fail, we just raced before the scan was done filling in data
                     break;
                 }
@@ -459,7 +460,7 @@ std::vector<WifiCaptive::Network> WifiCaptive::getScannedUniqueNetworks(bool run
     }
 
     n = WiFi.scanComplete();
-    Log.verboseln("Scanning networks, final scan result: %d", n);
+    Log_verbose("Scanning networks, final scan result: %d", n);
 
     // Process each found network
     for (int i = 0; i < n; ++i)
@@ -490,10 +491,10 @@ std::vector<WifiCaptive::Network> WifiCaptive::getScannedUniqueNetworks(bool run
         }
     }
 
-    Log.infoln("Unique networks found: %d", uniqueNetworks.size());
+    Log_info("Unique networks found: %d", uniqueNetworks.size());
     for (auto &network : uniqueNetworks)
     {
-        Log.infoln("SSID: %s, RSSI: %d, Open: %d", network.ssid.c_str(), network.rssi, network.open);
+        Log_info("SSID: %s, RSSI: %d, Open: %d", network.ssid.c_str(), network.rssi, network.open);
     }
 
     return uniqueNetworks;
@@ -567,7 +568,7 @@ std::vector<WifiCaptive::Network> WifiCaptive::combineNetworks(
 
 bool WifiCaptive::autoConnect()
 {
-    Log.info("Trying to autoconnect to wifi...\r\n");
+    Log_info("Trying to autoconnect to wifi...");
     readWifiCredentials();
 
     // if last used network is available, try to connect to it
@@ -575,20 +576,20 @@ bool WifiCaptive::autoConnect()
 
     if (_savedWifis[last_used_index].ssid != "")
     {
-        Log.info("Trying to connect to last used %s...\r\n", _savedWifis[last_used_index].ssid.c_str());
+        Log_info("Trying to connect to last used %s...", _savedWifis[last_used_index].ssid.c_str());
         WiFi.setSleep(0);
         WiFi.setMinSecurity(WIFI_AUTH_OPEN);
         WiFi.mode(WIFI_STA);
 
         for (int attempt = 0; attempt < WIFI_CONNECTION_ATTEMPTS; attempt++)
         {
-            Log.info("Attempt %d to connect to %s\r\n", attempt + 1, _savedWifis[last_used_index].ssid.c_str());
+            Log_info("Attempt %d to connect to %s", attempt + 1, _savedWifis[last_used_index].ssid.c_str());
             connect(_savedWifis[last_used_index].ssid, _savedWifis[last_used_index].pswd);
 
             // Check if connected
             if (WiFi.status() == WL_CONNECTED)
             {
-                Log.info("Connected to %s\r\n", _savedWifis[last_used_index].ssid.c_str());
+                Log_info("Connected to %s", _savedWifis[last_used_index].ssid.c_str());
                 return true;
             }
             WiFi.disconnect();
@@ -596,13 +597,13 @@ bool WifiCaptive::autoConnect()
         }
     }
 
-    Log.info("Last used network unavailable, scanning for known networks...\r\n");
+    Log_info("Last used network unavailable, scanning for known networks...");
     std::vector<Network> scanResults = getScannedUniqueNetworks(true);
     std::vector<WifiCaptive::WifiCredentials> sortedNetworks = matchNetworks(scanResults, _savedWifis);
     // if no networks found, try to connect to saved wifis
     if (sortedNetworks.size() == 0)
     {
-        Log.info("No matched networks found in scan, trying all saved networks...\r\n");
+        Log_info("No matched networks found in scan, trying all saved networks...");
         sortedNetworks = std::vector<WifiCredentials>(_savedWifis, _savedWifis + WIFI_MAX_SAVED_CREDS);
     }
 
@@ -614,17 +615,17 @@ bool WifiCaptive::autoConnect()
             continue;
         }
 
-        Log.info("Trying to connect to saved network %s...\r\n", network.ssid.c_str());
+        Log_info("Trying to connect to saved network %s...", network.ssid.c_str());
 
         for (int attempt = 0; attempt < WIFI_CONNECTION_ATTEMPTS; attempt++)
         {
-            Log.info("Attempt %d to connect to %s\r\n", attempt + 1, network.ssid.c_str());
+            Log_info("Attempt %d to connect to %s", attempt + 1, network.ssid.c_str());
             connect(network.ssid, network.pswd);
 
             // Check if connected
             if (WiFi.status() == WL_CONNECTED)
             {
-                Log.info("Connected to %s\r\n", network.ssid.c_str());
+                Log_info("Connected to %s", network.ssid.c_str());
                 // success! save the index of the last used network
                 for (int i = 0; i < WIFI_MAX_SAVED_CREDS; i++)
                 {
@@ -641,7 +642,7 @@ bool WifiCaptive::autoConnect()
         }
     }
 
-    Log.info("Failed to connect to any network\r\n");
+    Log_info("Failed to connect to any network");
     return false;
 }
 
