@@ -105,7 +105,11 @@ void bl_init(void)
 {
 
   Serial.begin(115200);
+#ifdef DEBUG
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
+#else
+  Log.begin(LOG_LEVEL_INFO, &Serial);
+#endif
   Log_info("BL init success");
   pins_init();
 
@@ -124,7 +128,9 @@ void bl_init(void)
   if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO)
   {
     auto button = read_button_presses();
+#ifdef DEBUG
     wait_for_serial();
+#endif
     Log_info("GPIO wakeup (%d) -> button was read (%s)", wakeup_reason, ButtonPressResultNames[button]);
     switch (button)
     {
@@ -142,7 +148,9 @@ void bl_init(void)
   }
   else
   {
+#ifdef DEBUG
     wait_for_serial();
+#endif
     Log_info("Non-GPIO wakeup (%d) -> didn't read buttons", wakeup_reason);
   }
 
