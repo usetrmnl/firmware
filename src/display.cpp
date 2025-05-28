@@ -1,9 +1,9 @@
 #include <Arduino.h>
 #include "png_flip.h"
-#include <display.h>
-#include "DEV_Config.h"
 #include "utility/Debug.h"
+#include "DEV_Config.h"
 #include "utility/EPD_7in5_V2.h"
+#include <display.h>
 #include <draw_scalable.h>
 #include "GUI_Paint.h"
 #include <config.h>
