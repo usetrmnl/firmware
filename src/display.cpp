@@ -285,7 +285,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     Log_info("Paint_NewImage");
     Paint_NewImage(BlackImage, width, height, 0, WHITE);
 
-    Log.info(show image for array\r\n");
+    Log.info("show image for array\r\n");
          // what if it is PNG ?
     // we could copy and swap at the same time...
     flip_image(BlackImage, width, height);
