@@ -494,3 +494,4 @@ void display_sleep(void)
 
     Log_info("Goto Sleep...");
     EPD_7IN5_V2_Sleep();
+}
