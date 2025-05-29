@@ -13,22 +13,20 @@ ApiSetupResponse parseResponse_apiSetup(String &payload)
     return {.outcome = ApiSetupOutcome::DeserializationError};
   }
 
-  if (doc["status"].as<int>() != 200)
+  ApiSetupResponse response;
+  response.status = doc["status"].as<int>();
+  response.message = doc["message"] | "";
+
+  if (response.status != 200)
   {
     Log_info("status FAIL.");
-
-    ApiSetupResponse response = {
-        .outcome = ApiSetupOutcome::StatusError,
-        .status = doc["status"]};
+    response.outcome = ApiSetupOutcome::StatusError;
     return response;
   }
 
-  return {
-      .outcome = ApiSetupOutcome::Ok,
-      .status = doc["status"],
-      .api_key = doc["api_key"] | "",
-      .friendly_id = doc["friendly_id"] | "",
-      .image_url = doc["image_url"] | "",
-      .message = doc["message"] | "",
-  };
+  response.outcome = ApiSetupOutcome::Ok;
+  response.api_key = doc["api_key"] | "";
+  response.friendly_id = doc["friendly_id"] | "";
+  response.image_url = doc["image_url"] | "";
+  return response;
 }

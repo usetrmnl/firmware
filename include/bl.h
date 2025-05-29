@@ -32,6 +32,7 @@ typedef struct DeviceStatusStamp
     float battery_voltage;
     char wakeup_reason[30];
     uint32_t free_heap_size;
+    uint32_t max_alloc_size;
 
     ScreenStatus screen_status;
     

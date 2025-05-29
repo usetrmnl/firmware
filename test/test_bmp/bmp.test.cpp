@@ -1,5 +1,5 @@
 #include <unity.h>
-#include <image_codec.h>
+#include <bmp.h>
 #include <string.h>
 #include <fstream>
 #include <vector>
@@ -39,9 +39,9 @@ void test_parseBMPHeader_BMP_NO_ERR(void)
   auto bmp_data = readBMPFile("./test.bmp");
   bool image_reverse = false;
 
-  image_err_e result = parseBMPHeader(bmp_data.data(), image_reverse);
+  bmp_err_e result = parseBMPHeader(bmp_data.data(), image_reverse);
 
-  TEST_ASSERT_EQUAL(IMAGE_NO_ERR, result);
+  TEST_ASSERT_EQUAL(BMP_NO_ERR, result);
   TEST_ASSERT_EQUAL(false, image_reverse);
 }
 
@@ -59,7 +59,7 @@ void test_parseBMPHeader_BMP_NO_ERR_reversed(void)
   bmp_data[60] = 0;
   bmp_data[61] = 0;
 
-  TEST_ASSERT_EQUAL(IMAGE_NO_ERR, parseBMPHeader(bmp_data.data(), image_reverse));
+  TEST_ASSERT_EQUAL(BMP_NO_ERR, parseBMPHeader(bmp_data.data(), image_reverse));
   TEST_ASSERT_EQUAL(true, image_reverse);
 }
 
@@ -70,7 +70,7 @@ void test_parseBMPHeader_NOT_BMP(void)
 
   bmp_data[0] = 'A';
 
-  TEST_ASSERT_EQUAL(IMAGE_WRONG_FORMAT, parseBMPHeader(bmp_data.data(), image_reverse));
+  TEST_ASSERT_EQUAL(BMP_NOT_BMP, parseBMPHeader(bmp_data.data(), image_reverse));
 }
 
 void test_parseBMPHeader_BMP_BAD_SIZE(void)
@@ -80,7 +80,7 @@ void test_parseBMPHeader_BMP_BAD_SIZE(void)
 
   bmp_data[18] = 123;
 
-  TEST_ASSERT_EQUAL(IMAGE_BAD_SIZE, parseBMPHeader(bmp_data.data(), image_reverse));
+  TEST_ASSERT_EQUAL(BMP_BAD_SIZE, parseBMPHeader(bmp_data.data(), image_reverse));
 }
 
 void test_parseBMPHeader_BMP_COLOR_SCHEME_FAILED(void)

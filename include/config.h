@@ -3,7 +3,7 @@
 
 #define FW_MAJOR_VERSION 1
 #define FW_MINOR_VERSION 5
-#define FW_PATCH_VERSION 0
+#define FW_PATCH_VERSION 5
 
 #define LOG_MAX_NOTES_NUMBER 5
 
@@ -33,11 +33,13 @@
 #define SLEEP_TIME_WHILE_NOT_CONNECTED 5       /* Time ESP32 will go to sleep (in seconds) */
 #define SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED 5 /* Time ESP32 will go to sleep (in seconds) */
 
+#define MS_TO_S_FACTOR 1000                    /* Conversion factor for milliseconds to seconds */
+
 enum API_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the API (in seconds)
 {
-    API_FIRST_RETRY = 5,
-    API_SECOND_RETRY = 10,
-    API_THIRD_RETRY = 30
+    API_FIRST_RETRY = 15,
+    API_SECOND_RETRY = 30,
+    API_THIRD_RETRY = 60
 };
 
 enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi-Fi (in seconds)
@@ -47,9 +49,18 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
     WIFI_THIRD_RETRY = 300
 };
 
+#if defined(BOARD_TRMNL)
 #define PIN_RESET 9
 #define PIN_INTERRUPT 2
+#elif defined(BOARD_WAVESHARE_ESP32_DRIVER)
+#define PIN_RESET 25
+#define PIN_INTERRUPT 16
+#define FAKE_BATTERY_VOLTAGE
+#endif
+
 #define PIN_BATTERY 3
+
+// #define FAKE_BATTERY_VOLTAGE // Uncomment to report 4.2V instead of reading ADC
 
 #define BUTTON_HOLD_TIME 5000
 

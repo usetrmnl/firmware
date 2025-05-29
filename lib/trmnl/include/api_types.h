@@ -30,6 +30,7 @@ enum class ApiDisplayOutcome
 struct ApiDisplayResponse
 {
   ApiDisplayOutcome outcome;
+  String error_detail;
   uint64_t status;
   String image_url;
   uint32_t image_url_timeout;
@@ -40,4 +41,19 @@ struct ApiDisplayResponse
   bool reset_firmware;
   SPECIAL_FUNCTION special_function;
   String action;
+};
+
+struct ApiDisplayInputs
+{
+  String baseUrl;
+  String apiKey;
+  String friendlyId;
+  uint32_t refreshRate;
+  String macAddress;
+  float batteryVoltage;
+  String firmwareVersion;
+  int rssi;
+  int displayWidth;
+  int displayHeight;
+  SPECIAL_FUNCTION specialFunction;
 };
