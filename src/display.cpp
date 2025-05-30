@@ -2,7 +2,8 @@
 #include "png_flip.h"
 #include <display.h>
 #include "DEV_Config.h"
-#include "EPD.h"
+#include "utility/EPD_7in5_V2.h"
+#include "utility/Debug.h"
 #include "GUI_Paint.h"
 #include <config.h>
 #include <ImageData.h>
@@ -235,28 +236,24 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
     
     Paint_NewImage(BlackImage, width, height, 0, WHITE);
 
-    Log_info("show image for array");
-    Paint_SelectImage(BlackImage);
-    Paint_Clear(WHITE);
+    Log.info("show image for array\r\n");
     if (reverse)
     {
-        Log_info("inverse the image");
-        for (size_t i = 0; i < DISPLAY_BMP_IMAGE_SIZE; i++)
+        Log.info("inverse the image\r\n");
+        for (size_t i = 0; i < Imagesize; i++)
         {
-            image_buffer[i] = ~image_buffer[i];
+            image_buffer[i + 62] = ~image_buffer[i + 62];
         }
     }
     if (isPNG == true)
     {
-        Log_info("Drawing PNG");
-        flip_image(image_buffer, width, height);
-        horizontal_mirror(image_buffer, width, height);
-        Paint_DrawBitMap(image_buffer);
+        Log.info("Drawing PNG\n");    
     }
-    else
-    {
+    else{
+        flip_image(image_buffer, width, height);
         Paint_DrawBitMap(image_buffer + 62);
     }
+    memcpy(Paint.Image, image_buffer, Imagesize);
     EPD_7IN5_V2_Display(BlackImage);
     Log_info("display");
 
@@ -288,10 +285,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     Log_info("Paint_NewImage");
     Paint_NewImage(BlackImage, width, height, 0, WHITE);
 
-    Log_info("show image for array");
-    Paint_SelectImage(BlackImage);
-    Paint_Clear(WHITE);
-    Paint_DrawBitMap(image_buffer + 62);
+    Log.info("show image for array\r\n");
+         // what if it is PNG ?
+    // we could copy and swap at the same time...
+    flip_image(BlackImage, width, height);
+    memcpy(BlackImage, image_buffer + 62, Imagesize);
     switch (message_type)
     {
     case WIFI_CONNECT:
@@ -431,10 +429,11 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     Log_info("Paint_NewImage");
     Paint_NewImage(BlackImage, width, height, 0, WHITE);
 
-    Log_info("show image for array");
-    Paint_SelectImage(BlackImage);
-    Paint_Clear(WHITE);
-    Paint_DrawBitMap(image_buffer + 62);
+    Log.info("show image for array\r\n");
+    // what if it is PNG ?
+    // we could copy and swap at the same time...
+    flip_image(BlackImage, width, height);
+    memcpy(BlackImage, image_buffer + 62, Imagesize);
     switch (message_type)
     {
     case FRIENDLY_ID:
@@ -492,6 +491,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
  */
 void display_sleep(void)
 {
+
     Log_info("Goto Sleep...");
-    EPD_7IN5B_V2_Sleep();
+    EPD_7IN5_V2_Sleep();
 }
