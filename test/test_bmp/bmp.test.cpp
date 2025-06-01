@@ -36,7 +36,7 @@ std::vector<uint8_t> readBMPFile(const char *filename)
 
 void test_parseBMPHeader_BMP_NO_ERR(void)
 {
-  auto bmp_data = readBMPFile("./test.bmp");
+  auto bmp_data = readBMPFile("./test/data/test.bmp");
   bool image_reverse = false;
 
   bmp_err_e result = parseBMPHeader(bmp_data.data(), image_reverse);
@@ -47,7 +47,7 @@ void test_parseBMPHeader_BMP_NO_ERR(void)
 
 void test_parseBMPHeader_BMP_NO_ERR_reversed(void)
 {
-  auto bmp_data = readBMPFile("./test.bmp");
+  auto bmp_data = readBMPFile("./test/data/test.bmp");
   bool image_reverse = false;
 
   bmp_data[54] = 255;
@@ -65,7 +65,7 @@ void test_parseBMPHeader_BMP_NO_ERR_reversed(void)
 
 void test_parseBMPHeader_NOT_BMP(void)
 {
-  auto bmp_data = readBMPFile("./test.bmp");
+  auto bmp_data = readBMPFile("./test/data/test.bmp");
   bool image_reverse = false;
 
   bmp_data[0] = 'A';
@@ -75,7 +75,7 @@ void test_parseBMPHeader_NOT_BMP(void)
 
 void test_parseBMPHeader_BMP_BAD_SIZE(void)
 {
-  auto bmp_data = readBMPFile("./test.bmp");
+  auto bmp_data = readBMPFile("./test/data/test.bmp");
   bool image_reverse = false;
 
   bmp_data[18] = 123;
@@ -85,7 +85,7 @@ void test_parseBMPHeader_BMP_BAD_SIZE(void)
 
 void test_parseBMPHeader_BMP_COLOR_SCHEME_FAILED(void)
 {
-  auto bmp_data = readBMPFile("./test.bmp");
+  auto bmp_data = readBMPFile("./test/data/test.bmp");
   bool image_reverse = false;
 
   bmp_data[54] = 123;
@@ -95,12 +95,19 @@ void test_parseBMPHeader_BMP_COLOR_SCHEME_FAILED(void)
 
 void test_parseBMPHeader_BMP_INVALID_OFFSET(void)
 {
-  auto bmp_data = readBMPFile("./test.bmp");
+  auto bmp_data = readBMPFile("./test/data/test.bmp");
   bool image_reverse = false;
 
   bmp_data[10] = 5;
 
   TEST_ASSERT_EQUAL(BMP_INVALID_OFFSET, parseBMPHeader(bmp_data.data(), image_reverse));
+}
+
+void test_parseBMPHeader_TopDown(void)
+{
+  auto bmp_data = readBMPFile("./test/data/rover_topdown.bmp");
+  bool image_reverse = false;
+  TEST_ASSERT_EQUAL(BMP_NO_ERR, parseBMPHeader(bmp_data.data(), image_reverse));
 }
 
 void setUp(void) {
@@ -120,6 +127,7 @@ void process()
   RUN_TEST(test_parseBMPHeader_BMP_BAD_SIZE);
   RUN_TEST(test_parseBMPHeader_BMP_COLOR_SCHEME_FAILED);
   RUN_TEST(test_parseBMPHeader_BMP_INVALID_OFFSET);
+  RUN_TEST(test_parseBMPHeader_TopDown);
   UNITY_END();
 }
 

@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
+#include <trmnl_log.h>
 
 // Error codes for the HTTP utilities - using distinct values to avoid overlap
 enum HttpError

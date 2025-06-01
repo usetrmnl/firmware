@@ -241,22 +241,12 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
     if (reverse)
     {
         Log_info("inverse the image");
-        for (size_t i = 0; i < DISPLAY_BMP_IMAGE_SIZE; i++)
+        for (size_t i = 0; i < DEFAULT_IMAGE_SIZE; i++)
         {
             image_buffer[i] = ~image_buffer[i];
         }
     }
-    if (isPNG == true)
-    {
-        Log_info("Drawing PNG");
-        flip_image(image_buffer, width, height);
-        horizontal_mirror(image_buffer, width, height);
-        Paint_DrawBitMap(image_buffer);
-    }
-    else
-    {
-        Paint_DrawBitMap(image_buffer + 62);
-    }
+    Paint_DrawBitMap(image_buffer);
     EPD_7IN5_V2_Display(BlackImage);
     Log_info("display");
 
