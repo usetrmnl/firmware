@@ -67,7 +67,7 @@ static void goToSleep(void);                         // sleep preparing
 static bool setClock(void);                          // clock synchronization
 static float readBatteryVoltage(void);               // battery voltage reading
 static void log_POST(char *log_buffer, size_t size); // log sending
-static void checkLogNotes(void);
+static void submitStoredLogs(void);
 static void writeSpecialFunction(SPECIAL_FUNCTION function);
 static void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size);
 static uint32_t getTime(void);
@@ -482,7 +482,7 @@ void bl_init(void)
 
   if (request_result != HTTPS_NO_ERR && request_result != HTTPS_PLUGIN_NOT_ATTACHED)
   {
-    checkLogNotes();
+    submitStoredLogs();
   }
 
   // display go to sleep
@@ -1878,7 +1878,7 @@ static uint32_t getTime(void)
   return now;
 }
 
-static void checkLogNotes(void)
+static void submitStoredLogs(void)
 {
   String log;
   gather_stored_logs(log, preferences);
