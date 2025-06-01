@@ -31,6 +31,7 @@
 #include <api-client/display.h>
 #include "driver/gpio.h"
 #include <nvs.h>
+#include <serialize_log.h>
 
 bool pref_clear = false;
 String new_filename = "";
@@ -39,7 +40,6 @@ uint8_t *buffer = nullptr;
 uint8_t *decodedPng = nullptr;
 char filename[1024];      // image URL
 char binUrl[1024];        // update URL
-char log_array[1024];     // log
 char message_buffer[128]; // message to show on the screen
 uint32_t time_since_sleep;
 image_err_e png_res = PNG_DECODE_ERR;
@@ -66,7 +66,7 @@ static void checkAndPerformFirmwareUpdate(void);     // OTA update
 static void goToSleep(void);                         // sleep preparing
 static bool setClock(void);                          // clock synchronization
 static float readBatteryVoltage(void);               // battery voltage reading
-static void log_POST(char *log_buffer, size_t size); // log sending
+static void submitOrSaveLogString(const char *log_buffer, size_t size); // log sending
 static void submitStoredLogs(void);
 static void writeSpecialFunction(SPECIAL_FUNCTION function);
 static void writeImageToFile(const char *name, uint8_t *in_buffer, size_t size);
@@ -79,7 +79,6 @@ static uint8_t *storedLogoOrDefault(void);
 static bool saveCurrentFileName(String &name);
 static bool checkCurrentFileName(String &newName);
 static DeviceStatusStamp getDeviceStatusStamp();
-bool SerializeJsonLog(DeviceStatusStamp device_status_stamp, time_t timestamp, int codeline, const char *source_file, char *log_message, uint32_t log_id);
 int submitLog(const char *format, time_t time, int line, const char *file, ...);
 void log_nvs_usage();
 
@@ -1842,7 +1841,7 @@ static float readBatteryVoltage(void)
  * @param size size of buffer
  * @return none
  */
-static void log_POST(char *log_buffer, size_t size)
+static void submitOrSaveLogString(const char *log_buffer, size_t size)
 {
   String api_key = "";
   if (preferences.isKey(PREFERENCES_API_KEY))
@@ -2104,43 +2103,6 @@ DeviceStatusStamp getDeviceStatusStamp()
   return deviceStatus;
 }
 
-bool SerializeJsonLog(DeviceStatusStamp device_status_stamp, time_t timestamp, int codeline, const char *source_file, char *log_message, uint32_t log_id)
-{
-  JsonDocument json_log;
-
-  json_log["creation_timestamp"] = timestamp;
-
-  json_log["device_status_stamp"]["wifi_rssi_level"] = device_status_stamp.wifi_rssi_level;
-  json_log["device_status_stamp"]["wifi_status"] = device_status_stamp.wifi_status;
-  json_log["device_status_stamp"]["refresh_rate"] = device_status_stamp.refresh_rate;
-  json_log["device_status_stamp"]["time_since_last_sleep_start"] = device_status_stamp.time_since_last_sleep;
-  json_log["device_status_stamp"]["current_fw_version"] = device_status_stamp.current_fw_version;
-  json_log["device_status_stamp"]["special_function"] = device_status_stamp.special_function;
-  json_log["device_status_stamp"]["battery_voltage"] = device_status_stamp.battery_voltage;
-  json_log["device_status_stamp"]["wakeup_reason"] = device_status_stamp.wakeup_reason;
-  json_log["device_status_stamp"]["free_heap_size"] = device_status_stamp.free_heap_size;
-  json_log["device_status_stamp"]["max_alloc_size"] = device_status_stamp.max_alloc_size;
-
-  json_log["log_id"] = log_id;
-  json_log["log_message"] = log_message;
-  json_log["log_codeline"] = codeline;
-  json_log["log_sourcefile"] = source_file;
-
-  json_log["additional_info"]["filename_current"] = preferences.getString(PREFERENCES_FILENAME_KEY, "");
-  json_log["additional_info"]["filename_new"] = new_filename.c_str();
-
-  if (log_retry)
-  {
-    json_log["additional_info"]["retry_attempt"] = preferences.getInt(PREFERENCES_CONNECT_API_RETRY_COUNT);
-  }
-
-  serializeJson(json_log, log_array);
-
-  log_POST(log_array, strlen(log_array));
-
-  return true;
-}
-
 int submitLog(const char *format, time_t time, int line, const char *file, ...)
 {
   uint32_t log_id = preferences.getUInt(PREFERENCES_LOG_ID_KEY, 1);
@@ -2154,7 +2116,21 @@ int submitLog(const char *format, time_t time, int line, const char *file, ...)
 
   va_end(args);
 
-  SerializeJsonLog(getDeviceStatusStamp(), time, line, file, log_message, log_id);
+  LogWithDetails input = {
+      .deviceStatusStamp = getDeviceStatusStamp(),
+      .timestamp = time,
+      .codeline = line,
+      .sourceFile = file,
+      .logMessage = log_message,
+      .logId = log_id,
+      .filenameCurrent = preferences.getString(PREFERENCES_FILENAME_KEY, ""),
+      .filenameNew = new_filename,
+      .logRetry = log_retry,
+      .retryAttempt = log_retry ? preferences.getInt(PREFERENCES_CONNECT_API_RETRY_COUNT) : 0};
+
+  String json_string = serialize_log(input);
+
+  submitOrSaveLogString(json_string.c_str(), json_string.length());
 
   preferences.putUInt(PREFERENCES_LOG_ID_KEY, ++log_id);
 
