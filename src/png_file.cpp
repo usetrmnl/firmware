@@ -3,7 +3,6 @@
 #include <PNGdec.h>
 #include <esp_mac.h>
 #include <SPIFFS.h>
-#include "png.h"
 
 File pngfile; // Global file handle
 
