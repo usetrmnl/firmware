@@ -68,7 +68,7 @@ bmp_err_e parseBMPHeader(uint8_t *data, bool &reversed)
 
     if (data[54] == 0 && data[55] == 0 && data[56] == 0 && data[57] == 0 && data[58] == 255 && data[59] == 255 && data[60] == 255 && data[61] == 0)
     {
-      Log_info("Color scheme standart");
+      Log_info("Color scheme standard");
       reversed = false;
     }
     else if (data[54] == 255 && data[55] == 255 && data[56] == 255 && data[57] == 0 && data[58] == 0 && data[59] == 0 && data[60] == 0 && data[61] == 0)

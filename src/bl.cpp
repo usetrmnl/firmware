@@ -218,6 +218,12 @@ void bl_init(void) {
  // Mount SPIFFS
   filesystem_init();
 
+  Log.info("%s [%d]: Display TRMNL logo  TEST tart\r\n", __FILE__, __LINE__);
+
+  buffer = (uint8_t *)malloc(DISPLAY_BMP_IMAGE_SIZE);
+  display_show_msg(storedLogoOrDefault(), TEST);
+  free(buffer);
+ delay(5000);
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER) {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
 
@@ -758,7 +764,7 @@ static https_request_err_e downloadAndShow() {
           case PNG_NO_ERR: {
 
             Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
-            display_show_image(imagePointer, image_reverse, isPNG);
+            display_show_image(imagePointer, image_reverse, false);
 
             // Using filename from API response
             new_filename = apiDisplayResult.response.filename;
@@ -799,7 +805,7 @@ static https_request_err_e downloadAndShow() {
               writeImageToFile("/current.bmp", buffer, content_size);
             }
             Log.info("Free heap at before display - %d", ESP.getMaxAllocHeap());
-            display_show_image(imagePointer, image_reverse, isPNG);
+            display_show_image(imagePointer, image_reverse, false);
 
             // Using filename from API response
             new_filename = apiDisplayResult.response.filename;
@@ -1206,7 +1212,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
             switch (image_proccess_response) {
             case PNG_NO_ERR: {
               Log.info("Showing image\n\r");
-              display_show_image(buffer, image_reverse, isPNG);
+              display_show_image(buffer, image_reverse, false);
               need_to_refresh_display = 1;
             } break;
             default: {
@@ -1215,7 +1221,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
             switch (bmp_proccess_response) {
             case BMP_NO_ERR: {
               Log.info("Showing image\n\r");
-              display_show_image(buffer, image_reverse, isPNG);
+              display_show_image(buffer, image_reverse, false);
               need_to_refresh_display = 1;
             } break;
             default: {
@@ -1290,7 +1296,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse) {
           }
 
           Log.info("Showing image\n\r");
-          display_show_image(buffer, image_reverse, isPNG);
+          display_show_image(buffer, image_reverse, false);
           need_to_refresh_display = 1;
 
           free(buffer);
