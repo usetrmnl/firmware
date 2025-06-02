@@ -32,6 +32,7 @@
 #include <stdlib.h>
 #include <stored_logs.h>
 #include <types.h>
+#include <trmnl_log.h>
 
 bool pref_clear = false;
 String new_filename = "";
@@ -113,7 +114,7 @@ void bl_init(void) {
 
   Serial.begin(115200);
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
-  Log_info("BL init success");
+  Log_info("BL init start");
   pins_init();
 
 #if defined(BOARD_SEEED_XIAO_ESP32C3) || defined(BOARD_SEEED_XIAO_ESP32S3)
@@ -1672,6 +1673,7 @@ static void goToSleep(void) {
            time_to_sleep);
   preferences.putUInt(PREFERENCES_LAST_SLEEP_TIME, getTime());
   preferences.end();
+  Serial.flush();
   esp_sleep_enable_timer_wakeup((uint64_t)time_to_sleep * SLEEP_uS_TO_S_FACTOR);
   // Configure GPIO pin for wakeup
 #if CONFIG_IDF_TARGET_ESP32
