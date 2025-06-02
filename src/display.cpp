@@ -281,7 +281,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     Log_info("show image for array");
     Paint_SelectImage(BlackImage);
     Paint_Clear(WHITE);
-    Paint_DrawBitMap(image_buffer + 62);
+    Paint_DrawBitMap(image_buffer);
     switch (message_type)
     {
     case WIFI_CONNECT:
@@ -424,7 +424,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     Log_info("show image for array");
     Paint_SelectImage(BlackImage);
     Paint_Clear(WHITE);
-    Paint_DrawBitMap(image_buffer + 62);
+    Paint_DrawBitMap(image_buffer);
     switch (message_type)
     {
     case FRIENDLY_ID:
