@@ -31,6 +31,9 @@
 #include <api-client/display.h>
 #include "driver/gpio.h"
 #include <nvs.h>
+#include <drawfont.h>
+#include "EPD.h"
+#include <GUI_Paint.h>
 
 bool pref_clear = false;
 String new_filename = "";
@@ -224,9 +227,18 @@ void bl_init(void)
   // Mount SPIFFS
   filesystem_init();
 
-
 #if defined(DEBUG_FONT)
-    displayCharset();
+  uint8_t *framebuffer = (uint8_t *)malloc(48000);
+  memset(framebuffer, 0xff, 48000);
+  Paint_NewImage(framebuffer, display_width(), display_height(), 0, WHITE);
+      displayCharset();
+EPD_7IN5_V2_Display(framebuffer);
+    delay(1000* 5);
+    memset(framebuffer, 0xff, 48000);
+displaySampleText();
+         EPD_7IN5_V2_Display(framebuffer);
+      free(framebuffer);
+       delay(1000* 5);
 #endif
 
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
