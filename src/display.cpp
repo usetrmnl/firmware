@@ -1,19 +1,21 @@
 #include "DEV_Config.h"
 #include "EPD.h"
 #include "GUI_Paint.h"
-#include "png_flip.h"
 #include <Arduino.h>
+
+#include <FiraMono-Medium12.h>
 #include <ImageData.h>
 #include <config.h>
 #include <display.h>
 #include <gfxfont.h>
 #include <inttypes.h>
 #include <trmnl_log.h>
-#include <FiraMono-Medium12.h>
 
+int16_t Paint_DrawLatin9Char(int16_t x, int16_t y, uint8_t c,
+                             const GFXfont *font, uint8_t colorfg);
 void Paint_DrawUtf8String(int16_t x, int16_t y, const char *utf8,
                           const GFXfont *font, uint8_t colorfg);
-
+void overlayCharset(const GFXfont *font, bool clear);
 /**
  * @brief Function to init the display
  * @param none
@@ -380,17 +382,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type) {
                         400, string1, &Font24, WHITE, BLACK);
   } break;
   case TEST: {
-    Paint_DrawString_EN(20, 0,
-                        "ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrs",
-                        &Font24, WHITE, BLACK);
-    Paint_DrawUtf8String(
-        20, 40, "ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrs",
-        &FiraMono_Medium12pt8b, BLACK);
-    Paint_DrawUtf8String(20, 80, "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏØÙÚÛÜÝÞßàáâãäå",
-                         &FiraMono_Medium12pt8b, BLACK);
-    Paint_DrawUtf8String(
-        20, 120, "çèéêëìíîïðñòóôõö÷øùúûüýþÿ¹º»¼½¾¿", &FiraMono_Medium12pt8b,
-        BLACK);
+    // TODO: special function
   } break;
   default:
     break;
@@ -465,25 +457,25 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type,
 
     String string1 = "FW: ";
     string1 += fw_version;
-    Paint_DrawUtf8String((800 - string1.length() * 17 > 9)
+    Paint_DrawString_EN((800 - string1.length() * 17 > 9)
                             ? (800 - string1.length() * 17) / 2 + 9
                             : 0,
-                        340, string1.c_str(), &FiraMono_Medium12pt8b, BLACK);
+                        340, string1.c_str(), &Font24, WHITE, BLACK);
     char string2[] = "Connect phone or computer";
-    Paint_DrawUtf8String((800 - sizeof(string2) * 17 > 9)
+    Paint_DrawString_EN((800 - sizeof(string2) * 17 > 9)
                             ? (800 - sizeof(string2) * 17) / 2 + 9
                             : 0,
-                        370, string2, &FiraMono_Medium12pt8b, BLACK);
+                        370, string2, &Font24, WHITE, BLACK);
     char string3[] = "to \"TRMNL\" WiFi network";
-    Paint_DrawUtf8String((800 - sizeof(string3) * 17 > 9)
+    Paint_DrawString_EN((800 - sizeof(string3) * 17 > 9)
                             ? (800 - sizeof(string3) * 17) / 2 + 9
                             : 0,
-                        400, string3, &FiraMono_Medium12pt8b, BLACK);
+                        400, string3, &Font24, WHITE, BLACK);
     char string4[] = "or scan QR code for help.";
-    Paint_DrawUtf8String((800 - sizeof(string4) * 17 > 9)
+    Paint_DrawString_EN((800 - sizeof(string4) * 17 > 9)
                             ? (800 - sizeof(string4) * 17) / 2 + 9
                             : 0,
-                        430, string4, &FiraMono_Medium12pt8b, BLACK);
+                        430, string4, &Font24, WHITE, BLACK);
 
     Paint_DrawImage(wifi_connect_qr, 640, 337, 130, 130);
   } break;
@@ -512,9 +504,57 @@ void display_sleep(void) {
   EPD_7IN5B_V2_Sleep();
 }
 
-// draws char in the latin1 range
-int16_t Paint_Latin1Char(int16_t x, int16_t y, uint8_t c, const GFXfont *font,
-                         uint8_t color) {
+byte c1 = 0; // Last character buffer
+
+// Convert a single char from UTF8 to Extended ASCII
+// Return "0" if a byte has to be ignored
+byte utf8_to_xtd_ascii(byte ascii) {
+  if (ascii < 128) { // Standard ASCII-set 0..0x7F handling
+    c1 = 0;
+    if (ascii < 32)
+      return 0;
+    else
+      return ascii;
+  }
+
+  byte last = c1;
+  c1 = ascii;
+
+  if (last == 0xC2) {
+    return ascii - 32;
+  } else if (last == 0xC3) {
+    return ascii + 32;
+  }
+  return 0;
+
+// In place conversion of a UTF8 string to Latin9
+int utf8tocp(char *s, int len) {
+  int k = 0;
+  char c;
+  c1 = 0;
+  for (int i = 0; i < len; i++) {
+    c = utf8_to_xtd_ascii(s[i]);
+    if (c != 0) {
+      s[k++] = c;
+    }
+  }
+  s[k] = 0;
+  return k;
+}
+
+// draws char in the latin9 range
+int16_t Paint_DrawLatin9Char(int16_t x, int16_t y, uint8_t c,
+                             const GFXfont *font, uint8_t color) {
+  if ((c < font->first) || (c > font->last)) {
+    GFXglyph *glyph = font->glyph + 'M' - font->first;
+    uint8_t w = glyph->width;
+    uint8_t h = glyph->height;
+    int8_t xo = glyph->xOffset;
+    int8_t yo = glyph->yOffset;
+    Paint_DrawRectangle(x + xo, y + yo, x + xo + w, y + yo + h, BLACK,
+                        DOT_PIXEL_DFT, DRAW_FILL_EMPTY);
+    return glyph->xAdvance;
+  }
   c -= (uint8_t)font->first;
   GFXglyph *glyph = font->glyph + c;
   uint8_t *bitmap = font->bitmap;
@@ -540,44 +580,6 @@ int16_t Paint_Latin1Char(int16_t x, int16_t y, uint8_t c, const GFXfont *font,
   return glyph->xAdvance;
 }
 
-byte c1 = 0; // Last character buffer
-
-// Convert a single char from UTF8 to Extended ASCII
-// Return "0" if a byte has to be ignored
-byte utf8_to_xtd_ascii(byte ascii) {
-  if (ascii < 128) { // Standard ASCII-set 0..0x7F handling
-    c1 = 0;
-    if (ascii < 32)
-      return 0;
-    else
-      return ascii;
-  }
-
-  byte last = c1;
-  c1 = ascii;
-
-  if (last == 0xC2) {
-    return ascii - 32;
-  } else if (last == 0xC3) {
-    return ascii + 32;
-  }
-  return 0;
-}
-// In place conversion of a UTF8 string to Latin1
-int utf8tocp(char *s, int len) {
-  int k = 0;
-  char c;
-  c1 = 0;
-  for (int i = 0; i < len; i++) {
-    c = utf8_to_xtd_ascii(s[i]);
-    if (c != 0) {
-      s[k++] = c;
-    }
-  }
-  s[k] = 0;
-  return k;
-}
-
 void Paint_DrawUtf8String(int16_t x, int16_t y, const char *utf8,
                           const GFXfont *font, uint8_t color) {
   // make a copy
@@ -586,7 +588,27 @@ void Paint_DrawUtf8String(int16_t x, int16_t y, const char *utf8,
   strncpy(buf, utf8, lenutf8);
   int len = utf8tocp(buf, lenutf8);
   for (int16_t c = 0; c < len; ++c) {
-    x += Paint_Latin1Char(x, y, buf[c], font, color);
+    x += Paint_DrawLatin9Char(x, y, buf[c], font, color);
   }
   free(buf);
+}
+
+void overlayCharset(GFXfont *font, bool clear) {
+  static char hex[] = "0123456789ABCDEF";
+  if (clear)
+    Paint_Clear(WHITE);
+  uint16_t gridx = display_width() / 17;
+  uint16_t gridy = display_height() / 17;
+  for (uint16_t y = 0; y < 16; ++y)
+    Paint_DrawLatin9Char(0, (gridy * 2) + y * gridy, hex[y],
+                         &FiraMono_Medium12pt8b, BLACK);
+  for (uint16_t x = 0; x < 16; ++x)
+    Paint_DrawLatin9Char(gridx + x * gridx, gridy, hex[x],
+                         &FiraMono_Medium12pt8b, BLACK);
+  for (uint16_t y = 0; y < 16; ++y) {
+    for (uint16_t x = 0; x < 16; ++x) {
+      Paint_DrawLatin9Char(gridx + x * gridx, (gridy * 2) + y * gridy,
+                           y * 16 + x, &FiraMono_Medium12pt8b, BLACK);
+    }
+  }
 }

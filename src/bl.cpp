@@ -32,7 +32,6 @@
 #include <stdlib.h>
 #include <stored_logs.h>
 #include <types.h>
-#include <trmnl_log.h>
 
 bool pref_clear = false;
 String new_filename = "";
@@ -217,13 +216,7 @@ void bl_init(void) {
   display_init();
  // Mount SPIFFS
   filesystem_init();
-
-  Log.info("%s [%d]: Display TRMNL logo  TEST tart\r\n", __FILE__, __LINE__);
-
-  buffer = (uint8_t *)malloc(DISPLAY_BMP_IMAGE_SIZE);
-  display_show_msg(storedLogoOrDefault(), WIFI_CONNECT, "123456", true, "1.5.4ß", "de la vega");
-  free(buffer);
- delay(20000);
+  
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER) {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
 
@@ -238,7 +231,6 @@ void bl_init(void) {
     preferences.putString(PREFERENCES_FILENAME_KEY, "");
   }
 
- 
   Log_info("Firmware version %d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION,
            FW_PATCH_VERSION);
   Log_info("Arduino version %d.%d.%d", ESP_ARDUINO_VERSION_MAJOR,
