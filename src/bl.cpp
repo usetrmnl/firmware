@@ -59,6 +59,7 @@ RTC_DATA_ATTR uint8_t need_to_refresh_display = 1;
 Preferences preferences;
 
 static https_request_err_e downloadAndShow(); // download and show the image
+static uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer);
 static https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse);
 static void getDeviceCredentials();                  // receiveing API key and Friendly ID
 static void resetDeviceCredentials(void);            // reset device credentials API key, Friendly ID, Wi-Fi SSID and password
@@ -614,7 +615,7 @@ static https_request_err_e downloadAndShow()
         HTTPClient &https = *httpsp;
 
         https.setTimeout(15000);
-	https.setConnectTimeout(15000);
+        https.setConnectTimeout(15000);
 
         if (status && !update_firmware && !reset_firmware)
         {
@@ -694,27 +695,12 @@ static https_request_err_e downloadAndShow()
           Log.info("%s [%d]: Stream available: %d\r\n", __FILE__, __LINE__, stream->available());
 
           bool isPNG = https.header("Content-Type") == "image/png";
-          int iteration_counter = 0;
-
-          unsigned long download_start = millis();
 
           Log.info("%s [%d]: Starting a download at: %d\r\n", __FILE__, __LINE__, getTime());
           heap_caps_check_integrity_all(true);
           buffer = (uint8_t *)malloc(content_size);
-          int counter2 = content_size;
-          while (counter != content_size && millis() - download_start < 10000)
-          {
-            if (stream->available())
-            {
-              Log.info("%s [%d]: Downloading... Available bytes: %d\r\n", __FILE__, __LINE__, stream->available());
-              counter += stream->readBytes(buffer + counter, counter2 -= counter);
-              iteration_counter++;
-            }
 
-            delay(10);
-          }
-
-          Log.info("%s [%d]: Ending a download at: %d, in %d iterations\r\n", __FILE__, __LINE__, getTime(), iteration_counter);
+          counter = downloadStream(stream, content_size, buffer);
 
           if (counter >= 2 && buffer[0] == 'B' && buffer[1] == 'M')
           {
@@ -728,7 +714,7 @@ static https_request_err_e downloadAndShow()
             Log.error("%s [%d]: Receiving failed. Read: %d\r\n", __FILE__, __LINE__, counter);
 
             // display_show_msg(const_cast<uint8_t *>(default_icon), API_SIZE_ERROR);
-            submit_log("HTTPS request error. Returned code - %d, available bytes - %d, received bytes - %d in %d iterations", httpCode, https.getSize(), counter, iteration_counter);
+            submit_log("HTTPS request error. Returned code - %d, available bytes - %d, received bytes - %d", httpCode, https.getSize(), counter);
 
             return HTTPS_WRONG_IMAGE_SIZE;
           }
@@ -891,6 +877,27 @@ static https_request_err_e downloadAndShow()
   Log_info("Returned result - %d", result);
 
   return result;
+}
+
+uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer)
+{
+  int iteration_counter = 0;
+  int counter2 = content_size;
+  unsigned long download_start = millis();
+  int counter = 0;
+  while (counter != content_size && millis() - download_start < 10000)
+  {
+    if (stream->available())
+    {
+      Log.info("%s [%d]: Downloading... Available bytes: %d\r\n", __FILE__, __LINE__, stream->available());
+      counter += stream->readBytes(buffer + counter, counter2 -= counter);
+      iteration_counter++;
+    }
+    delay(10);
+  }
+
+  Log_info("Download end: %d/%d bytes in %d ms (%d iterations)", counter, content_size, millis() - download_start, iteration_counter);
+  return counter;
 }
 
 https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
