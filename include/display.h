@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include "fonts.h"
 #include "DEV_Config.h"
+#include <gfxfont.h>
 
 enum MSG
 {
@@ -110,4 +111,10 @@ void display_show_msg_api(uint8_t *image_buffer, String message);
  */
 void display_sleep(void);
 
+
+int16_t Paint_DrawLatin9Char(int16_t x, int16_t y, uint8_t c,
+                             const GFXfont *font, uint8_t colorfg);
+void Paint_DrawUtf8String(int16_t x, int16_t y, const char *utf8,
+                          const GFXfont *font, uint8_t colorfg);
+void displayCharset(uint32_t duration_seconds = 10);
 #endif

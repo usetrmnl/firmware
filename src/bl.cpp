@@ -221,6 +221,13 @@ void bl_init(void)
   // EPD clear
   Log.info("%s [%d]: Display init\r\n", __FILE__, __LINE__);
   display_init();
+  // Mount SPIFFS
+  filesystem_init();
+
+
+#if defined(DEBUG_FONT)
+    displayCharset();
+#endif
 
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER)
   {
@@ -237,8 +244,6 @@ void bl_init(void)
     preferences.putString(PREFERENCES_FILENAME_KEY, "");
   }
 
-  // Mount SPIFFS
-  filesystem_init();
 
   Log_info("Firmware version %d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION, FW_PATCH_VERSION);
   Log_info("Arduino version %d.%d.%d", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);

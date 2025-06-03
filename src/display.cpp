@@ -8,6 +8,7 @@
 #include <ImageData.h>
 #include <ctype.h> //iscntrl()
 #include <trmnl_log.h>
+#include <FiraMono-Medium12.h>
 
 /**
  * @brief Function to init the display
@@ -494,4 +495,119 @@ void display_sleep(void)
 {
     Log_info("Goto Sleep...");
     EPD_7IN5B_V2_Sleep();
+}
+
+byte c1 = 0; // Last character buffer
+
+// Convert a single char from UTF8 to Extended ASCII
+// Return "0" if a byte has to be ignored
+byte utf8_to_xtd_ascii(byte ascii) {
+  if (ascii < 128) { // Standard ASCII-set 0..0x7F handling
+    c1 = 0;
+    if (ascii < 32)
+      return 0;
+    else
+      return ascii;
+  }
+
+  byte last = c1;
+  c1 = ascii;
+
+  if (last == 0xC2) {
+    return ascii - 32;
+  } else if (last == 0xC3) {
+    return ascii + 32;
+  }
+  return 0;
+}
+
+// In place conversion of a UTF8 string to Latin9
+int utf8tocp(char *s, int len) {
+  int k = 0;
+  char c;
+  c1 = 0;
+  for (int i = 0; i < len; i++) {
+    c = utf8_to_xtd_ascii(s[i]);
+    if (c != 0) {
+      s[k++] = c;
+    }
+  }
+  s[k] = 0;
+  return k;
+}
+
+// draws char in the latin9 range
+int16_t Paint_DrawLatin9Char(int16_t x, int16_t y, uint8_t c,
+                             const GFXfont *font, uint8_t color) {
+  if ((c < font->first) || (c > font->last)) {
+    GFXglyph *glyph = font->glyph + 'M' - font->first;
+    uint8_t w = glyph->width;
+    uint8_t h = glyph->height;
+    int8_t xo = glyph->xOffset;
+    int8_t yo = glyph->yOffset;
+    Paint_DrawRectangle(x + xo, y + yo, x + xo + w, y + yo + h, BLACK,
+                        DOT_PIXEL_DFT, DRAW_FILL_EMPTY);
+    return glyph->xAdvance;
+  }
+  c -= (uint8_t)font->first;
+  GFXglyph *glyph = font->glyph + c;
+  uint8_t *bitmap = font->bitmap;
+
+  uint16_t bo = glyph->bitmapOffset;
+  uint8_t w = glyph->width;
+  uint8_t h = glyph->height;
+  int8_t xo = glyph->xOffset;
+  int8_t yo = glyph->yOffset;
+  uint8_t xx, yy, bits = 0, bit = 0;
+
+  for (yy = 0; yy < h; yy++) {
+    for (xx = 0; xx < w; xx++) {
+      if (!(bit++ & 7)) {
+        bits = bitmap[bo++];
+      }
+      if (bits & 0x80) {
+        Paint_SetPixel(x + xo + xx, y + yo + yy, color);
+      }
+      bits <<= 1;
+    }
+  }
+  return glyph->xAdvance;
+}
+
+void Paint_DrawUtf8String(int16_t x, int16_t y, const char *utf8,
+                          const GFXfont *font, uint8_t color) {
+  // make a copy
+  int lenutf8 = strlen(utf8);
+  char *buf = (char *)malloc(lenutf8 + 1);
+  strncpy(buf, utf8, lenutf8);
+  int len = utf8tocp(buf, lenutf8);
+  for (int16_t c = 0; c < len; ++c) {
+    x += Paint_DrawLatin9Char(x, y, buf[c], font, color);
+  }
+  free(buf);
+}
+
+void displayCharset(uint32_t duration_seconds) {
+  static char hex[] = "0123456789ABCDEF";
+  uint8_t* framebuffer = (uint8_t *)malloc(48000);
+  Paint_NewImage(framebuffer, display_width(), display_height(), 0, WHITE);
+  memset(framebuffer, 0xff, 48000);
+  uint16_t gridx = display_width() / 17;
+  uint16_t gridy = display_height() / 17;
+  for (uint16_t y = 0; y < 16; ++y)
+    Paint_DrawLatin9Char(0, (gridy * 2) + y * gridy, hex[y],
+                         &FiraMono_Medium12pt8b, BLACK);
+  for (uint16_t x = 0; x < 16; ++x)
+    Paint_DrawLatin9Char(gridx + x * gridx, gridy, hex[x],
+                         &FiraMono_Medium12pt8b, BLACK);
+  for (uint16_t y = 0; y < 16; ++y) {
+    for (uint16_t x = 0; x < 16; ++x) {
+      Paint_DrawLatin9Char(gridx + x * gridx, (gridy * 2) + y * gridy,
+                           y * 16 + x, &FiraMono_Medium12pt8b, BLACK);
+    }
+  }
+  EPD_7IN5_V2_Display(framebuffer);
+  free(framebuffer);
+  framebuffer = nullptr;
+  delay(1000 * duration_seconds);
 }
