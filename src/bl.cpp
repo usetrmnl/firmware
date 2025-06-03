@@ -221,9 +221,9 @@ void bl_init(void) {
   Log.info("%s [%d]: Display TRMNL logo  TEST tart\r\n", __FILE__, __LINE__);
 
   buffer = (uint8_t *)malloc(DISPLAY_BMP_IMAGE_SIZE);
-  display_show_msg(storedLogoOrDefault(), TEST);
+  display_show_msg(storedLogoOrDefault(), WIFI_CONNECT, "123456", true, "1.5.4ß", "de la vega");
   free(buffer);
- delay(5000);
+ delay(20000);
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER) {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
 

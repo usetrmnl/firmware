@@ -7,11 +7,12 @@
 #include <config.h>
 #include <display.h>
 #include <gfxfont.h>
-#include <trmnl_log.h>
-#include <ParadroidMonoLight18.h>
 #include <inttypes.h>
+#include <trmnl_log.h>
+#include <FiraMono-Medium12.h>
 
-void Paint_DrawUtf8String(int16_t x, int16_t y, const char *utf8, const GFXfont *font, uint8_t color);
+void Paint_DrawUtf8String(int16_t x, int16_t y, const char *utf8,
+                          const GFXfont *font, uint8_t colorfg);
 
 /**
  * @brief Function to init the display
@@ -221,7 +222,7 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPng) {
   }
   Paint_DrawBitMap(image_buffer);
   Log_info("display");
-    EPD_7IN5_V2_Display(BlackImage);
+  EPD_7IN5_V2_Display(BlackImage);
   free(BlackImage);
   BlackImage = NULL;
 }
@@ -379,18 +380,17 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type) {
                         400, string1, &Font24, WHITE, BLACK);
   } break;
   case TEST: {
-    Paint_DrawString_EN(0, 0,
-                        "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+    Paint_DrawString_EN(20, 0,
+                        "ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrs",
                         &Font24, WHITE, BLACK);
-    Paint_DrawString_EN(0, 40,
-                        "abcdefghijklmnopqrstuvwxyz",
-                        &Font24, WHITE, BLACK);
-    Paint_DrawString_EN(0, 80,
-                        "0123456789",
-                        &Font24, WHITE, BLACK);
-    Paint_DrawUtf8String(0, 120,
-                        "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏ",
-                        &ParadroidMono_Light18pt8b, BLACK);
+    Paint_DrawUtf8String(
+        20, 40, "ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrs",
+        &FiraMono_Medium12pt8b, BLACK);
+    Paint_DrawUtf8String(20, 80, "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏØÙÚÛÜÝÞßàáâãäå",
+                         &FiraMono_Medium12pt8b, BLACK);
+    Paint_DrawUtf8String(
+        20, 120, "çèéêëìíîïðñòóôõö÷øùúûüýþÿ¹º»¼½¾¿", &FiraMono_Medium12pt8b,
+        BLACK);
   } break;
   default:
     break;
@@ -465,25 +465,25 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type,
 
     String string1 = "FW: ";
     string1 += fw_version;
-    Paint_DrawString_EN((800 - string1.length() * 17 > 9)
+    Paint_DrawUtf8String((800 - string1.length() * 17 > 9)
                             ? (800 - string1.length() * 17) / 2 + 9
                             : 0,
-                        340, string1.c_str(), &Font24, WHITE, BLACK);
+                        340, string1.c_str(), &FiraMono_Medium12pt8b, BLACK);
     char string2[] = "Connect phone or computer";
-    Paint_DrawString_EN((800 - sizeof(string2) * 17 > 9)
+    Paint_DrawUtf8String((800 - sizeof(string2) * 17 > 9)
                             ? (800 - sizeof(string2) * 17) / 2 + 9
                             : 0,
-                        370, string2, &Font24, WHITE, BLACK);
+                        370, string2, &FiraMono_Medium12pt8b, BLACK);
     char string3[] = "to \"TRMNL\" WiFi network";
-    Paint_DrawString_EN((800 - sizeof(string3) * 17 > 9)
+    Paint_DrawUtf8String((800 - sizeof(string3) * 17 > 9)
                             ? (800 - sizeof(string3) * 17) / 2 + 9
                             : 0,
-                        400, string3, &Font24, WHITE, BLACK);
+                        400, string3, &FiraMono_Medium12pt8b, BLACK);
     char string4[] = "or scan QR code for help.";
-    Paint_DrawString_EN((800 - sizeof(string4) * 17 > 9)
+    Paint_DrawUtf8String((800 - sizeof(string4) * 17 > 9)
                             ? (800 - sizeof(string4) * 17) / 2 + 9
                             : 0,
-                        430, string4, &Font24, WHITE, BLACK);
+                        430, string4, &FiraMono_Medium12pt8b, BLACK);
 
     Paint_DrawImage(wifi_connect_qr, 640, 337, 130, 130);
   } break;
@@ -514,7 +514,7 @@ void display_sleep(void) {
 
 // draws char in the latin1 range
 int16_t Paint_Latin1Char(int16_t x, int16_t y, uint8_t c, const GFXfont *font,
-                        uint8_t color) {
+                         uint8_t color) {
   c -= (uint8_t)font->first;
   GFXglyph *glyph = font->glyph + c;
   uint8_t *bitmap = font->bitmap;
@@ -540,7 +540,7 @@ int16_t Paint_Latin1Char(int16_t x, int16_t y, uint8_t c, const GFXfont *font,
   return glyph->xAdvance;
 }
 
-byte c1 = 0;  // Last character buffer
+byte c1 = 0; // Last character buffer
 
 // Convert a single char from UTF8 to Extended ASCII
 // Return "0" if a byte has to be ignored
@@ -575,11 +575,11 @@ int utf8tocp(char *s, int len) {
     }
   }
   s[k] = 0;
-  return k - 1;
+  return k;
 }
 
-void Paint_DrawUtf8String(int16_t x, int16_t y, const char *utf8, const GFXfont *font,
-                          uint8_t color) {
+void Paint_DrawUtf8String(int16_t x, int16_t y, const char *utf8,
+                          const GFXfont *font, uint8_t color) {
   // make a copy
   int lenutf8 = strlen(utf8);
   char *buf = (char *)malloc(lenutf8 + 1);
