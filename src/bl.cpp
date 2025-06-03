@@ -1587,7 +1587,7 @@ static void getDeviceCredentials()
               buffer = (uint8_t *)malloc(https.getSize());
               if (stream->available() && https.getSize() == DISPLAY_BMP_IMAGE_SIZE)
               {
-                counter = stream->readBytes(buffer, DISPLAY_BMP_IMAGE_SIZE);
+                counter = downloadStream(stream, DISPLAY_BMP_IMAGE_SIZE, buffer);
               }
               https.end();
               if (counter == DISPLAY_BMP_IMAGE_SIZE)
