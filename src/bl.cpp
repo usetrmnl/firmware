@@ -708,20 +708,20 @@ static https_request_err_e downloadAndShow()
             {
               Log.info("%s [%d]: Downloading... Available bytes: %d\r\n", __FILE__, __LINE__, stream->available());
               counter += stream->readBytes(buffer + counter, counter2 -= counter);
-              if (counter >= 2)
-              {
-                if (buffer[0] == 'B' && buffer[1] == 'M')
-                {
-                  isPNG = false;
-                  Log.info("BMP file detected");
-                }
-              }
               iteration_counter++;
             }
 
             delay(10);
           }
+
           Log.info("%s [%d]: Ending a download at: %d, in %d iterations\r\n", __FILE__, __LINE__, getTime(), iteration_counter);
+
+          if (counter >= 2 && buffer[0] == 'B' && buffer[1] == 'M')
+          {
+            isPNG = false;
+            Log.info("BMP file detected");
+          }
+
           if (counter != content_size)
           {
 
