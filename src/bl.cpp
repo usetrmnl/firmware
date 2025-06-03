@@ -27,6 +27,9 @@
 #include <math.h>
 #include <nvs.h>
 #include <serialize_log.h>
+#include <png_file.h>
+#include <pins.h>
+#include <stored_logs.h>
 
 bool pref_clear = false;
 String new_filename = "";
@@ -830,27 +833,6 @@ static https_request_err_e downloadAndShow() {
   Log_info("Returned result - %d", result);
 
   return result;
-}
-
-uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer)
-{
-  int iteration_counter = 0;
-  int counter2 = content_size;
-  unsigned long download_start = millis();
-  int counter = 0;
-  while (counter != content_size && millis() - download_start < 10000)
-  {
-    if (stream->available())
-    {
-      Log.info("%s [%d]: Downloading... Available bytes: %d\r\n", __FILE__, __LINE__, stream->available());
-      counter += stream->readBytes(buffer + counter, counter2 -= counter);
-      iteration_counter++;
-    }
-    delay(10);
-  }
-
-  Log_info("Download end: %d/%d bytes in %d ms (%d iterations)", counter, content_size, millis() - download_start, iteration_counter);
-  return counter;
 }
 
 uint32_t downloadStream(WiFiClient *stream, int content_size, uint8_t *buffer)
