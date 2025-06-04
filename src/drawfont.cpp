@@ -1,19 +1,31 @@
-#include <drawfont.h>
-#include <display.h>
 #include <GUI_Paint.h>
 #include <NicoClean-Regular8.h>
-
-const GFXfont* getDefaultFont() { return &NicoClean_Regular8pt8b; }
-
-static const GFXfont* current_font  = getDefaultFont();
-const GFXfont* getCurrentFont() { return current_font; }
+#include <cstring>
+#include <display.h>
+#include <drawfont.h>
 
 
-byte c1 = 0; // Last character buffer
+// internal
+int16_t DrawLatin9Char(int16_t x, int16_t y, uint8_t c, uint8_t colorfg);
+void DrawUtf8String(int16_t x, int16_t y, const uint8_t *utf8, uint8_t colorfg);
+void DrawLatinString(int16_t x, int16_t y, const uint8_t *latin, uint8_t colorfg);
+void GetLatinTextBounds(const uint8_t *latintext, uint16_t *w, uint16_t *h);
+
+
+const uint8_t *GetLatinText();
+uint16_t Utf8ToLatin(const uint8_t *utf8text);
+
+const GFXfont *Paint_GetDefaultFont() { return &NicoClean_Regular8pt8b; }
+
+static const GFXfont *current_font = Paint_GetDefaultFont();
+const GFXfont *Paint_GetFont() { return current_font; }
+void Paint_SetFont(const GFXfont *font) { current_font = font; }
+
+uint8_t c1 = 0; // Last character buffer
 
 // Convert a single char from UTF8 to Extended ASCII
 // Return "0" if a byte has to be ignored
-byte utf8_to_xtd_ascii(byte ascii) {
+uint8_t utf8_to_xtd_ascii(uint8_t ascii) {
   if (ascii < 128) { // Standard ASCII-set 0..0x7F handling
     c1 = 0;
     if (ascii < 32)
@@ -21,8 +33,7 @@ byte utf8_to_xtd_ascii(byte ascii) {
     else
       return ascii;
   }
-
-  byte last = c1;
+  uint8_t last = c1;
   c1 = ascii;
 
   if (last == 0xC2) {
@@ -33,27 +44,37 @@ byte utf8_to_xtd_ascii(byte ascii) {
   return 0;
 }
 
-// In place conversion of a UTF8 string to Latin
-uint16_t utf8tocp(char *s, uint16_t len) {
-  uint16_t k = 0;
+static uint8_t latinbuffer[256];
+
+// returns number of latin1 chars converted
+uint16_t Utf8ToLatin(const uint8_t *utf8text) {
+  uint16_t lenutf8 = strlen((const char *)utf8text);
+  uint16_t k = 0; // length of latin1
   char c;
   c1 = 0;
-  for (uint16_t i = 0; i < len; i++) {
-    c = utf8_to_xtd_ascii(s[i]);
+  for (uint16_t i = 0; i < lenutf8; i++) {
+    c = utf8_to_xtd_ascii(utf8text[i]);
     if (c != 0) {
-      s[k++] = c;
+      if (k < 256) {
+        latinbuffer[k++] = c;
+      } else {
+        latinbuffer[k] = 0;
+        return k;
+      }
     }
   }
-  s[k] = 0;
+  latinbuffer[k] = 0;
   return k;
 }
 
 // draws char in the latin9 range
 //  skips or displays  rectangles
-int16_t Paint_DrawLatin9Char(int16_t x, int16_t y, uint8_t c, uint8_t color) {
-    if (x >= display_width() || y >= display_height()) return 0;
-      const GFXfont *font = getCurrentFont();
+int16_t DrawLatin9Char(int16_t x, int16_t y, uint8_t c, uint8_t color) {
+  if (x >= display_width() || y >= display_height())
+    return 0;
+  const GFXfont *font = Paint_GetFont();
   if ((c < font->first) || (c > font->last)) {
+#if 0
     GFXglyph *glyph = font->glyph + 'A' - font->first;
     uint8_t w = glyph->width;
     uint8_t h = glyph->height;
@@ -62,6 +83,9 @@ int16_t Paint_DrawLatin9Char(int16_t x, int16_t y, uint8_t c, uint8_t color) {
     Paint_DrawRectangle(x + xo, y + yo, x + xo + w, y + yo + h, BLACK,
                         DOT_PIXEL_DFT, DRAW_FILL_EMPTY);
     return glyph->xAdvance;
+#else
+    return 0;
+#endif
   }
   c -= (uint8_t)font->first;
   GFXglyph *glyph = font->glyph + c;
@@ -88,69 +112,101 @@ int16_t Paint_DrawLatin9Char(int16_t x, int16_t y, uint8_t c, uint8_t color) {
   return glyph->xAdvance;
 }
 
-void Paint_DrawUtf8String(int16_t x, int16_t y, const char *utf8text, uint8_t color) {
-  // make a copy and convert
-  uint16_t lenutf8 = strlen(utf8text);
-  char *buf = (char *)malloc(lenutf8 + 1);
-  strncpy(buf, utf8text, lenutf8);
-  uint16_t len = utf8tocp(buf, lenutf8);
-  for (uint16_t c = 0; c < len; ++c) {
-    x += Paint_DrawLatin9Char(x, y, buf[c], color);
+const uint8_t *GetLatinText() { return latinbuffer; }
+
+
+void DrawLatinString(int16_t x, int16_t y, const uint8_t *latin_text,
+                           uint8_t color) {
+  uint16_t latin_length = strlen((const char *)latin_text);
+  for (uint16_t c = 0; c < latin_length; ++c) {
+    x += DrawLatin9Char(x, y, latin_text[c], color);
   }
-  free(buf);
 }
-
-
-// Displays all chars and a sample text
-char sampletext[] = "Lorem ipsum dolor sit amet,\
-consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,\
-quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.\
-Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.\
-Excepteur sint occaecat cupidatat non proident,\
-sunt in culpa qui officia deserunt mollit anim id est laborum.On the other hand, \
-we denounce with righteous indignation and dislike men who are so beguiled and demoralized\
- by the charms of pleasure of the moment, so blinded by desire, that they cannot foresee the pain and trouble\
-  that are bound to ensue; and equal blame belongs to those who fail in their duty through weakness of will,\
-   which is the same as saying through shrinking from toil and pain. These cases are perfectly simple and easy to distinguish.\
-    In a free hour, when our power of choice is untrammelled and when nothing prevents our being able to do what we like best, \
-    every pleasure is to be welcomed and every pain avoided. But in certain circumstances and owing to the claims of duty \
-    or the obligations of business it will frequently occur that pleasures have to be repudiated and annoyances accepted. \
-    The wise man therefore always holds in these matters to this principle of selection:\
-     he rejects pleasures to secure other greater pleasures, or else he endures pains to avoid worse pains.";
-     
 
 void displayCharset() {
   static char hex[] = "0123456789ABCDEF";
-  const GFXfont *font = getCurrentFont();
+  const GFXfont *font = Paint_GetFont();
 
   uint16_t gridx = display_width() / 17;
   uint16_t gridy = display_height() / 17;
   for (uint16_t y = 0; y < 16; ++y)
 
-    Paint_DrawLatin9Char(0, (gridy * 2) + y * gridy, hex[y], BLACK);
+    DrawLatin9Char(0, (gridy * 2) + y * gridy, hex[y], BLACK);
   for (uint16_t x = 0; x < 16; ++x)
-    Paint_DrawLatin9Char(gridx + x * gridx, gridy, hex[x], 0);
+    DrawLatin9Char(gridx + x * gridx, gridy, hex[x], 0);
   for (uint16_t y = 0; y < 16; ++y) {
     for (uint16_t x = 0; x < 16; ++x) {
-      Paint_DrawLatin9Char(gridx + x * gridx, (gridy * 2) + y * gridy,
+      DrawLatin9Char(gridx + x * gridx, (gridy * 2) + y * gridy,
                            y * 16 + x, BLACK);
     }
   }
 }
 
+// Displays all chars and a sample text
+const char *sampletext[] = {"Lorem ipsum dolor sit amet",
+                            "Départ à l'heure français",
+                            "pingüino mañana emoción", "glück lächeln groß"};
+
 void displaySampleText() {
-   const GFXfont *font = getCurrentFont();
-    uint16_t posy = font->yAdvance;
-  uint16_t posx = 0;
-  uint32_t pos = 0;
-  do {
-    posx += Paint_DrawLatin9Char(posx, posy, sampletext[pos], BLACK);
-    if (posx > (display_width() - 20)) {
-      posx = 0;
-      posy += font->yAdvance;
-    }
-    ++pos;
-  } while (sampletext[pos] != 0);
+  const GFXfont *font = Paint_GetFont();
+  uint8_t numtext = sizeof(sampletext) / sizeof(const char *);
+  uint16_t height = numtext * font->yAdvance;
+  uint16_t leftx = 0;
+  uint16_t lefty = font->yAdvance;
+
+  uint16_t rightx = display_width();
+  uint16_t righty = display_height() - height;
+
+  uint16_t centerx = display_width() / 2;
+  uint16_t centery = (display_height() - height) / 2;
+
+  for (uint8_t idx = 0; idx < numtext; ++idx) {
+    lefty += Paint_DrawText(leftx, lefty, (const uint8_t*)sampletext[idx], BLACK, LEFT);
+    righty += Paint_DrawText(rightx, righty, (const uint8_t*)sampletext[idx], BLACK, RIGHT);
+    centery += Paint_DrawText(centerx, centery, (const uint8_t*)sampletext[idx], BLACK, CENTER);
+  }
 }
 
+// single public function
+int16_t Paint_DrawText(int16_t x, int16_t y, const uint8_t *text, uint8_t color,
+                       JUSTIFICATION justification) {
+  const GFXfont *font = Paint_GetFont();
+  uint16_t width = 0;
+  uint16_t height = 0;
+  uint16_t latin_length = Utf8ToLatin(text);
+  const uint8_t *latintext = GetLatinText();
+  GetLatinTextBounds(latintext, &width, &height);
+  int16_t xpos = (justification == LEFT)
+                     ? x
+                     : (justification == RIGHT ? (x - width) : x - (width / 2));
+  DrawLatinString(xpos, y, latintext, color);
+  return font->yAdvance;
+}
 
+void Paint_GetGlyphBounds(uint8_t latinchar, uint16_t *width, uint16_t *height) {
+  const GFXfont *font = Paint_GetFont();
+  if ((latinchar < font->first) || (latinchar > font->last)) {
+    return;
+  }
+  latinchar -= (uint8_t)font->first;
+  GFXglyph *glyph = font->glyph + latinchar;
+  uint16_t bo = glyph->bitmapOffset;
+  *width += glyph->xAdvance;
+  *height = font->yAdvance;
+}
+
+void GetLatinTextBounds(const uint8_t *latintext, uint16_t *w,
+                              uint16_t *h) {
+  uint16_t latin_length = strlen((const char*)latintext);
+  *w = 0;
+  *h = 0;
+  for (uint16_t c = 0; c < latin_length; ++c) {
+    Paint_GetGlyphBounds(latintext[c], w, h);
+  }
+}
+
+void Paint_GetTextBounds(const uint8_t* text, uint16_t* width, uint16_t* height) {
+  uint16_t latinlength = Utf8ToLatin(text);
+  const uint8_t *latintext = GetLatinText();
+  GetLatinTextBounds(latintext, width, height);
+}

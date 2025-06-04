@@ -4,13 +4,22 @@
 #include <cstdint>
 #include <gfxfont.h>
 
+enum JUSTIFICATION {
+    LEFT,
+    RIGHT,
+    CENTER
+};
 
-const GFXfont* getDefaultFont();
-const GFXfont* getCurrentFont();
+const GFXfont* Paint_GetDefaultFont();
+const GFXfont* Paint_GetFont();
+void Paint_SetFont(const GFXfont* font);
 
-int16_t Paint_DrawLatin9Char(int16_t x, int16_t y, uint8_t c, uint8_t colorfg);
-void Paint_DrawUtf8String(int16_t x, int16_t y, const char *utf8, uint8_t colorfg);
+/// draws UTF8 text
+int16_t Paint_DrawText(int16_t x, int16_t y, const uint8_t* text, uint8_t color, JUSTIFICATION justification = LEFT); 
 
+// fills width
+void Paint_GetTextBounds(const uint8_t* text, uint16_t* width, uint16_t* height);
+void Paint_GetGlyphBounds(uint8_t latinchar, uint16_t *width, uint16_t *height);
 
 void displayCharset();
 void displaySampleText();
