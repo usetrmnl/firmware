@@ -6,9 +6,9 @@
 #include <ImageData.h>
 #include <config.h>
 #include <display.h>
-#include <trmnl_log.h>
 #include <drawfont.h>
-
+#include <fonts.h>
+#include <trmnl_log.h>
 
 /**
  * @brief Function to init the display
@@ -231,6 +231,67 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG) {
   BlackImage = NULL;
 }
 
+// utility function to display text in a rectangle
+void DisplayShowMessage(int16_t x, int16_t y, uint16_t width, uint16_t height,
+                        const char *message[], uint16_t numtext,
+                        JUSTIFICATION justification) {
+  const GFXfont *font = Paint_GetFont();
+#if defined(DEBUG_TEXT_LAYOUT)
+Log_info(" %d %d %dx%d",x, y, width, height);
+  Paint_DrawRectangle(x, y, x + width, y + height, BLACK, DOT_PIXEL_2X2,
+                      DRAW_FILL_EMPTY);
+  Paint_DrawLine(x, y, x + width, y + height, BLACK, DOT_PIXEL_DFT,
+                 LINE_STYLE_DOTTED);
+
+  Paint_DrawLine(x, y + height, x + width, y, BLACK, DOT_PIXEL_DFT,
+                 LINE_STYLE_DOTTED);
+#endif
+  uint16_t textheight = numtext * font->yAdvance;
+  // find max width
+  uint16_t textwidth = 0;
+  for (uint16_t t = 0; t < numtext; ++t) {
+    uint16_t twidth = 0, theight = 0;
+    Paint_GetTextBounds((const uint8_t *)message[t], &twidth, &theight);
+    if (twidth > textwidth)
+      textwidth = twidth;
+  }
+  // center in the whole box
+  int16_t newx = x + (width - textwidth) / 2;
+  int16_t newy = y + (height - textheight) / 2;
+  uint16_t newwidth = textwidth;
+  uint16_t newheight = textheight;
+#if defined(DEBUG_TEXT_LAYOUT)
+  Paint_DrawRectangle(newx, newy, newx + newwidth, newy + newheight, BLACK,
+                      DOT_PIXEL_DFT, DRAW_FILL_EMPTY);
+
+#endif
+
+  int16_t ypos = newy;
+  for (uint8_t t = 0; t < numtext; ++t) {
+    int16_t xpos = 0;
+    uint16_t twidth, theight;
+    Paint_GetTextBounds((const uint8_t *)message[t], &twidth, &theight);
+    switch (justification) {
+    case LEFT:
+      xpos = newx;
+      break;
+    case RIGHT:
+      xpos = newx + textwidth - twidth;
+      break;
+    case CENTER:
+      xpos = newx + ((textwidth - twidth) / 2);
+      break;
+    }
+#if defined(DEBUG_TEXT_LAYOUT)
+    Paint_DrawPoint(xpos, ypos, BLACK, DOT_PIXEL_3X3, DOT_FILL_RIGHTUP);
+    Paint_DrawRectangle(xpos, ypos, xpos + twidth, ypos + theight, BLACK,
+                        DOT_PIXEL_DFT, DRAW_FILL_EMPTY);
+#endif
+    ypos +=
+        Paint_DrawText(xpos, ypos, (const uint8_t *)message[t], BLACK, LEFT);
+  }
+}
+
 /**
  * @brief Function to show the image with message on the display
  * @param image_buffer pointer to the uint8_t image buffer
@@ -258,20 +319,43 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type) {
   Paint_SelectImage(BlackImage);
   Paint_Clear(WHITE);
   Paint_DrawBitMap(image_buffer + 62);
+#if defined(GFX_FONT)
+  // center text horizontally and start after the logo
+  uint16_t logoheight = 100;
+  uint16_t margin = 20;
+  // logo is centered
+  int16_t xpos = margin;
+  uint16_t availablewidth = display_width() - (2 * margin);
+  int16_t ypos = (display_height() / 2) + (logoheight / 2) + margin;
+  uint16_t availableheight = (display_height() - logoheight) / 2 - (2 * margin);
+#endif
+
   switch (message_type) {
   case WIFI_CONNECT: {
-    char string1[] = "Connect to TRMNL WiFi";
-    Paint_DrawString_EN((800 - sizeof(string1) * 17 > 9)
+#if !defined (GFX_FONT)
+     char string1[] = "Connect to TRMNL WiFi";
+    char string2[] = "on your phone or computer";
+  Paint_DrawString_EN((800 - sizeof(string1) * 17 > 9)
                             ? (800 - sizeof(string1) * 17) / 2 + 9
                             : 0,
                         400, string1, &Font24, WHITE, BLACK);
-    char string2[] = "on your phone or computer";
+
     Paint_DrawString_EN((800 - sizeof(string2) * 17 > 9)
                             ? (800 - sizeof(string2) * 17) / 2 + 9
                             : 0,
                         430, string2, &Font24, WHITE, BLACK);
+#else
+    const char *strings[] = {"Connect to TRMNL WiFi",
+                             "on your phone or computer"};
+    uint8_t numtext = sizeof(strings) / sizeof(const char *);
+    Paint_DrawRectangle(xpos, ypos, xpos + availablewidth,
+                        ypos + availableheight, BLACK, DOT_PIXEL_2X2,
+                        DRAW_FILL_EMPTY);
+    DisplayShowMessage(xpos, ypos, availablewidth, availableheight, strings, numtext, CENTER);
+#endif
   } break;
   case WIFI_FAILED: {
+#if !defined (GFX_FONT)
     char string1[] = "Can't establish WiFi";
     Paint_DrawString_EN((800 - sizeof(string1) * 17 > 9)
                             ? (800 - sizeof(string1) * 17) / 2 + 9
@@ -292,8 +376,23 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type) {
                             ? (800 - sizeof(string4) * 17) / 2 + 9
                             : 0,
                         430, string4, &Font24, WHITE, BLACK);
-
     Paint_DrawImage(wifi_failed_qr, 640, 337, 130, 130);
+#else
+    const char *strings[] = { "Can't establish WiFi",
+                             "connection. Hold button on",
+                            "the back to reset WiFi",
+                          "or scan QR Code for help." };
+   uint8_t numtext = sizeof(strings) / sizeof(const char *);
+   uint16_t qrcodesize = 130;
+   availablewidth = display_width() - qrcodesize - 3 * margin;
+   DisplayShowMessage(xpos, ypos, availablewidth, availableheight, strings, numtext, CENTER);
+   // nicoclean32
+   //DisplayShowMessage(margin, margin, display_width() - 2 * margin, display_height() - 2 * margin, strings, numtext, CENTER);
+      int16_t qrcodex = xpos + availablewidth + margin;
+   int16_t qrcodey = ypos + (availableheight / 2) - (qrcodesize / 2);
+    Paint_DrawImage(wifi_failed_qr, qrcodex, qrcodey, qrcodesize, qrcodesize);
+#endif
+
   } break;
   case WIFI_INTERNAL_ERROR: {
     char string1[] = "WiFi connected, but";

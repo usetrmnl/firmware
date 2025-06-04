@@ -220,20 +220,20 @@ void bl_init(void) {
   // Mount SPIFFS
   filesystem_init();
 
-#if defined(DEBUG_FONT)
-  uint8_t *framebuffer = (uint8_t *)malloc(48000);
-  memset(framebuffer, 0xff, 48000);
-  Paint_NewImage(framebuffer, display_width(), display_height(), 0, WHITE);
-  displayCharset();
-  EPD_7IN5_V2_Display(framebuffer);
-  delay(1000 * 10);
-  memset(framebuffer, 0xff, 48000);
-  displaySampleText();
-  EPD_7IN5_V2_Display(framebuffer);
-  free(framebuffer);
-  delay(1000 * 10);
-   display_show_msg(storedLogoOrDefault(), WIFI_CONNECT);
-   delay(1000 * 10);
+#if defined(GFX_FONT) &&  defined(DEBUG_TEXT)
+  // uint8_t *framebuffer = (uint8_t *)malloc(48000);
+  // memset(framebuffer, 0xff, 48000);
+  // Paint_NewImage(framebuffer, display_width(), display_height(), 0, WHITE);
+  // displayCharset();
+  // EPD_7IN5_V2_Display(framebuffer);
+  // delay(1000 * 10);
+  // memset(framebuffer, 0xff, 48000);
+  // displaySampleText();
+  // EPD_7IN5_V2_Display(framebuffer);
+  // free(framebuffer);
+  // delay(1000 * 10);
+   display_show_msg(storedLogoOrDefault(), WIFI_FAILED); // WIFI_CONNECT); 
+   delay(1000 * 30);
 #endif
 
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER) {

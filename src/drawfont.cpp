@@ -1,6 +1,7 @@
 #include <GUI_Paint.h>
 #include <NicoClean-Regular8.h>
-#include <cstring>
+//#include <NicoClean-Regular16.h>
+//#include <NicoClean-Regular32.h>
 #include <display.h>
 #include <drawfont.h>
 
@@ -179,7 +180,7 @@ int16_t Paint_DrawText(int16_t x, int16_t y, const uint8_t *text, uint8_t color,
   int16_t xpos = (justification == LEFT)
                      ? x
                      : (justification == RIGHT ? (x - width) : x - (width / 2));
-  DrawLatinString(xpos, y, latintext, color);
+  DrawLatinString(xpos, y + font->yAdvance, latintext, color);
   return font->yAdvance;
 }
 
