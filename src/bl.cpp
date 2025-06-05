@@ -220,18 +220,23 @@ void bl_init(void) {
   // Mount SPIFFS
   filesystem_init();
 
-#if defined(GFX_FONT) &&  defined(DEBUG_TEXT)
+#if defined(DEBUG_TEXT)
+#if defined(GFX_FONT) 
   uint8_t *framebuffer = (uint8_t *)malloc(48000);
   memset(framebuffer, 0xff, 48000);
   Paint_NewImage(framebuffer, display_width(), display_height(), 0, WHITE);
   displayCharset();
+   BMPToCustomSerial("charset.bmp", framebuffer);
   EPD_7IN5_V2_Display(framebuffer);
-  delay(1000 * 10);
-  memset(framebuffer, 0xff, 48000);
-  displaySampleText();
-  EPD_7IN5_V2_Display(framebuffer);
-  free(framebuffer);
-  delay(1000 * 10);
+   delay(1000 * 10);
+  // memset(framebuffer, 0xff, 48000);
+  // displaySampleText();
+  // BMPToCustomSerial("sampletext.bmp", framebuffer);
+  // EPD_7IN5_V2_Display(framebuffer);
+  // free(framebuffer);
+  // delay(1000 * 10);
+  #endif
+  // TODO: all screens
    display_show_msg(storedLogoOrDefault(), WIFI_FAILED); // WIFI_CONNECT); 
    delay(1000 * 10);
 #endif
@@ -1686,12 +1691,15 @@ static void checkAndPerformFirmwareUpdate(void) {
  * @return none
  */
 static void goToSleep(void) {
-  WiFi.disconnect(true);
+   WiFi.disconnect(true);
   filesystem_deinit();
   uint32_t time_to_sleep = SLEEP_TIME_TO_SLEEP;
   if (preferences.isKey(PREFERENCES_SLEEP_TIME_KEY))
     time_to_sleep =
         preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP);
+        #if defined(DEBUG_TEXT)
+        time_to_sleep = 60;
+        #endif
   Log.info("%s [%d]: time to sleep - %d\r\n", __FILE__, __LINE__,
            time_to_sleep);
   preferences.putUInt(PREFERENCES_LAST_SLEEP_TIME, getTime());
