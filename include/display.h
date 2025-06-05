@@ -110,6 +110,4 @@ void display_show_msg_api(uint8_t *image_buffer, String message);
  */
 void display_sleep(void);
 
-void BMPToCustomSerial(const char* name, const uint8_t *data);
-
 #endif
