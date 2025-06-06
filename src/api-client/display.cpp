@@ -66,6 +66,9 @@ ApiDisplayResult fetchApiDisplay(ApiDisplayInputs &apiDisplayInputs)
           };
         }
 
+        https->setTimeout(15000);
+        https->setConnectTimeout(15000);
+
         addHeaders(*https, apiDisplayInputs);
 
         delay(5);
