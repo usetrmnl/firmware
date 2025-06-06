@@ -73,7 +73,7 @@ ApiDisplayResult fetchApiDisplay(ApiDisplayInputs &apiDisplayInputs)
         int httpCode = https->GET();
 
         if (httpCode < 0 ||
-            !(httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY))
+            !(httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY || httpCode == HTTP_CODE_TOO_MANY_REQUESTS))
         {
           Log_error("[HTTPS] GET... failed, error: %s", https->errorToString(httpCode).c_str());
 
