@@ -1,5 +1,5 @@
-#include "trmnl_log.h"
 #include "EPD.h"
+#include "trmnl_log.h"
 #include "api-client/submit_log.h"
 #include "driver/gpio.h"
 #include "http_client.h"
@@ -35,7 +35,6 @@
 #include <stdlib.h>
 #include <stored_logs.h>
 #include <types.h>
-
 
 bool pref_clear = false;
 String new_filename = "";
@@ -98,25 +97,15 @@ void log_nvs_usage();
 #define submit_log(format, ...)                                                \
   submitLog(format, getTime(), __LINE__, __FILE__, ##__VA_ARGS__);
 
-void wait_for_serial() {
-#ifdef WAIT_FOR_SERIAL
-  for (int i = 10; i > 0 && !Serial; i--) {
-    Log_info("## Waiting for serial.. %d", i);
-    delay(1000);
-  }
-#endif
-}
-
 /**
  * @brief Function to init business logic module
  * @param none
  * @return none
  */
 void bl_init(void) {
-
   Serial.begin(115200);
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
-  Log_info("BL init success");
+  Log_info("BL init start");
   pins_init();
 
 #if defined(BOARD_SEEED_XIAO_ESP32C3) || defined(BOARD_SEEED_XIAO_ESP32S3)
@@ -134,7 +123,6 @@ void bl_init(void) {
 
   if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO) {
     auto button = read_button_presses();
-    wait_for_serial();
     Log_info("GPIO wakeup (%d) -> button was read (%s)", wakeup_reason,
              ButtonPressResultNames[button]);
     switch (button) {
@@ -150,7 +138,6 @@ void bl_init(void) {
     }
     Log_info("button handling end");
   } else {
-    wait_for_serial();
     Log_info("Non-GPIO wakeup (%d) -> didn't read buttons", wakeup_reason);
   }
 
@@ -220,20 +207,41 @@ void bl_init(void) {
   // Mount SPIFFS
   filesystem_init();
 
-#if defined(GFX_FONT) &&  defined(DEBUG_TEXT)
-  uint8_t *framebuffer = (uint8_t *)malloc(48000);
-  memset(framebuffer, 0xff, 48000);
-  Paint_NewImage(framebuffer, display_width(), display_height(), 0, WHITE);
-  displayCharset();
-  EPD_7IN5_V2_Display(framebuffer);
+#if defined(DEBUG_TEXT)
+   Log_info("Starting display messages visual test");
+  display_show_msg(storedLogoOrDefault(), WIFI_FAILED);
+ delay(1000 * 10);
+  display_show_msg(storedLogoOrDefault(), WIFI_WEAK);
   delay(1000 * 10);
-  memset(framebuffer, 0xff, 48000);
-  displaySampleText();
-  EPD_7IN5_V2_Display(framebuffer);
-  free(framebuffer);
+  display_show_msg(storedLogoOrDefault(), WIFI_INTERNAL_ERROR);
   delay(1000 * 10);
-   display_show_msg(storedLogoOrDefault(), WIFI_FAILED); // WIFI_CONNECT); 
-   delay(1000 * 10);
+  display_show_msg(storedLogoOrDefault(), API_ERROR);
+  delay(1000 * 10);
+  display_show_msg(storedLogoOrDefault(), API_SIZE_ERROR);
+  delay(1000 * 10);
+  display_show_msg(storedLogoOrDefault(), FW_UPDATE);
+  delay(1000 * 10);
+  display_show_msg(storedLogoOrDefault(), FW_UPDATE_FAILED);
+  delay(1000 * 10);
+  display_show_msg(storedLogoOrDefault(), FW_UPDATE_SUCCESS);
+  delay(1000 * 10);
+  display_show_msg(storedLogoOrDefault(), BMP_FORMAT_ERROR);
+  delay(1000 * 10);
+  display_show_msg(storedLogoOrDefault(), TEST);
+  delay(1000 * 10);
+
+  const char loremipsum[] =
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit,sed do eiusmod "
+      "tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim\n "
+      "veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea "
+      "commodo consequat. ";
+  display_show_msg(storedLogoOrDefault(), FRIENDLY_ID, "123456", true,
+                   "1.5.6 ßétà", "");
+  delay(1000 * 10);
+  display_show_msg(storedLogoOrDefault(), MAC_NOT_REGISTERED, "123456", true,
+                   "1.5.6 ßétà2", loremipsum);
+  delay(1000 * 10);
+  Log_info("Done display messages test");
 #endif
 
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER) {
@@ -293,16 +301,10 @@ void bl_init(void) {
     // WiFi credentials are not saved - start captive portal
     Log.info("%s [%d]: WiFi NOT saved\r\n", __FILE__, __LINE__);
 
-    char fw_version[20];
+    
+    Log.info("%s [%d]: FW version %s\r\n", __FILE__, __LINE__, GetFirmwareVersionString());
 
-    sprintf(fw_version, "%d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION,
-            FW_PATCH_VERSION);
-
-    String fw = fw_version;
-
-    Log.info("%s [%d]: FW version %s\r\n", __FILE__, __LINE__, fw_version);
-
-    showMessageWithLogo(WIFI_CONNECT, "", false, fw.c_str(), "");
+    showMessageWithLogo(WIFI_CONNECT, "", false, (const char*)GetFirmwareVersionString(), "");
     WifiCaptivePortal.setResetSettingsCallback(resetDeviceCredentials);
     res = WifiCaptivePortal.startPortal();
     if (!res) {
@@ -1387,17 +1389,13 @@ static void getDeviceCredentials() {
              preferences.getString(PREFERENCES_API_URL, API_BASE_URL).c_str());
       strcat(new_url, "/api/setup/");
 
-      char fw_version[30];
-      sprintf(fw_version, "%d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION,
-              FW_PATCH_VERSION);
-
       if (https.begin(*client, new_url)) { // HTTPS
         Log.info("%s [%d]: RSSI: %d\r\n", __FILE__, __LINE__, WiFi.RSSI());
         Log.info("%s [%d]: [HTTPS] GET...\r\n", __FILE__, __LINE__);
         // start connection and send HTTP header
 
         https.addHeader("ID", WiFi.macAddress());
-        https.addHeader("FW-Version", fw_version);
+        https.addHeader("FW-Version", (const char*)GetFirmwareVersionString());
         Log.info("%s [%d]: Device MAC address: %s\r\n", __FILE__, __LINE__,
                  WiFi.macAddress().c_str());
 

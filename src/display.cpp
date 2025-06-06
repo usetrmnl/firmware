@@ -9,6 +9,16 @@
 #include <drawfont.h>
 #include <fonts.h>
 #include <trmnl_log.h>
+#include <vector>
+#include <string>
+
+uint16_t logofullheight = 80;
+uint16_t fwoffset = 0;
+uint16_t logoheight = 80;
+uint16_t logowidth = 384;
+uint16_t marginx = 50;
+uint16_t marginy = 20;
+uint16_t qrcodesize = 130;
 
 /**
  * @brief Function to init the display
@@ -62,10 +72,11 @@ uint16_t display_width() { return EPD_7IN5_V2_WIDTH; }
  * @param is_center_aligned If true, center the text; if false, left-align
  * @return none
  */
-void Paint_DrawMultilineText(UWORD x_start, UWORD y_start, const char *message,
-                             uint16_t max_width, uint16_t font_width,
-                             UWORD color_fg, UWORD color_bg, sFONT *font,
-                             bool is_center_aligned) {
+void Paint_DrawMultilineTextOld(UWORD x_start, UWORD y_start,
+                                const char *message, uint16_t max_width,
+                                uint16_t font_width, UWORD color_fg,
+                                UWORD color_bg, sFONT *font,
+                                bool is_center_aligned) {
   uint16_t display_width_pixels = max_width;
   int max_chars_per_line = display_width_pixels / font_width;
 
@@ -225,73 +236,20 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG) {
     Paint_DrawBitMap(image_buffer + 62);
   }
   EPD_7IN5_V2_Display(BlackImage);
-  Log_info("display");
+  Log_info("Display done");
 
   free(BlackImage);
   BlackImage = NULL;
 }
 
-// utility function to display text in a rectangle
-void DisplayShowMessage(int16_t x, int16_t y, uint16_t width, uint16_t height,
-                        const char *message[], uint16_t numtext,
-                        JUSTIFICATION justification) {
-  const GFXfont *font = Paint_GetFont();
-#if defined(DEBUG_TEXT_LAYOUT)
-Log_info(" %d %d %dx%d",x, y, width, height);
-  Paint_DrawRectangle(x, y, x + width, y + height, BLACK, DOT_PIXEL_2X2,
-                      DRAW_FILL_EMPTY);
-  Paint_DrawLine(x, y, x + width, y + height, BLACK, DOT_PIXEL_DFT,
-                 LINE_STYLE_DOTTED);
-
-  Paint_DrawLine(x, y + height, x + width, y, BLACK, DOT_PIXEL_DFT,
-                 LINE_STYLE_DOTTED);
-#endif
-  uint16_t textheight = numtext * font->yAdvance;
-  // find max width
-  uint16_t textwidth = 0;
-  for (uint16_t t = 0; t < numtext; ++t) {
-    uint16_t twidth = 0, theight = 0;
-    Paint_GetTextBounds((const uint8_t *)message[t], &twidth, &theight);
-    if (twidth > textwidth)
-      textwidth = twidth;
+static uint8_t fw_version[20] = {0};
+const uint8_t *GetFirmwareVersionString() {
+  if (fw_version[0] == 0) {
+    sprintf((char*)fw_version, "%d.%d.%d", FW_MAJOR_VERSION, FW_MINOR_VERSION,
+            FW_PATCH_VERSION);
   }
-  // center in the whole box
-  int16_t newx = x + (width - textwidth) / 2;
-  int16_t newy = y + (height - textheight) / 2;
-  uint16_t newwidth = textwidth;
-  uint16_t newheight = textheight;
-#if defined(DEBUG_TEXT_LAYOUT)
-  Paint_DrawRectangle(newx, newy, newx + newwidth, newy + newheight, BLACK,
-                      DOT_PIXEL_DFT, DRAW_FILL_EMPTY);
-
-#endif
-
-  int16_t ypos = newy;
-  for (uint8_t t = 0; t < numtext; ++t) {
-    int16_t xpos = 0;
-    uint16_t twidth, theight;
-    Paint_GetTextBounds((const uint8_t *)message[t], &twidth, &theight);
-    switch (justification) {
-    case LEFT:
-      xpos = newx;
-      break;
-    case RIGHT:
-      xpos = newx + textwidth - twidth;
-      break;
-    case CENTER:
-      xpos = newx + ((textwidth - twidth) / 2);
-      break;
-    }
-#if defined(DEBUG_TEXT_LAYOUT)
-    Paint_DrawPoint(xpos, ypos, BLACK, DOT_PIXEL_3X3, DOT_FILL_RIGHTUP);
-    Paint_DrawRectangle(xpos, ypos, xpos + twidth, ypos + theight, BLACK,
-                        DOT_PIXEL_DFT, DRAW_FILL_EMPTY);
-#endif
-    ypos +=
-        Paint_DrawText(xpos, ypos, (const uint8_t *)message[t], BLACK, LEFT);
-  }
+  return fw_version;
 }
-
 /**
  * @brief Function to show the image with message on the display
  * @param image_buffer pointer to the uint8_t image buffer
@@ -299,6 +257,7 @@ Log_info(" %d %d %dx%d",x, y, width, height);
  * @return none
  */
 void display_show_msg(uint8_t *image_buffer, MSG message_type) {
+  Log_info("display_show_msg %d", (uint16_t)message_type);
   auto width = display_width();
   auto height = display_height();
   UBYTE *BlackImage;
@@ -319,182 +278,105 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type) {
   Paint_SelectImage(BlackImage);
   Paint_Clear(WHITE);
   Paint_DrawBitMap(image_buffer + 62);
-#if defined(GFX_FONT)
   // center text horizontally and start after the logo
-  uint16_t logoheight = 100;
-  uint16_t margin = 20;
-  // logo is centered
-  int16_t xpos = margin;
-  uint16_t availablewidth = display_width() - (2 * margin);
-  int16_t ypos = (display_height() / 2) + (logoheight / 2) + margin;
-  uint16_t availableheight = (display_height() - logoheight) / 2 - (2 * margin);
+  uint16_t availablewidth = display_width() / 2 - (2 * marginx);
+uint16_t availableheight =
+      (display_height() - logofullheight) / 2 - (2 * marginy);
+ 
+
+  // place firmware on logo
+  uint8_t fwwidth = LatinTextWidth(GetFirmwareVersionString());
+  int16_t xpos = (display_width() / 2) + (logowidth / 2) - fwwidth;
+  int16_t ypos = (display_height() / 2) + (logoheight / 2) + fwoffset;
+#if defined(DEBUG_TEXT_LAYOUT)
+  Paint_DrawRectangle(xpos, ypos, xpos + availablewidth, ypos + availableheight,
+                      BLACK, DOT_PIXEL_DFT, DRAW_FILL_EMPTY);
 #endif
+  Paint_DrawLatinText(xpos, ypos, GetFirmwareVersionString(), BLACK);
+
+  // replace box for text
+ xpos = display_width() / 4 + marginx;
+ ypos = (display_height() / 2) + (logoheight / 2) + marginy;
+
 
   switch (message_type) {
   case WIFI_CONNECT: {
-#if !defined (GFX_FONT)
-     char string1[] = "Connect to TRMNL WiFi";
-    char string2[] = "on your phone or computer";
-  Paint_DrawString_EN((800 - sizeof(string1) * 17 > 9)
-                            ? (800 - sizeof(string1) * 17) / 2 + 9
-                            : 0,
-                        400, string1, &Font24, WHITE, BLACK);
-
-    Paint_DrawString_EN((800 - sizeof(string2) * 17 > 9)
-                            ? (800 - sizeof(string2) * 17) / 2 + 9
-                            : 0,
-                        430, string2, &Font24, WHITE, BLACK);
-#else
     const char *strings[] = {"Connect to TRMNL WiFi",
                              "on your phone or computer"};
     uint8_t numtext = sizeof(strings) / sizeof(const char *);
-    Paint_DrawRectangle(xpos, ypos, xpos + availablewidth,
-                        ypos + availableheight, BLACK, DOT_PIXEL_2X2,
-                        DRAW_FILL_EMPTY);
-    DisplayShowMessage(xpos, ypos, availablewidth, availableheight, strings, numtext, CENTER);
-#endif
+    Paint_DrawTextLines(xpos, ypos, availablewidth, availableheight,
+                        (const uint8_t **)strings, numtext, BLACK, CENTER);
   } break;
   case WIFI_FAILED: {
-#if !defined (GFX_FONT)
-    char string1[] = "Can't establish WiFi";
-    Paint_DrawString_EN((800 - sizeof(string1) * 17 > 9)
-                            ? (800 - sizeof(string1) * 17) / 2 + 9
-                            : 0,
-                        340, string1, &Font24, WHITE, BLACK);
-    char string2[] = "connection. Hold button on";
-    Paint_DrawString_EN((800 - sizeof(string2) * 17 > 9)
-                            ? (800 - sizeof(string2) * 17) / 2 + 9
-                            : 0,
-                        370, string2, &Font24, WHITE, BLACK);
-    char string3[] = "the back to reset WiFi";
-    Paint_DrawString_EN((800 - sizeof(string3) * 17 > 9)
-                            ? (800 - sizeof(string3) * 17) / 2 + 9
-                            : 0,
-                        400, string3, &Font24, WHITE, BLACK);
-    char string4[] = "or scan QR Code for help.";
-    Paint_DrawString_EN((800 - sizeof(string4) * 17 > 9)
-                            ? (800 - sizeof(string4) * 17) / 2 + 9
-                            : 0,
-                        430, string4, &Font24, WHITE, BLACK);
-    Paint_DrawImage(wifi_failed_qr, 640, 337, 130, 130);
-#else
-    const char *strings[] = { "Can't establish WiFi",
-                             "connection. Hold button on",
-                            "the back to reset WiFi",
-                          "or scan QR Code for help." };
-   uint8_t numtext = sizeof(strings) / sizeof(const char *);
-   uint16_t qrcodesize = 130;
-   availablewidth = display_width() - qrcodesize - 3 * margin;
-   DisplayShowMessage(xpos, ypos, availablewidth, availableheight, strings, numtext, CENTER);
-   // nicoclean32
-   //DisplayShowMessage(margin, margin, display_width() - 2 * margin, display_height() - 2 * margin, strings, numtext, CENTER);
-      int16_t qrcodex = xpos + availablewidth + margin;
-   int16_t qrcodey = ypos + (availableheight / 2) - (qrcodesize / 2);
+    const char *strings[] = {
+        "Can't establish WiFi", "connection. Hold button on",
+        "the back to reset WiFi", "or scan QR Code for help."};
+    uint8_t numtext = sizeof(strings) / sizeof(const char *);
+    Paint_DrawTextLines(xpos, ypos, availablewidth, availableheight,
+                        (const uint8_t **)strings, numtext, BLACK, CENTER);
+    int16_t qrcodex = display_width() - marginx - qrcodesize;
+    int16_t qrcodey = ypos + (availableheight / 2) - (qrcodesize / 2);
     Paint_DrawImage(wifi_failed_qr, qrcodex, qrcodey, qrcodesize, qrcodesize);
-#endif
 
   } break;
   case WIFI_INTERNAL_ERROR: {
-    char string1[] = "WiFi connected, but";
-    Paint_DrawString_EN((800 - sizeof(string1) > 9) * 17
-                            ? (800 - sizeof(string1) * 17) / 2 + 9
-                            : 0,
-                        340, string1, &Font24, WHITE, BLACK);
-    char string2[] = "API connection cannot be";
-    Paint_DrawString_EN((800 - sizeof(string2) > 9) * 17
-                            ? (800 - sizeof(string2) * 17) / 2 + 9
-                            : 0,
-                        370, string2, &Font24, WHITE, BLACK);
-    char string3[] = "established. Try to refresh,";
-    Paint_DrawString_EN((800 - sizeof(string3) > 9) * 17
-                            ? (800 - sizeof(string3) * 17) / 2 + 9
-                            : 0,
-                        400, string3, &Font24, WHITE, BLACK);
-    char string4[] = "or scan QR Code for help.";
-    Paint_DrawString_EN((800 - sizeof(string4) > 9) * 17
-                            ? (800 - sizeof(string4) * 17) / 2 + 9
-                            : 0,
-                        430, string4, &Font24, WHITE, BLACK);
-
-    Paint_DrawImage(wifi_failed_qr, 640, 337, 130, 130);
+    const char *strings[] = {"WiFi connected, but", "API connection cannot be",
+                             "established. Try to refresh,",
+                             "or scan QR Code for help."};
+    uint8_t numtext = sizeof(strings) / sizeof(const char *);
+    Paint_DrawTextLines(xpos, ypos, availablewidth, availableheight,
+                        (const uint8_t **)strings, numtext, BLACK, CENTER);
+    int16_t qrcodex = display_width() - marginx - qrcodesize;
+    int16_t qrcodey = ypos + (availableheight / 2) - (qrcodesize / 2);
+    Paint_DrawImage(wifi_failed_qr, qrcodex, qrcodey, qrcodesize, qrcodesize);
   } break;
   case WIFI_WEAK: {
-    char string1[] = "WiFi connected but signal is weak";
-    Paint_DrawString_EN((800 - sizeof(string1) > 9) * 17
-                            ? (800 - sizeof(string1) * 17) / 2 + 9
-                            : 0,
-                        400, string1, &Font24, WHITE, BLACK);
+    const char *strings[] = {"WiFi connected but signal is weak"};
+    uint8_t numtext = sizeof(strings) / sizeof(const char *);
+    Paint_DrawTextLines(xpos, ypos, availablewidth, availableheight,
+                        (const uint8_t **)strings, numtext, BLACK, CENTER);
   } break;
   case API_ERROR: {
-    char string1[] = "WiFi connected, TRMNL not responding.";
-    Paint_DrawString_EN((800 - sizeof(string1) > 9) * 17
-                            ? (800 - sizeof(string1) * 17) / 2 + 9
-                            : 0,
-                        340, string1, &Font24, WHITE, BLACK);
-    char string2[] = "Short click the button on back,";
-    Paint_DrawString_EN((800 - sizeof(string2) > 9) * 17
-                            ? (800 - sizeof(string2) * 17) / 2 + 9
-                            : 0,
-                        400, string2, &Font24, WHITE, BLACK);
-    char string3[] = "otherwise check your internet.";
-    Paint_DrawString_EN((800 - sizeof(string3) > 9) * 17
-                            ? (800 - sizeof(string3) * 17) / 2 + 9
-                            : 0,
-                        430, string3, &Font24, WHITE, BLACK);
+    const char *strings[] = {"WiFi connected, TRMNL not responding.",
+                             "Short click the button on back,",
+                             "otherwise check your internet."};
+    uint8_t numtext = sizeof(strings) / sizeof(const char *);
+    Paint_DrawTextLines(xpos, ypos, availablewidth, availableheight,
+                        (const uint8_t **)strings, numtext, BLACK, CENTER);
   } break;
   case API_SIZE_ERROR: {
-    char string1[] = "WiFi connected, TRMNL content malformed.";
-    Paint_DrawString_EN((800 - sizeof(string1) > 9) * 17
-                            ? (800 - sizeof(string1) * 17) / 2 + 9
-                            : 0,
-                        400, string1, &Font24, WHITE, BLACK);
-    char string2[] = "Wait or reset by holding button on back.";
-    Paint_DrawString_EN((800 - sizeof(string2) > 9) * 17
-                            ? (800 - sizeof(string2) * 17) / 2 + 9
-                            : 0,
-                        430, string2, &Font24, WHITE, BLACK);
+    const char *strings[] = {"WiFi connected, TRMNL content malformed."};
+    uint8_t numtext = sizeof(strings) / sizeof(const char *);
+    Paint_DrawTextLines(xpos, ypos, availablewidth, availableheight,
+                        (const uint8_t **)strings, numtext, BLACK, CENTER);
   } break;
   case FW_UPDATE: {
-    char string1[] = "Firmware update available! Starting now...";
-    Paint_DrawString_EN((800 - sizeof(string1) > 9) * 17
-                            ? (800 - sizeof(string1) * 17) / 2 + 9
-                            : 0,
-                        400, string1, &Font24, WHITE, BLACK);
+    const char *strings[] = {"Firmware update available! Starting now..."};
+    uint8_t numtext = sizeof(strings) / sizeof(const char *);
+    Paint_DrawTextLines(xpos, ypos, availablewidth, availableheight,
+                        (const uint8_t **)strings, numtext, BLACK, CENTER);
   } break;
   case FW_UPDATE_FAILED: {
-    char string1[] = "Firmware update failed. Device will restart...";
-    Paint_DrawString_EN((800 - sizeof(string1) > 9) * 17
-                            ? (800 - sizeof(string1) * 17) / 2 + 9
-                            : 0,
-                        400, string1, &Font24, WHITE, BLACK);
+    const char *strings[] = {"Firmware update failed. Device will restart..."};
+    uint8_t numtext = sizeof(strings) / sizeof(const char *);
+    Paint_DrawTextLines(xpos, ypos, availablewidth, availableheight,
+                        (const uint8_t **)strings, numtext, BLACK, CENTER);
   } break;
   case FW_UPDATE_SUCCESS: {
-    char string1[] = "Firmware update success. Device will restart..";
-    Paint_DrawString_EN((800 - sizeof(string1) > 9) * 17
-                            ? (800 - sizeof(string1) * 17) / 2 + 9
-                            : 0,
-                        400, string1, &Font24, WHITE, BLACK);
+    const char *strings[] = {"Firmware update success. Device will restart.."};
+    uint8_t numtext = sizeof(strings) / sizeof(const char *);
+    Paint_DrawTextLines(xpos, ypos, availablewidth, availableheight,
+                        (const uint8_t **)strings, numtext, BLACK, CENTER);
   } break;
   case BMP_FORMAT_ERROR: {
-    char string1[] = "The image format is incorrect";
-    Paint_DrawString_EN((800 - sizeof(string1) > 9) * 17
-                            ? (800 - sizeof(string1) * 17) / 2 + 9
-                            : 0,
-                        400, string1, &Font24, WHITE, BLACK);
+    const char *strings[] = {"The image format is incorrect"};
+    uint8_t numtext = sizeof(strings) / sizeof(const char *);
+    Paint_DrawTextLines(xpos, ypos, availablewidth, availableheight,
+                        (const uint8_t **)strings, numtext, BLACK, CENTER);
   } break;
   case TEST: {
-    Paint_DrawString_EN(0, 0,
-                        "ABCDEFGHIYABCDEFGHIYABCDEFGHIYABCDEFGHIYABCDEFGHIY",
-                        &Font24, WHITE, BLACK);
-    Paint_DrawString_EN(0, 40,
-                        "abcdefghiyabcdefghiyabcdefghiyabcdefghiyabcdefghiy",
-                        &Font24, WHITE, BLACK);
-    Paint_DrawString_EN(0, 80,
-                        "A B C D E F G H I Y A B C D E F G H I Y A B C D E",
-                        &Font24, WHITE, BLACK);
-    Paint_DrawString_EN(0, 120,
-                        "a b c d e f g h i y a b c d e f g h i y a b c d e",
-                        &Font24, WHITE, BLACK);
+    Paint_Charset();
+   // Paint_Layout();
   } break;
   default:
     break;
@@ -519,6 +401,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type) {
 void display_show_msg(uint8_t *image_buffer, MSG message_type,
                       String friendly_id, bool id, const char *fw_version,
                       String message) {
+  Log_info("display_show_msg  with FW %d", (uint16_t)message_type);
   if (message_type == WIFI_CONNECT) {
     Log_info("Display set to white");
     EPD_7IN5_V2_ClearWhite();
@@ -541,69 +424,72 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type,
   Log_info("Paint_NewImage");
   Paint_NewImage(BlackImage, width, height, 0, WHITE);
 
-  Log_info("show image for array");
   Paint_SelectImage(BlackImage);
   Paint_Clear(WHITE);
   Paint_DrawBitMap(image_buffer + 62);
+
+  // center text horizontally and start after the logo
+  uint16_t availableheight =
+      (display_height() - logofullheight) / 2 - (2 * marginy);
+  uint16_t availablewidth = display_width() / 2 - (2 * marginx);
+ 
+  // place firmware on logo
+  uint8_t fwwidth = LatinTextWidth(GetFirmwareVersionString());
+  int16_t xpos = (display_width() / 2) + (logowidth / 2) - fwwidth;
+  int16_t ypos = (display_height() / 2) + (logoheight / 2) + fwoffset;
+#if defined(DEBUG_TEXT_LAYOUT)
+  Paint_DrawRectangle(xpos, ypos, xpos + availablewidth, ypos + availableheight,
+                      BLACK, DOT_PIXEL_DFT, DRAW_FILL_EMPTY);
+#endif
+  Paint_DrawLatinText(xpos, ypos, GetFirmwareVersionString(), BLACK);
+
+  // replace
+   xpos = display_width() / 4 + marginx;
+   ypos = (display_height() / 2) + (logoheight / 2) + marginy;
+
   switch (message_type) {
-  case FRIENDLY_ID: {
+    case FRIENDLY_ID: {
     Log_info("friendly id case");
-    char string1[] = "Please sign up at usetrmnl.com/signup";
-    Paint_DrawString_EN((800 - sizeof(string1) * 17 > 9)
-                            ? (800 - sizeof(string1) * 17) / 2 + 9
-                            : 0,
-                        400, string1, &Font24, WHITE, BLACK);
-
-    String string2 = "with Friendly ID ";
+    String stringid("with Friendly ID ");
     if (id) {
-      string2 += friendly_id;
+      stringid += friendly_id;
     }
-    string2 += " to finish setup";
-    Paint_DrawString_EN((800 - string2.length() * 17 > 9)
-                            ? (800 - string2.length() * 17) / 2 + 9
-                            : 0,
-                        430, string2.c_str(), &Font24, WHITE, BLACK);
-  } break;
-  case WIFI_CONNECT: {
-    Log_info("wifi connect case");
-
-    String string1 = "FW: ";
-    string1 += fw_version;
-    Paint_DrawString_EN((800 - string1.length() * 17 > 9)
-                            ? (800 - string1.length() * 17) / 2 + 9
-                            : 0,
-                        340, string1.c_str(), &Font24, WHITE, BLACK);
-    char string2[] = "Connect phone or computer";
-    Paint_DrawString_EN((800 - sizeof(string2) * 17 > 9)
-                            ? (800 - sizeof(string2) * 17) / 2 + 9
-                            : 0,
-                        370, string2, &Font24, WHITE, BLACK);
-    char string3[] = "to \"TRMNL\" WiFi network";
-    Paint_DrawString_EN((800 - sizeof(string3) * 17 > 9)
-                            ? (800 - sizeof(string3) * 17) / 2 + 9
-                            : 0,
-                        400, string3, &Font24, WHITE, BLACK);
-    char string4[] = "or scan QR code for help.";
-    Paint_DrawString_EN((800 - sizeof(string4) * 17 > 9)
-                            ? (800 - sizeof(string4) * 17) / 2 + 9
-                            : 0,
-                        430, string4, &Font24, WHITE, BLACK);
-
-    Paint_DrawImage(wifi_connect_qr, 640, 337, 130, 130);
-  } break;
-  case MAC_NOT_REGISTERED: {
-    UWORD y_start = 340;
-    Paint_DrawMultilineText(0, y_start, message.c_str(), width, Font24.Width,
-                            WHITE, BLACK, &Font24, true);
-  } break;
-  default:
-    break;
+    stringid += " to finish setup";
+    const char *strings[] = {"Please sign up at usetrmnl.com/signup",
+                             stringid.c_str()};
+    uint16_t numtext = sizeof(strings) / sizeof(const char *);
+    Paint_DrawTextLines(xpos, ypos, availablewidth, availableheight,
+                        (const uint8_t **)strings, numtext, BLACK, CENTER);
   }
-  Log_info("Start drawing...");
-  EPD_7IN5_V2_Display(BlackImage);
-  Log_info("display");
-  free(BlackImage);
-  BlackImage = NULL;
+  break;
+case WIFI_CONNECT: {
+  Log_info("wifi connect case");
+  const char *strings[] = { "Connect phone or computer",
+                           "to \"TRMNL\" WiFi network",
+                           "or scan QR code for help."};
+  uint16_t numtext = sizeof(strings) / sizeof(const char *);
+  Paint_DrawTextLines(xpos, ypos, availablewidth, availableheight,
+                      (const uint8_t **)strings, numtext, BLACK, CENTER);
+  int16_t qrcodex = display_width() - marginx - qrcodesize;
+  int16_t qrcodey = ypos + (availableheight / 2) - (qrcodesize / 2);
+  Paint_DrawImage(wifi_connect_qr, qrcodex, qrcodey, qrcodesize, qrcodesize);
+} break;
+case MAC_NOT_REGISTERED: {
+  Log_info("mac_not_registered case");
+  // no more than 1/2 of the width for the text
+  xpos = display_width() / 4;
+  availablewidth = display_width() / 2;
+  Paint_DrawMultilineText(xpos, ypos, availablewidth, availableheight,
+                          (uint8_t *)message.c_str(), BLACK, CENTER);
+} break;
+default:
+  break;
+}
+Log_info("Start drawing...");
+EPD_7IN5_V2_Display(BlackImage);
+Log_info("Done");
+free(BlackImage);
+BlackImage = NULL;
 }
 
 /**
