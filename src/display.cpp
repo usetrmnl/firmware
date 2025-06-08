@@ -11,7 +11,7 @@
 #include <trmnl_log.h>
 
 
-#if defined(DEBUG_TEXT) && defined(DEBUG_TEXT_LAYOUT) 
+#if defined(DEBUG_TEXT) 
 void display_debug_text();
 #endif
 
@@ -38,7 +38,7 @@ void display_init(void) {
   EPD_7IN5_V2_Init_New();
   Log_info("screen hw end");
 
-#if defined(DEBUG_TEXT) && defined(DEBUG_TEXT_LAYOUT) 
+#if defined(DEBUG_TEXT)
   display_debug_text();
 #endif
 }
@@ -494,7 +494,7 @@ void display_sleep(void) {
   EPD_7IN5B_V2_Sleep();
 }
 
-#if defined(DEBUG_TEXT) && defined(DEBUG_TEXT_LAYOUT) 
+#if defined(DEBUG_TEXT)
 const char loremipsum[] =
     "Lorem ipsum dolor sit amet, consectetur adipiscing elit,\nsed do eiusmod "
     "tempor incididunt ut labore et dolore magna aliqua.\nUt enim ad minim "
