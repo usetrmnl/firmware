@@ -1,44 +1,45 @@
 #ifndef DRAWFONT_H
 #define DRAWFONT_H
 
+#include "config.h"
 #include <cstdint>
 #include <gfxfont.h>
 
-enum JUSTIFICATION {
-    LEFT,
-    RIGHT,
-    TOP,
-    BOTTOM,
-    CENTER,
-    FIT  // nt used yet
+enum ANCHOR {
+  TOPLEFT,
+  TOP,
+  TOPRIGHT,
+  RIGHT,
+  BOTTOMRIGTH,
+  BOTTOM,
+  BOTTOMLEFT,
+  LEFT,
+  CENTER
 };
 
-const GFXfont* Paint_GetDefaultFont();
-const GFXfont* Paint_GetFont();
-void Paint_SetFont(const GFXfont* font);
+const GFXfont *Paint_GetDefaultFont();
+const GFXfont *Paint_GetFont();
+void Paint_SetFont(const GFXfont *font);
 
-uint16_t LatinTextWidth(const uint8_t *text);
+const GFXglyph *Paint_GetGlyph(uint16_t code);
 
-/// UTF8 text
-// draws a single line, returns the vertical offset to next line
-int16_t Paint_DrawText(int16_t x, int16_t y, uint8_t* text, uint8_t color); 
-int16_t Paint_DrawLatinText(int16_t x, int16_t y, const uint8_t* text, uint8_t color); 
+// returns horizontal advance to next char
+int16_t Paint_DrawGlyph(uint16_t c, int16_t x, int16_t y, uint8_t color);
+/// UTF8 public functions
+// draws a single line
+void Paint_DrawTextAt(const char *text, int16_t x, int16_t y, uint8_t color,
+                      ANCHOR anchor = CENTER);
 
-// draws given lines justified in a box
-void Paint_DrawTextLines(int16_t x, int16_t y, uint16_t width, uint16_t height,
-                         const uint8_t *lines[], uint16_t numlines, uint8_t color,
-                         JUSTIFICATION hjustification = CENTER,
-                         JUSTIFICATION vjustification = CENTER);
-                        
-// draws given lines, handles CR and word-wrap
-void Paint_DrawMultilineText(int16_t x, int16_t y, uint16_t width, uint16_t height,
-                        uint8_t *text, uint8_t color, JUSTIFICATION justification, JUSTIFICATION vjustification = CENTER);
-                        
+void Paint_DrawTextRect(const char *text, int16_t x, int16_t y, uint16_t width,
+                        uint16_t height, uint8_t color, ANCHOR anchor = CENTER);
 
-// fills width
-void Paint_GetTextBounds(const uint8_t* text, uint16_t* width, uint16_t* height);
-void Paint_GetGlyphBounds(uint8_t latinchar, uint16_t *width, uint16_t *height);
+void Paint_GetTextInfo(const char *utf8text, uint16_t *numlines,
+                       uint16_t *maxwidth, uint16_t *maxheight,
+                       uint16_t *lineheight);
+// utf8
+char *Utf8ToLatin(const char **utf8text, uint16_t *len); // makes a copy
+void Paint_DrawLatinText(const char *s, int16_t len, int16_t x, int16_t y, uint8_t color = BLACK);
+// demo
+void Demo_Charset();
 
-void Paint_Charset();
-void Paint_Layout();
 #endif

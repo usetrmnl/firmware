@@ -207,43 +207,6 @@ void bl_init(void) {
   // Mount SPIFFS
   filesystem_init();
 
-#if defined(DEBUG_TEXT)
-   Log_info("Starting display messages visual test");
-  display_show_msg(storedLogoOrDefault(), WIFI_FAILED);
- delay(1000 * 10);
-  display_show_msg(storedLogoOrDefault(), WIFI_WEAK);
-  delay(1000 * 10);
-  display_show_msg(storedLogoOrDefault(), WIFI_INTERNAL_ERROR);
-  delay(1000 * 10);
-  display_show_msg(storedLogoOrDefault(), API_ERROR);
-  delay(1000 * 10);
-  display_show_msg(storedLogoOrDefault(), API_SIZE_ERROR);
-  delay(1000 * 10);
-  display_show_msg(storedLogoOrDefault(), FW_UPDATE);
-  delay(1000 * 10);
-  display_show_msg(storedLogoOrDefault(), FW_UPDATE_FAILED);
-  delay(1000 * 10);
-  display_show_msg(storedLogoOrDefault(), FW_UPDATE_SUCCESS);
-  delay(1000 * 10);
-  display_show_msg(storedLogoOrDefault(), BMP_FORMAT_ERROR);
-  delay(1000 * 10);
-  display_show_msg(storedLogoOrDefault(), TEST);
-  delay(1000 * 10);
-
-  const char loremipsum[] =
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit,sed do eiusmod "
-      "tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim\n "
-      "veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea "
-      "commodo consequat. ";
-  display_show_msg(storedLogoOrDefault(), FRIENDLY_ID, "123456", true,
-                   "1.5.6 ßétà", "");
-  delay(1000 * 10);
-  display_show_msg(storedLogoOrDefault(), MAC_NOT_REGISTERED, "123456", true,
-                   "1.5.6 ßétà2", loremipsum);
-  delay(1000 * 10);
-  Log_info("Done display messages test");
-#endif
-
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER) {
     Log.info("%s [%d]: Display TRMNL logo start\r\n", __FILE__, __LINE__);
 
