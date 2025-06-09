@@ -72,6 +72,8 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 
 #define BUTTON_HOLD_TIME 5000
 
+#define BUTTON_SOFT_RESET_TIME 15000
+
 #define SERVER_MAX_RETRIES 3
 
 #define API_BASE_URL "https://trmnl.app"

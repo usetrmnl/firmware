@@ -2,7 +2,8 @@ enum ButtonPressResult
 {
   LongPress,
   DoubleClick,
-  NoAction
+  NoAction,
+  SoftReset
 };
 extern const char *ButtonPressResultNames[3];
 

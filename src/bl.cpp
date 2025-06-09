@@ -137,6 +137,8 @@ void bl_init(void)
       break;
     case NoAction:
       break;
+    case SoftReset:
+      resetDeviceCredentials();
     }
     Log_info("button handling end");
   }
