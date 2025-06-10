@@ -128,7 +128,7 @@ int16_t Paint_DrawGlyph(uint16_t c, int16_t x, int16_t y, uint8_t color) {
   int8_t yo = glyph->yOffset;
   uint8_t xx, yy, bits = 0, bit = 0;
 
-#if defined(DEBUG_TEXT) && defined(DEBUG_TEXT_LAYOUT)
+#if defined(DEBUG_TEXT) && defined(DEBUG_GLYPH_LAYOUT)
 Paint_DrawRectangle(x, y - font->yAdvance, x + glyph->xAdvance, y, BLACK, DOT_PIXEL_DFT, DRAW_FILL_EMPTY);
 Paint_DrawRectangle(x + xo, y + yo, x + xo + w, y + yo + h, BLACK, DOT_PIXEL_DFT, DRAW_FILL_EMPTY);
 #endif

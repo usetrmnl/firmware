@@ -10,8 +10,7 @@
 #include <fonts.h>
 #include <trmnl_log.h>
 
-
-#if defined(DEBUG_TEXT) 
+#if defined(DEBUG_TEXT)
 void display_debug_text();
 #endif
 
@@ -19,9 +18,9 @@ uint16_t logofullheight = 80;
 uint16_t fw_offset = 0;
 uint16_t logoheight = 40;
 uint16_t logowidth = 384;
-uint16_t marginx = 20;
-uint16_t marginy = 20;
-uint16_t marginbottom = 20; // some pixels are hidden
+int16_t marginx = 20;
+int16_t marginy = 20;
+int16_t marginbottom = 20; // some pixels are hidden
 uint16_t qrcodesize = 130;
 
 /**
@@ -283,6 +282,73 @@ static void Paint_FirmwareVersion() {
   Paint_DrawTextAt(fw_text, fw_centerx, fw_centery, BLACK);
 }
 
+typedef struct UserMessage {
+  MSG msg; // the MSG
+  const char *text;
+} UserMessage;
+
+// order does not matter we search for the MSG..
+UserMessage messages[] = {
+    {WIFI_CONNECT, "Connect phone or computer to\n\"TRMNL\" WiFi network},\n"
+                   "or scan QR code for help."},
+    {WIFI_FAILED, "Can't establish WiFi connection.\n Hold button on "
+                  " the back to reset WiFi\nor scan QR Code for help."},
+    {WIFI_WEAK, "WiFi connected but signal is weak"},
+    {WIFI_INTERNAL_ERROR,
+     "WiFi connected, but API connection cannot be established.\n"
+     "Try to refresh or scan QR Code for help."},
+    {API_ERROR, "WiFi connected, but TRMNL not responding.\n"
+                "Short click the button on back, "
+                "otherwise check your internet."},
+    {API_SIZE_ERROR, "WiFi connected, TRMNL content malformed."},
+    {FW_UPDATE, "Firmware update !\nStarting now..."},
+    {FW_UPDATE_FAILED, "Firmware update failed.\nDevice will restart..."},
+    {FW_UPDATE_SUCCESS, "Firmware update success.\n Device will restart.."},
+    {BMP_FORMAT_ERROR, "The image format is incorrect"}};
+
+const char *GetUserMessage(MSG msg) {
+  uint8_t nmsg = sizeof(messages) / sizeof(UserMessage);
+  for (uint8_t m = 0; m < nmsg; ++m) {
+    if (messages[m].msg == msg) {
+      return messages[m].text;
+    }
+  }
+  return nullptr;
+}
+
+// centered below logo but has space for the optional qrcode on the right
+// all displayed messages are centered in the same bbox
+void GetTextBBox(int16_t *left, int16_t *top, uint16_t *width,
+                 uint16_t *height) {
+  uint16_t dwidth = (uint16_t)display_width();
+  uint16_t dheight = (uint16_t)display_height();
+  *width = dwidth - (qrcodesize * 2 + marginx) * 4;
+  *height = (dheight - logofullheight) / 2 - (2 * marginy) - marginbottom;
+  *left = (dwidth - *width) / 2;
+  *top = ((dheight + logofullheight) / 2) + marginy - marginbottom;
+#if defined(DEBUG_TEXT) && defined(DEBUG_TEXT_LAYOUT)
+  Paint_DrawRectangle(*left, *top, *left + *width, *top + *height, BLACK,
+                      DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
+  Paint_DrawLine(dwidth / 2, 0, dwidth / 2, dheight, BLACK, DOT_PIXEL_DFT,
+                 LINE_STYLE_DOTTED);
+
+#endif
+}
+
+void GetQrCodeCenter(int16_t *centerx, int16_t *centery) {
+  // aligned with bbox center in y, so same value
+   uint16_t dwidth = (uint16_t)display_width();
+  uint16_t dheight = (uint16_t)display_height();
+  uint16_t height = (dheight - logofullheight) / 2 - (2 * marginy) - marginbottom;
+  int16_t top = ((dheight + logofullheight) / 2) + marginy - marginbottom;
+  *centery = top + height / 2;
+  *centerx = dwidth - marginx - qrcodesize / 2;
+#if defined(DEBUG_TEXT) && defined(DEBUG_TEXT_LAYOUT)
+  Paint_DrawLine(0, *centery, dwidth, *centery, BLACK, DOT_PIXEL_2X2,
+                 LINE_STYLE_DOTTED);
+#endif
+}
+
 /**
  * @brief Function to show the image with message on the display
  * @param image_buffer pointer to the uint8_t image buffer
@@ -312,77 +378,26 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type) {
   Paint_DrawBitMap(image_buffer + 62);
   Paint_FirmwareVersion();
 
-  // text horizontally and start after the logo
-  int16_t width = dwidth / 2 - (2 * marginx);
-  int16_t height =
-      (dheight - logofullheight) / 2 - (2 * marginy) - marginbottom;
+  // text is  below the logo
+  // default box to show text in
+  int16_t left, top = 0; 
+  uint16_t width, height = 0;
+  // center of qrcode
+  int16_t qrcenterx, qrcentery = 0;
 
-  // box to show text in
-  int16_t xpos = dwidth / 4 + marginx;
-  int16_t ypos = (dheight / 2) + (logofullheight / 2) + marginy - marginbottom;
+  GetTextBBox(&left, &top, &width, &height);
+  GetQrCodeCenter(&qrcenterx, &qrcentery);
 
-  int16_t centery = dheight - (height / 2) - marginy - marginbottom;
-
-  int16_t qrcodex = dwidth - marginx - qrcodesize;
-  int16_t qrcodey = centery - qrcodesize / 2;
-
-  switch (message_type) {
-  case WIFI_CONNECT: {
-    const char text[] = "Connect to TRMNL WiFi\n"
-                        "on your phone or computer";
-    Paint_DrawTextRect(text, xpos, ypos, width, height, BLACK);
-  } break;
-  case WIFI_FAILED: {
-    const char text[] = "Can't establish WiFi connection.\n Hold button on "
-                        " the back to reset WiFi\nor scan QR Code for help.";
-    Paint_DrawTextRect(text, xpos, ypos, width, height, BLACK);
-    Paint_DrawImage(wifi_failed_qr, qrcodex, qrcodey, qrcodesize, qrcodesize);
-  } break;
-  case WIFI_INTERNAL_ERROR: {
-    const char text[] =
-        "WiFi connected, but API connection cannot be established.\n"
-        "Try to refresh or scan QR Code for help.";
-    Paint_DrawTextRect(text, xpos, ypos, width, height, BLACK);
-    Paint_DrawImage(wifi_failed_qr, qrcodex, qrcodey, qrcodesize, qrcodesize);
-  } break;
-  case WIFI_WEAK: {
-    const char text[] = "WiFi connected but signal is weak";
-    Paint_DrawTextRect(text, xpos, ypos, width, height, BLACK);
-  } break;
-  case API_ERROR: {
-    const char text[] = "WiFi connected, but TRMNL not responding.\n"
-                        "Short click the button on back, "
-                        "otherwise check your internet.";
-    Paint_DrawTextRect(text, xpos, ypos, width, height, BLACK);
-  } break;
-  case API_SIZE_ERROR: {
-    const char text[] = "WiFi connected, TRMNL content malformed.";
-    Paint_DrawTextRect(text, xpos, ypos, width, height, BLACK);
-  } break;
-  case FW_UPDATE: {
-    const char text[] = "Firmware update !\nStarting now...";
-    Paint_DrawTextRect(text, xpos, ypos, width, height, BLACK);
-  } break;
-  case FW_UPDATE_FAILED: {
-    const char text[] = "Firmware update failed.\nDevice will restart...";
-    Paint_DrawTextRect(text, xpos, ypos, width, height, BLACK);
-  } break;
-  case FW_UPDATE_SUCCESS: {
-    const char text[] = "Firmware update success.\n Device will restart..";
-    Paint_DrawTextRect(text, xpos, ypos, width, height, BLACK);
-  } break;
-  case BMP_FORMAT_ERROR: {
-    const char text[] = "The image format is incorrect";
-    Paint_DrawTextRect(text, xpos, ypos, width, height, BLACK);
-  } break;
-  case TEST: {
-    Demo_Charset();
-    Paint_DrawTextAt("abcdefg\nhijklmno", 100, 100, BLACK);
-  } break;
-  default:
-    break;
+  const char *text = GetUserMessage(message_type);
+  if (text) {
+    Paint_DrawTextRect(text, left, top, width, height, BLACK);
   }
-
+  if ((message_type == WIFI_FAILED) || (message_type == WIFI_INTERNAL_ERROR)) {
+    Paint_DrawImage(wifi_failed_qr, qrcenterx - (qrcodesize / 2),
+                    qrcentery - (qrcodesize / 2), qrcodesize, qrcodesize);
+  } else if (message_type == TEST) {
+    Demo_Charset();
+  }
   EPD_7IN5_V2_Display(BlackImage);
   Log_info("display");
   free(BlackImage);
@@ -431,51 +446,33 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type,
   Paint_DrawBitMap(image_buffer + 62);
 
   Paint_FirmwareVersion();
+  // text is  below the logo
+  // default box to show text in
+  int16_t left, top = 0;
+  uint16_t width, height = 0;
+  // center of qrcode
+  int16_t qrcenterx, qrcentery = 0;
 
-  // text horizontally and start after the logo
-  int16_t width = dwidth / 2 - (2 * marginx);
-  int16_t height =
-      (dheight - logofullheight) / 2 - (2 * marginy) - marginbottom;
+  GetTextBBox(&left, &top, &width, &height);
+  GetQrCodeCenter(&qrcenterx, &qrcentery);
 
-  int16_t centerx = dwidth / 2;
-  int16_t centery = dheight - (height / 2) - marginy - marginbottom;
-
-  // box to show text in
-  // box to show text in
-  int16_t xpos = dwidth / 4 + marginx;
-  int16_t ypos = (dheight / 2) + (logofullheight / 2) + marginy;
-
-#if defined(DEBUG_TEXT) && defined(DEBUG_TEXT_LAYOUT)
-  Paint_DrawLine(0, centery, dwidth, centery, BLACK, DOT_PIXEL_2X2,
-                 LINE_STYLE_DOTTED);
-  Paint_DrawLine(centerx, 0, centerx, dheight, BLACK, DOT_PIXEL_2X2,
-                 LINE_STYLE_DOTTED);
-#endif
-
-  switch (message_type) {
-  case FRIENDLY_ID: {
+  const char *text = GetUserMessage(message_type);
+  if (text) {
+    Paint_DrawTextRect(text, left, top, width, height, BLACK);
+  }
+  if (message_type == FRIENDLY_ID) {
     Log_info("friendly id case");
     String message("Please sign up at usetrmnl.com/signup\nwith Friendly ID ");
     message += id ? friendly_id : "";
     message += "\nto finish setup";
-    Paint_DrawTextRect(message.c_str(), xpos, ypos, width, height, BLACK);
-  } break;
-  case WIFI_CONNECT: {
-    Log_info("wifi connect case");
-    const char *text = "Connect phone or computer to\n\"TRMNL\" WiFi network,\n"
-                       "or scan QR code for help.";
-    Paint_DrawTextRect(text, xpos, ypos, width, height, BLACK);
-    int16_t qrcodex = display_width() - marginx - qrcodesize;
-    int16_t qrcodey = centery - qrcodesize / 2;
-    Paint_DrawImage(wifi_connect_qr, qrcodex, qrcodey, qrcodesize, qrcodesize);
-
-  } break;
-  case MAC_NOT_REGISTERED: {
+    Paint_DrawTextRect(message.c_str(), left, top, width, height, BLACK);
+  } else if (message_type == MAC_NOT_REGISTERED) {
     Log_info("mac_not_registered case");
-    Paint_DrawTextRect(message.c_str(), xpos, ypos, width, height, BLACK);
-  } break;
-  default:
-    break;
+    Paint_DrawTextRect(message.c_str(), left, top, width, height, BLACK);
+  } else if (message_type == WIFI_CONNECT) {
+       Paint_DrawImage(wifi_connect_qr, qrcenterx - (qrcodesize / 2),
+                    qrcentery - (qrcodesize / 2), qrcodesize, qrcodesize);
+
   }
   Log_info("Start drawing...");
   EPD_7IN5_V2_Display(BlackImage);
@@ -502,36 +499,35 @@ const char loremipsum[] =
     "commodo consequat. ";
 
 void display_debug_text() {
-Log_info("Starting display messages visual test");
-uint8_t* background = (uint8_t*)default_icon;
-display_show_msg(background, WIFI_FAILED);
-delay(1000 * 10);
-display_show_msg(background, WIFI_WEAK);
-delay(1000 * 10);
-display_show_msg(background, WIFI_INTERNAL_ERROR);
-delay(1000 * 10);
-display_show_msg(background, API_ERROR);
-delay(1000 * 10);
-display_show_msg(background, API_SIZE_ERROR);
-delay(1000 * 10);
-display_show_msg(background, FW_UPDATE);
-delay(1000 * 10);
-display_show_msg(background, FW_UPDATE_FAILED);
-delay(1000 * 10);
-display_show_msg(background, FW_UPDATE_SUCCESS);
-delay(1000 * 10);
-display_show_msg(background, BMP_FORMAT_ERROR);
-delay(1000 * 10);
-display_show_msg(background, TEST);
-delay(1000 * 10);
+  Log_info("Starting display messages visual test");
+  uint8_t *background = (uint8_t *)default_icon;
+  display_show_msg(background, WIFI_FAILED);
+  delay(1000 * 10);
+  display_show_msg(background, WIFI_WEAK);
+  delay(1000 * 10);
+  display_show_msg(background, WIFI_INTERNAL_ERROR);
+  delay(1000 * 10);
+  display_show_msg(background, API_ERROR);
+  delay(1000 * 10);
+  display_show_msg(background, API_SIZE_ERROR);
+  delay(1000 * 10);
+  display_show_msg(background, FW_UPDATE);
+  delay(1000 * 10);
+  display_show_msg(background, FW_UPDATE_FAILED);
+  delay(1000 * 10);
+  display_show_msg(background, FW_UPDATE_SUCCESS);
+  delay(1000 * 10);
+  display_show_msg(background, BMP_FORMAT_ERROR);
+  delay(1000 * 10);
+  display_show_msg(background, TEST);
+  delay(1000 * 10);
 
+  display_show_msg(background, FRIENDLY_ID, "123456", true, "1.5.6 ßétà", "");
+  delay(1000 * 10);
+  display_show_msg(background, MAC_NOT_REGISTERED, "123456", true,
+                   "1.5.6 ßétà2", loremipsum);
+  delay(1000 * 10);
 
-display_show_msg(background, FRIENDLY_ID, "123456", true, "1.5.6 ßétà", "");
-delay(1000 * 10);
-display_show_msg(background, MAC_NOT_REGISTERED, "123456", true, "1.5.6 ßétà2",
-                 loremipsum);
-delay(1000 * 10);
-
-Log_info("Done display messages test");
+  Log_info("Done display messages test");
 }
 #endif
