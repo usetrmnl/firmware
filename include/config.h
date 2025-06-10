@@ -78,4 +78,6 @@ enum WIFI_CONNECT_RETRY_TIME // Time to sleep before trying to connect to the Wi
 
 #define API_BASE_URL "https://trmnl.app"
 
+const char *GetFirmwareVersionString();
+
 #endif
