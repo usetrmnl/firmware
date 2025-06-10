@@ -1,4 +1,5 @@
-#pragma once
+#if !defined(PNG_H)
+#define PNG_H
 
 #include <PNGdec.h>
 
@@ -15,4 +16,6 @@ enum image_err_e
 
 image_err_e processPNG(PNG *png, uint8_t *&decoded_buffer);
 
-image_err_e decodePNG(uint8_t *buffer, uint8_t *&decoded_buffer);
+image_err_e decodePNGMemory(uint8_t *buffer, uint8_t *&decoded_buffer);
+
+#endif

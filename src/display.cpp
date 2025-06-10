@@ -241,22 +241,12 @@ void display_show_image(uint8_t *image_buffer, bool reverse, bool isPNG)
     if (reverse)
     {
         Log_info("inverse the image");
-        for (size_t i = 0; i < DISPLAY_BMP_IMAGE_SIZE; i++)
+        for (size_t i = 0; i < DEFAULT_IMAGE_SIZE; i++)
         {
             image_buffer[i] = ~image_buffer[i];
         }
     }
-    if (isPNG == true)
-    {
-        Log_info("Drawing PNG");
-        flip_image(image_buffer, width, height);
-        horizontal_mirror(image_buffer, width, height);
-        Paint_DrawBitMap(image_buffer);
-    }
-    else
-    {
-        Paint_DrawBitMap(image_buffer + 62);
-    }
+    Paint_DrawBitMap(image_buffer);
     EPD_7IN5_V2_Display(BlackImage);
     Log_info("display");
 
@@ -291,7 +281,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type)
     Log_info("show image for array");
     Paint_SelectImage(BlackImage);
     Paint_Clear(WHITE);
-    Paint_DrawBitMap(image_buffer + 62);
+    Paint_DrawBitMap(image_buffer);
     switch (message_type)
     {
     case WIFI_CONNECT:
@@ -434,7 +424,7 @@ void display_show_msg(uint8_t *image_buffer, MSG message_type, String friendly_i
     Log_info("show image for array");
     Paint_SelectImage(BlackImage);
     Paint_Clear(WHITE);
-    Paint_DrawBitMap(image_buffer + 62);
+    Paint_DrawBitMap(image_buffer);
     switch (message_type)
     {
     case FRIENDLY_ID:
