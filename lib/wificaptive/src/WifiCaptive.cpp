@@ -593,7 +593,13 @@ bool WifiCaptive::autoConnect()
                 return true;
             }
             WiFi.disconnect();
-            delay(500);
+            
+            // Exponential backoff: 2s, 4s, 8s delays between attempts
+            if (attempt < WIFI_CONNECTION_ATTEMPTS - 1) {
+                uint32_t backoff_delay = 2000 * (1 << attempt); // 2^attempt * 2000ms
+                Log_info("Connection failed, waiting %d ms before retry...", backoff_delay);
+                delay(backoff_delay);
+            }
         }
     }
 
@@ -638,7 +644,13 @@ bool WifiCaptive::autoConnect()
                 return true;
             }
             WiFi.disconnect();
-            delay(2000);
+            
+            // Exponential backoff: 2s, 4s, 8s delays between attempts
+            if (attempt < WIFI_CONNECTION_ATTEMPTS - 1) {
+                uint32_t backoff_delay = 2000 * (1 << attempt); // 2^attempt * 2000ms
+                Log_info("Connection failed, waiting %d ms before retry...", backoff_delay);
+                delay(backoff_delay);
+            }
         }
     }
 
