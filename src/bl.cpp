@@ -80,7 +80,7 @@ static uint8_t *storedLogoOrDefault(void);
 static bool saveCurrentFileName(String &name);
 static bool checkCurrentFileName(String &newName);
 static DeviceStatusStamp getDeviceStatusStamp();
-int submitLog(const char *format, time_t time, int line, const char *file, ...);
+void submitLog(const char *format, time_t time, int line, const char *file, ...);
 void log_nvs_usage();
 
 #define submit_log(format, ...) submitLog(format, getTime(), __LINE__, __FILE__, ##__VA_ARGS__);
@@ -473,7 +473,7 @@ void bl_init(void)
     if (preferences.getInt(PREFERENCES_SLEEP_TIME_KEY, 0) != SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED)
     {
       Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED);
-      size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED);
+      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED);
       Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_PLUGIN_NOT_ATTACHED);
     }
   }
@@ -599,9 +599,7 @@ static https_request_err_e downloadAndShow()
     return apiDisplayResult.error;
   }
 
-  handleApiDisplayResponse(apiDisplayResult.response);
-
-  https_request_err_e result = HTTPS_NO_ERR;
+  https_request_err_e result = handleApiDisplayResponse(apiDisplayResult.response);
 
   auto withHttpResult = withHttp(
       filename,
@@ -1009,7 +1007,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
       if (rate != preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP))
       {
         Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, rate);
-        size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, rate);
+        preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, rate);
         Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
       }
 
@@ -1040,7 +1038,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
     {
       result = HTTPS_RESET;
       Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
-      size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
+      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
       Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
       status = false;
     }
@@ -1096,7 +1094,6 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
               }
               else
               {
-                // don't draw received logo
                 status = false;
               }
             }
@@ -1134,7 +1131,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
           if (rate != preferences.getUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_TO_SLEEP))
           {
             Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, rate);
-            size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, rate);
+            preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, rate);
             Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
           }
           status = false;
@@ -1386,7 +1383,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
     {
       result = HTTPS_NO_REGISTER;
       Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
-      size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
+      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
       Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
       status = false;
     }
@@ -1395,7 +1392,7 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
     {
       result = HTTPS_RESET;
       Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
-      size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
+      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
       Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
       status = false;
     }
@@ -1864,8 +1861,8 @@ static void submitOrSaveLogString(const char *log_buffer, size_t size)
   }
 
   LogApiInput input{api_key, log_buffer};
-  auto result = submitLogToApi(input, preferences.getString(PREFERENCES_API_URL, API_BASE_URL).c_str());
-  if (!result)
+  auto submitLogToApiResult = submitLogToApi(input, preferences.getString(PREFERENCES_API_URL, API_BASE_URL).c_str());
+  if (!submitLogToApiResult)
   {
     Log_info("Was unable to send log to API; saving locally for later.");
     // log not send
@@ -1902,20 +1899,20 @@ static void submitStoredLogs(void)
     Log.error("%s [%d]: %s key not exists.\r\n", __FILE__, __LINE__, PREFERENCES_API_KEY);
   }
 
-  bool result = false;
+  bool submitLogToApiResult = false;
   if (log.length() > 0)
   {
     Log.info("%s [%d]: log string - %s\r\n", __FILE__, __LINE__, log.c_str());
     Log.info("%s [%d]: need to send the log\r\n", __FILE__, __LINE__);
 
     LogApiInput input{api_key, log.c_str()};
-    result = submitLogToApi(input, preferences.getString(PREFERENCES_API_URL, API_BASE_URL).c_str());
+    submitLogToApiResult = submitLogToApi(input, preferences.getString(PREFERENCES_API_URL, API_BASE_URL).c_str());
   }
   else
   {
     Log.info("%s [%d]: no needed to send the log\r\n", __FILE__, __LINE__);
   }
-  if (result == true)
+  if (submitLogToApiResult == true)
   {
     clear_stored_logs(preferences);
   }
@@ -2112,7 +2109,7 @@ DeviceStatusStamp getDeviceStatusStamp()
   return deviceStatus;
 }
 
-int submitLog(const char *format, time_t time, int line, const char *file, ...)
+void submitLog(const char *format, time_t time, int line, const char *file, ...)
 {
   uint32_t log_id = preferences.getUInt(PREFERENCES_LOG_ID_KEY, 1);
 
@@ -2121,7 +2118,7 @@ int submitLog(const char *format, time_t time, int line, const char *file, ...)
   va_list args;
   va_start(args, file);
 
-  int result = vsnprintf(log_message, sizeof(log_message), format, args);
+  vsnprintf(log_message, sizeof(log_message), format, args);
 
   va_end(args);
 
@@ -2142,8 +2139,6 @@ int submitLog(const char *format, time_t time, int line, const char *file, ...)
   submitOrSaveLogString(json_string.c_str(), json_string.length());
 
   preferences.putUInt(PREFERENCES_LOG_ID_KEY, ++log_id);
-
-  return result;
 }
 
 void log_nvs_usage()
