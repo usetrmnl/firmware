@@ -74,7 +74,7 @@ void WifiCaptive::setUpWebserver(AsyncWebServer &server, const IPAddress &localI
 			return request->send(202);
 		} else {
 			// Data structure to store the highest RSSI for each SSID
-            // Warning: DO NOT USE true on this function in an async context! 
+            // Warning: DO NOT USE true on this function in an async context!
 			std::vector<Network> uniqueNetworks = getScannedUniqueNetworks(false);
             std::vector<Network> combinedNetworks = combineNetworks(uniqueNetworks, _savedWifis);
 
@@ -610,7 +610,7 @@ bool WifiCaptive::autoConnect()
     WiFi.mode(WIFI_STA);
     for (auto &network : sortedNetworks)
     {
-        if (network.ssid == "" || (network.ssid == _savedWifis[0].ssid && network.pswd == _savedWifis[0].pswd))
+        if (network.ssid == "" || (network.ssid == _savedWifis[last_used_index].ssid && network.pswd == _savedWifis[last_used_index].pswd))
         {
             continue;
         }
