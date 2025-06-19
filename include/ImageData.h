@@ -32,11 +32,12 @@
 #ifndef IMAGEDATA_H_
 #define IMAGEDATA_H_
 
-#include <Arduino.h>
+#include <inttypes.h>
 
-extern const uint8_t default_icon[];
+extern const uint8_t logo_bmp[];
+extern const uint8_t logo_png[];
 extern const uint8_t wifi_connect_qr[];
 extern const uint8_t wifi_failed_qr[];
 
 #endif
-/* FILE END */
+
