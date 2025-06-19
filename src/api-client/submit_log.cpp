@@ -30,6 +30,10 @@ bool submitLogToApi(LogApiInput &input, const char *api_url)
                     https.addHeader("Accept", "application/json");
                     https.addHeader("Access-Token", input.api_key);
                     https.addHeader("Content-Type", "application/json");
+
+                    https.setTimeout(15000);
+                    https.setConnectTimeout(15000);
+
                     Log_info("Send log - %s", payload.c_str());
                     // start connection and send HTTP header
                     int httpCode = https.POST(payload);
