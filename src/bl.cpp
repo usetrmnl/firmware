@@ -1028,8 +1028,8 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
     case 202:
     {
       result = HTTPS_NO_REGISTER;
-      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
-      size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
+      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, apiResponse.refresh_rate);
+      size_t result = preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, apiResponse.refresh_rate);
       Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
       status = false;
     }
@@ -1382,8 +1382,8 @@ https_request_err_e handleApiDisplayResponse(ApiDisplayResponse &apiResponse)
     case 202:
     {
       result = HTTPS_NO_REGISTER;
-      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, SLEEP_TIME_WHILE_NOT_CONNECTED);
-      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, SLEEP_TIME_WHILE_NOT_CONNECTED);
+      Log.info("%s [%d]: write new refresh rate: %d\r\n", __FILE__, __LINE__, apiResponse.refresh_rate);
+      preferences.putUInt(PREFERENCES_SLEEP_TIME_KEY, apiResponse.refresh_rate);
       Log.info("%s [%d]: written new refresh rate: %d\r\n", __FILE__, __LINE__, result);
       status = false;
     }
