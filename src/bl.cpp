@@ -565,26 +565,39 @@ ApiDisplayInputs loadApiDisplayInputs(Preferences &preferences)
  */
 static https_request_err_e downloadAndShow()
 {
-  IPAddress serverIP;
   String apiHostname = preferences.getString(PREFERENCES_API_URL, API_BASE_URL);
   apiHostname.replace("https://", "");
   apiHostname.replace("http://", "");
   apiHostname.replace("/", "");
-  for (int attempt = 1; attempt <= 5; ++attempt)
-  {
-    if (WiFi.hostByName(apiHostname.c_str(), serverIP) == 1)
+
+  // Remove port number if present
+  int portIndex = apiHostname.indexOf(':');
+  if (portIndex != -1) {
+    apiHostname = apiHostname.substring(0, portIndex);
+  }
+
+  IPAddress serverIP;
+  // Check if the hostname is already an IP address
+  if (serverIP.fromString(apiHostname)) {
+    Log.info("%s [%d]: Using direct IP address: %s\r\n", __FILE__, __LINE__, serverIP.toString().c_str());
+  } else {
+    // Only perform DNS resolution if it's not an IP address
+    for (int attempt = 1; attempt <= 5; ++attempt)
     {
-      Log.info("%s [%d]: Hostname resolved to %s on attempt %d\r\n", __FILE__, __LINE__, serverIP.toString().c_str(), attempt);
-      break;
-    }
-    else
-    {
-      Log.error("%s [%d]: Failed to resolve hostname on attempt %d\r\n", __FILE__, __LINE__, attempt);
-      if (attempt == 5)
+      if (WiFi.hostByName(apiHostname.c_str(), serverIP) == 1)
       {
-        submit_log("Failed to resolve hostname after 5 attempts, continuing...");
+        Log.info("%s [%d]: Hostname resolved to %s on attempt %d\r\n", __FILE__, __LINE__, serverIP.toString().c_str(), attempt);
+        break;
       }
-      delay(2000);
+      else
+      {
+        Log.error("%s [%d]: Failed to resolve hostname on attempt %d\r\n", __FILE__, __LINE__, attempt);
+        if (attempt == 5)
+        {
+          submit_log("Failed to resolve hostname after 5 attempts, continuing...");
+        }
+        delay(2000);
+      }
     }
   }
 
